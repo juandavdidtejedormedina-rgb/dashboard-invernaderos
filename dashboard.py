@@ -497,7 +497,7 @@ def cargar_datos(ruta_bytes):
         return pd.DataFrame()
 
     try:
-        xls = pd.ExcelFile(io.BytesIO(ruta_bytes))
+        xls = pd.ExcelFile(io.BytesIO(ruta_bytes), engine="openpyxl")
         registros = []
 
         for sheet in [s for s in xls.sheet_names if s.lower() != 'plantilla']:
