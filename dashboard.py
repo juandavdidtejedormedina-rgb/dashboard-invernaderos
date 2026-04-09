@@ -457,6 +457,7 @@ div[data-testid="stDataFrame"] {{
 # --- COPIA DESDE AQUÍ HASTA EL FINAL DEL BLOQUE ---
 
 # 1. Aplicar Estilos CSS para Pantalla Ancha y Colores
+# --- REEMPLAZA EL BLOQUE DE ESTILOS Y LOGO POR ESTE ---
 st.markdown(f"""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@500;600;700;800&family=Roboto:wght@300;400;500;700&display=swap');
@@ -472,12 +473,15 @@ st.markdown(f"""
     --elite-white: {BRAND_COLORS['white']};
 }}
 
+/* ESTO HACE QUE SE VEA A PANTALLA COMPLETA */
 .main .block-container {{
     max-width: 100% !important;
-    padding: 1rem 2rem !important;
+    padding-left: 2rem !important;
+    padding-right: 2rem !important;
+    padding-top: 1rem !important;
 }}
 
-.stPlotlyChart {{
+.stPlotlyChart, .js-plotly-plot {{
     width: 100% !important;
 }}
 
@@ -486,7 +490,21 @@ header[data-testid="stHeader"] {{
     height: 0rem;
 }}
 </style>
+
+<div class="hero-card">
+    <div class="hero-logo-shell">
+        {logo_html}
+    </div>
+    <div class="hero-copy">
+        <p class="hero-kicker">THE ELITE FLOWER • MANTENIMIENTO Y AUTOMATIZACIÓN</p>
+        <h1>Visualización Variables Invernaderos</h1>
+        <p class="hero-subtitle">
+            Panel ejecutivo para analizar sensores, cortinas y comportamiento operativo por bloque.
+        </p>
+    </div>
+</div>
 """, unsafe_allow_html=True)
+# --- FIN DEL BLOQUE NUEVO ---
 
 # 2. Mostrar el Logo y Título (Hero Card)
 st.markdown(f"""
