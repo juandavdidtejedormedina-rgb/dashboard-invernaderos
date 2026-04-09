@@ -54,7 +54,7 @@ BRAND_COLORS = {
 }
 BRAND_KEYWORDS = ['Bold', 'Caring', 'Creative', 'Inspiring', 'Forward Looking']
 APP_DIR = Path(__file__).resolve().parent
-LOGO_PATH = APP_DIR.parent / 'logo elite.png'
+LOGO_PATH = APP_DIR / 'logo elite.png'
 CORR_AXIS_TITLES = {
     'Temperatura': 'Temp.',
     'Humedad Relativa': 'Humedad',
@@ -448,26 +448,32 @@ st.markdown(
 
 # 2. Selector de archivos en la barra lateral
 st.sidebar.header("Datos fuente")
-st.sidebar.caption("Carga los archivos maestros para habilitar el análisis ejecutivo del bloque.")
+st.sidebar.caption("Carga archivos manualmente o usa los de GitHub por defecto.")
 
-# URLs RAW de GitHub
-URL_VARIABLES = "https://raw.githubusercontent.com/juandavidtejodermedina-rgb/dashboard-invernaderos/main/Datos_variables.xlsx"
-URL_CORTINAS = "https://raw.githubusercontent.com/juandavidtejodermedina-rgb/dashboard-invernaderos/main/Registro_Cortinas_Final.xlsx"
+archivo_variables = st.sidebar.file_uploader("Sube variables (Opcional)", type=["xlsx"])
+archivo_cortinas = st.sidebar.file_uploader("Sube cortinas (Opcional)", type=["xlsx"])
 
-st.sidebar.header("Datos fuente")
-st.sidebar.caption("Carga los archivos maestros o usa los datos por defecto.")
+# Lógica de carga automática
+@st.cache_data(show_spinner="Descargando datos de GitHub...")
+def descargar_desde_github(url):
+    try:
+        response = requests.get(url)
+        response.raise_for_status()
+        return response.content
+    except Exception as e:
+        st.error(f"Error al conectar con GitHub: {e}")
+        return None
 
-archivo_variables = st.sidebar.file_uploader("Sube variables", type=["xlsx"])
-archivo_cortinas = st.sidebar.file_uploader("Sube cortinas", type=["xlsx"])
-if archivo_variables is not None:
+# Asignación de bytes (Prioriza subida manual, luego GitHub)
+if archivo_variables:
     archivo_variables_bytes = archivo_variables.read()
 else:
-    archivo_variables_bytes = requests.get(URL_VARIABLES).content
+    archivo_variables_bytes = descargar_desde_github(URL_VARIABLES)
 
-if archivo_cortinas is not None:
+if archivo_cortinas:
     archivo_cortinas_bytes = archivo_cortinas.read()
 else:
-    archivo_cortinas_bytes = requests.get(URL_CORTINAS).content
+    archivo_cortinas_bytes = descargar_desde_github(URL_CORTINAS)
 
 # 3. Funciones de carga de datos con corrección de FECHAS
 
