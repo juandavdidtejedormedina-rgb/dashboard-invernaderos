@@ -451,7 +451,7 @@ st.sidebar.header("Datos fuente")
 st.sidebar.caption("Carga los archivos maestros para habilitar el análisis ejecutivo del bloque.")
 
 # URLs RAW de GitHub
-URL_VARIABLES = "https://raw.githubusercontent.com/juandavidtejodermedina-rgb/dashboard-invernaderos/main/Datos%20variables.xlsx"
+URL_VARIABLES = "https://raw.githubusercontent.com/juandavidtejodermedina-rgb/dashboard-invernaderos/main/Datos_variables.xlsx"
 URL_CORTINAS = "https://raw.githubusercontent.com/juandavidtejodermedina-rgb/dashboard-invernaderos/main/Registro_Cortinas_Final.xlsx"
 
 st.sidebar.header("Datos fuente")
@@ -810,7 +810,7 @@ def cargar_cortinas(ruta_bytes):
         return pd.DataFrame()
 
     try:
-        xls = pd.ExcelFile(io.BytesIO(ruta_bytes))
+        xls = pd.ExcelFile(io.BytesIO(ruta_bytes), engine="openpyxl")
         registros = []
 
         for sheet in [s for s in xls.sheet_names if s.lower() != 'plantilla']:
