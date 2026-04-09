@@ -462,11 +462,11 @@ def descargar_desde_github(url):
         return None
 
 # 2. Selector de archivos en la barra lateral
-st.sidebar.header("Datos fuente")
-st.sidebar.caption("Usa los archivos de GitHub o sube unos nuevos.")
+st.sidebar.header("Actualmente se estan leyendo datos de la nube, si desea leer otro archivo debe subirlo")
+st.sidebar.caption("Usa los archivos de la nube o sube unos nuevos.")
 
-archivo_variables = st.sidebar.file_uploader("Sube variables (Opcional)", type=["xlsx"])
-archivo_cortinas = st.sidebar.file_uploader("Sube cortinas (Opcional)", type=["xlsx"])
+archivo_variables = st.sidebar.file_uploader("Sube archivo variables (Opcional)", type=["xlsx"])
+archivo_cortinas = st.sidebar.file_uploader("Sube archivo cortinas (Opcional)", type=["xlsx"])
 
 # Lógica de asignación de datos
 if archivo_variables:
