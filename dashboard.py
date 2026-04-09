@@ -446,15 +446,12 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-# 2. Selector de archivos en la barra lateral
-st.sidebar.header("Datos fuente")
-st.sidebar.caption("Carga archivos manualmente o usa los de GitHub por defecto.")
+# --- CONFIGURACIÓN DE URLS (Mover aquí para evitar NameError) ---
+URL_VARIABLES = "https://raw.githubusercontent.com/juandavidtejodermedina-rgb/dashboard-invernaderos/main/Datos_variables.xlsx"
+URL_CORTINAS = "https://raw.githubusercontent.com/juandavidtejodermedina-rgb/dashboard-invernaderos/main/Registro_Cortinas_Final.xlsx"
 
-archivo_variables = st.sidebar.file_uploader("Sube variables (Opcional)", type=["xlsx"])
-archivo_cortinas = st.sidebar.file_uploader("Sube cortinas (Opcional)", type=["xlsx"])
-
-# Lógica de carga automática
-@st.cache_data(show_spinner="Descargando datos de GitHub...")
+# Definición de la función de descarga
+@st.cache_data(show_spinner="Descargando datos desde el repositorio...")
 def descargar_desde_github(url):
     try:
         response = requests.get(url)
@@ -464,7 +461,14 @@ def descargar_desde_github(url):
         st.error(f"Error al conectar con GitHub: {e}")
         return None
 
-# Asignación de bytes (Prioriza subida manual, luego GitHub)
+# 2. Selector de archivos en la barra lateral
+st.sidebar.header("Datos fuente")
+st.sidebar.caption("Usa los archivos de GitHub o sube unos nuevos.")
+
+archivo_variables = st.sidebar.file_uploader("Sube variables (Opcional)", type=["xlsx"])
+archivo_cortinas = st.sidebar.file_uploader("Sube cortinas (Opcional)", type=["xlsx"])
+
+# Lógica de asignación de datos
 if archivo_variables:
     archivo_variables_bytes = archivo_variables.read()
 else:
