@@ -452,7 +452,7 @@ div[data-testid="stDataFrame"] {{
     }}
 }}
 </style>
-""", unsafe_allow_html=True)
+unsafe_allow_html=True)
 # Este bloque dibuja el logo y el título en la pantalla
 # --- COPIA DESDE AQUÍ HASTA EL FINAL DEL BLOQUE ---
 
