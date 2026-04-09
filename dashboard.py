@@ -447,8 +447,8 @@ st.markdown(
 )
 
 # --- CONFIGURACIÓN DE URLS (Mover aquí para evitar NameError) ---
-URL_VARIABLES = "https://github.com/juandavdidtejedormedina-rgb/dashboard-invernaderos/blob/82ca17db550f10446d197e3221b5e0c4b56aba83/Datos_variables.xlsx"
-URL_CORTINAS = "https://github.com/juandavdidtejedormedina-rgb/dashboard-invernaderos/blob/82ca17db550f10446d197e3221b5e0c4b56aba83/Registro_Cortinas_Final.xlsx"
+URL_VARIABLES = "https://raw.githubusercontent.com/juandavdidtejedormedina-rgb/dashboard-invernaderos/main/Datos_variables.xlsx"
+URL_CORTINAS = "https://raw.githubusercontent.com/juandavdidtejedormedina-rgb/dashboard-invernaderos/main/Registro_Cortinas_Final.xlsx"
 
 # Definición de la función de descarga
 @st.cache_data(show_spinner="Descargando datos desde el repositorio...")
