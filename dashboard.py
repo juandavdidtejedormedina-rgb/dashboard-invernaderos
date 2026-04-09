@@ -9,7 +9,11 @@ import html
 import base64
 from pathlib import Path
 from datetime import datetime, timedelta
-
+st.set_page_config(
+    page_title="Monitor Variables B34", 
+    page_icon="📊", 
+    layout="wide"  # Esto es lo que expande la pantalla
+)
 
 def _image_to_base64(image_path):
     try:
