@@ -151,6 +151,28 @@ st.markdown(f"""
     --elite-white: {BRAND_COLORS['white']};
 }}
 
+/* ESTO EXPANDE LA PANTALLA AL 100% */
+.main .block-container {{
+    max-width: 100% !important;
+    padding-left: 2rem !important;
+    padding-right: 2rem !important;
+    padding-top: 1rem !important;
+}}
+
+/* ESTO AJUSTA LAS GRÁFICAS AL ANCHO TOTAL */
+.stPlotlyChart, .js-plotly-plot {{
+    width: 100% !important;
+}}
+
+/* ESTO QUITA LA BARRA SUPERIOR SOBRANTE */
+header[data-testid="stHeader"] {{
+    visibility: hidden;
+    height: 0rem;
+}}
+</style>
+""", unsafe_allow_html=True)
+/* ------------------------------------ */
+""", unsafe_allow_html=True)
 .stApp {{
     background:
         radial-gradient(circle at top right, rgba(194, 223, 234, 0.45), transparent 25%),
