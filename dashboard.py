@@ -450,6 +450,13 @@ st.markdown(
 st.sidebar.header("Datos fuente")
 st.sidebar.caption("Carga los archivos maestros para habilitar el análisis ejecutivo del bloque.")
 
+# URLs RAW de GitHub
+URL_VARIABLES = "https://raw.githubusercontent.com/juandavidtejodermedina-rgb/dashboard-invernaderos/main/Datos%20variables.xlsx"
+URL_CORTINAS = "https://raw.githubusercontent.com/juandavidtejodermedina-rgb/dashboard-invernaderos/main/Registro_Cortinas_Final.xlsx"
+
+st.sidebar.header("Datos fuente")
+st.sidebar.caption("Carga los archivos maestros o usa los datos por defecto.")
+
 archivo_variables = st.sidebar.file_uploader("Sube variables", type=["xlsx"])
 archivo_cortinas = st.sidebar.file_uploader("Sube cortinas", type=["xlsx"])
 
@@ -462,36 +469,6 @@ if archivo_cortinas is not None:
     archivo_cortinas_bytes = archivo_cortinas.read()
 else:
     archivo_cortinas_bytes = requests.get(URL_CORTINAS).content
-# URLs RAW de GitHub (pon las tuyas)
-URL_VARIABLES = "https://raw.githubusercontent.com/TU_USUARIO/dashboard-invernaderos/main/Datos%20variables.xlsx"
-URL_CORTINAS = "https://raw.githubusercontent.com/TU_USUARIO/dashboard-invernaderos/main/Registro_Cortinas_Final.xlsx"
-
-# Descargar archivos automáticamente
-archivo_variables_bytes = requests.get(URL_VARIABLES).content
-archivo_cortinas_bytes = requests.get(URL_CORTINAS).content
-
-archivo_variables_bytes = None
-archivo_cortinas_bytes = None
-
-if archivo_variables is not None:
-    try:
-        archivo_variables.seek(0)
-    except Exception:
-        pass
-    archivo_variables_bytes = archivo_variables.read()
-    st.sidebar.success("Archivo de variables cargado correctamente.")
-else:
-    st.sidebar.info("Sube el archivo de variables para habilitar la lectura ambiental del bloque.")
-
-if archivo_cortinas is not None:
-    try:
-        archivo_cortinas.seek(0)
-    except Exception:
-        pass
-    archivo_cortinas_bytes = archivo_cortinas.read()
-    st.sidebar.success("Archivo de cortinas cargado correctamente.")
-else:
-    st.sidebar.info("Sube el archivo de cortinas para habilitar el seguimiento operativo del bloque.")
 
 # 3. Funciones de carga de datos con corrección de FECHAS
 
