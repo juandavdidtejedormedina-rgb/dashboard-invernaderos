@@ -454,23 +454,57 @@ div[data-testid="stDataFrame"] {{
 </style>
 """, unsafe_allow_html=True)
 # Este bloque dibuja el logo y el título en la pantalla
-st.markdown(
-    f"""
-    <div class="hero-card">
-        <div class="hero-logo-shell">
-            {logo_html}
-        </div>
-        <div class="hero-copy">
-            <p class="hero-kicker">THE ELITE FLOWER • MANTENIMIENTO Y AUTOMATIZACIÓN</p>
-            <h1>Visualizacion Variables Invernaderos</h1>
-            <p class="hero-subtitle">
-                Panel ejecutivo para analizar sensores, cortinas y comportamiento operativo
-                por bloque.
-            </p>
-        </div>
+# --- COPIA DESDE AQUÍ HASTA EL FINAL DEL BLOQUE ---
+
+# 1. Aplicar Estilos CSS para Pantalla Ancha y Colores
+st.markdown(f"""
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@500;600;700;800&family=Roboto:wght@300;400;500;700&display=swap');
+
+:root {{
+    --elite-hero: {BRAND_COLORS['hero']};
+    --elite-sky: {BRAND_COLORS['sky']};
+    --elite-rose: {BRAND_COLORS['rose']};
+    --elite-beige: {BRAND_COLORS['beige']};
+    --elite-graphite: {BRAND_COLORS['graphite']};
+    --elite-ink: {BRAND_COLORS['ink']};
+    --elite-paper: {BRAND_COLORS['paper']};
+    --elite-white: {BRAND_COLORS['white']};
+}}
+
+.main .block-container {{
+    max-width: 100% !important;
+    padding: 1rem 2rem !important;
+}}
+
+.stPlotlyChart {{
+    width: 100% !important;
+}}
+
+header[data-testid="stHeader"] {{
+    visibility: hidden;
+    height: 0rem;
+}}
+</style>
+""", unsafe_allow_html=True)
+
+# 2. Mostrar el Logo y Título (Hero Card)
+st.markdown(f"""
+<div class="hero-card">
+    <div class="hero-logo-shell">
+        {logo_html}
     </div>
-    """,
-    unsafe_allow_html=True 
+    <div class="hero-copy">
+        <p class="hero-kicker">THE ELITE FLOWER • MANTENIMIENTO Y AUTOMATIZACIÓN</p>
+        <h1>Visualización Variables Invernaderos</h1>
+        <p class="hero-subtitle">
+            Panel ejecutivo para analizar sensores, cortinas y comportamiento operativo por bloque.
+        </p>
+    </div>
+</div>
+""", unsafe_allow_html=True)
+
+# --- AQUÍ TERMINA EL CAMBIO ---
 ) # <-- Este es otro paréntesis independiente
 
 # --- CONFIGURACIÓN DE URLS (Mover aquí para evitar NameError) ---
