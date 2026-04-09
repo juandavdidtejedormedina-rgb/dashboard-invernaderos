@@ -3,6 +3,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import io
 import warnings
+import requests
 import re
 import html
 import base64
@@ -448,8 +449,26 @@ st.markdown(
 # 2. Selector de archivos en la barra lateral
 st.sidebar.header("Datos fuente")
 st.sidebar.caption("Carga los archivos maestros para habilitar el análisis ejecutivo del bloque.")
-archivo_variables = st.sidebar.file_uploader("Sube el archivo Excel con tus variables", type=["xlsx"], key="vars")
-archivo_cortinas = st.sidebar.file_uploader("Sube el archivo Excel de cortinas", type=["xlsx"], key="cortinas")
+
+archivo_variables = st.sidebar.file_uploader("Sube variables", type=["xlsx"])
+archivo_cortinas = st.sidebar.file_uploader("Sube cortinas", type=["xlsx"])
+
+if archivo_variables is not None:
+    archivo_variables_bytes = archivo_variables.read()
+else:
+    archivo_variables_bytes = requests.get(URL_VARIABLES).content
+
+if archivo_cortinas is not None:
+    archivo_cortinas_bytes = archivo_cortinas.read()
+else:
+    archivo_cortinas_bytes = requests.get(URL_CORTINAS).content
+# URLs RAW de GitHub (pon las tuyas)
+URL_VARIABLES = "https://raw.githubusercontent.com/TU_USUARIO/dashboard-invernaderos/main/Datos%20variables.xlsx"
+URL_CORTINAS = "https://raw.githubusercontent.com/TU_USUARIO/dashboard-invernaderos/main/Registro_Cortinas_Final.xlsx"
+
+# Descargar archivos automáticamente
+archivo_variables_bytes = requests.get(URL_VARIABLES).content
+archivo_cortinas_bytes = requests.get(URL_CORTINAS).content
 
 archivo_variables_bytes = None
 archivo_cortinas_bytes = None
