@@ -151,28 +151,6 @@ st.markdown(f"""
     --elite-white: {BRAND_COLORS['white']};
 }}
 
-/* ESTO EXPANDE LA PANTALLA AL 100% */
-.main .block-container {{
-    max-width: 100% !important;
-    padding-left: 2rem !important;
-    padding-right: 2rem !important;
-    padding-top: 1rem !important;
-}}
-
-/* ESTO AJUSTA LAS GRÁFICAS AL ANCHO TOTAL */
-.stPlotlyChart, .js-plotly-plot {{
-    width: 100% !important;
-}}
-
-/* ESTO QUITA LA BARRA SUPERIOR SOBRANTE */
-header[data-testid="stHeader"] {{
-    visibility: hidden;
-    height: 0rem;
-}}
-</style>
-""", unsafe_allow_html=True)
-/* ------------------------------------ */
-""", unsafe_allow_html=True)
 .stApp {{
     background:
         radial-gradient(circle at top right, rgba(194, 223, 234, 0.45), transparent 25%),
@@ -452,78 +430,25 @@ div[data-testid="stDataFrame"] {{
     }}
 }}
 </style>
-unsafe_allow_html=True)
-# Este bloque dibuja el logo y el título en la pantalla
-# --- COPIA DESDE AQUÍ HASTA EL FINAL DEL BLOQUE ---
-
-# 1. Aplicar Estilos CSS para Pantalla Ancha y Colores
-# --- REEMPLAZA EL BLOQUE DE ESTILOS Y LOGO POR ESTE ---
-st.markdown(f"""
-<style>
-@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@500;600;700;800&family=Roboto:wght@300;400;500;700&display=swap');
-
-:root {{
-    --elite-hero: {BRAND_COLORS['hero']};
-    --elite-sky: {BRAND_COLORS['sky']};
-    --elite-rose: {BRAND_COLORS['rose']};
-    --elite-beige: {BRAND_COLORS['beige']};
-    --elite-graphite: {BRAND_COLORS['graphite']};
-    --elite-ink: {BRAND_COLORS['ink']};
-    --elite-paper: {BRAND_COLORS['paper']};
-    --elite-white: {BRAND_COLORS['white']};
-}}
-
-/* ESTO HACE QUE SE VEA A PANTALLA COMPLETA */
-.main .block-container {{
-    max-width: 100% !important;
-    padding-left: 2rem !important;
-    padding-right: 2rem !important;
-    padding-top: 1rem !important;
-}}
-
-.stPlotlyChart, .js-plotly-plot {{
-    width: 100% !important;
-}}
-
-header[data-testid="stHeader"] {{
-    visibility: hidden;
-    height: 0rem;
-}}
-</style>
-
-<div class="hero-card">
-    <div class="hero-logo-shell">
-        {logo_html}
-    </div>
-    <div class="hero-copy">
-        <p class="hero-kicker">THE ELITE FLOWER • MANTENIMIENTO Y AUTOMATIZACIÓN</p>
-        <h1>Visualización Variables Invernaderos</h1>
-        <p class="hero-subtitle">
-            Panel ejecutivo para analizar sensores, cortinas y comportamiento operativo por bloque.
-        </p>
-    </div>
-</div>
 """, unsafe_allow_html=True)
-# --- FIN DEL BLOQUE NUEVO ---
-
-# 2. Mostrar el Logo y Título (Hero Card)
-st.markdown(f"""
-<div class="hero-card">
-    <div class="hero-logo-shell">
-        {logo_html}
+st.markdown(
+    f"""
+    <div class="hero-card">
+        <div class="hero-logo-shell">
+            {logo_html}
+        </div>
+        <div class="hero-copy">
+            <p class="hero-kicker">THE ELITE FLOWER • MANTENIMIENTO Y AUTOMATIZACIÓN</p>
+            <h1>Visualizacion Variables Invernaderos</h1>
+            <p class="hero-subtitle">
+                Panel ejecutivo para analizar sensores, cortinas y comportamiento operativo
+                por bloque.
+            </p>
+        </div>
     </div>
-    <div class="hero-copy">
-        <p class="hero-kicker">THE ELITE FLOWER • MANTENIMIENTO Y AUTOMATIZACIÓN</p>
-        <h1>Visualización Variables Invernaderos</h1>
-        <p class="hero-subtitle">
-            Panel ejecutivo para analizar sensores, cortinas y comportamiento operativo por bloque.
-        </p>
-    </div>
-</div>
-""", unsafe_allow_html=True)
-
-# --- AQUÍ TERMINA EL CAMBIO ---
-) # <-- Este es otro paréntesis independiente
+    """,
+    unsafe_allow_html=True
+)
 
 # --- CONFIGURACIÓN DE URLS (Mover aquí para evitar NameError) ---
 URL_VARIABLES = "https://raw.githubusercontent.com/juandavdidtejedormedina-rgb/dashboard-invernaderos/main/Datos_variables.xlsx"
