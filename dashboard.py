@@ -459,18 +459,15 @@ st.sidebar.caption("Carga los archivos maestros o usa los datos por defecto.")
 
 archivo_variables = st.sidebar.file_uploader("Sube variables", type=["xlsx"])
 archivo_cortinas = st.sidebar.file_uploader("Sube cortinas", type=["xlsx"])
-
 if archivo_variables is not None:
     archivo_variables_bytes = archivo_variables.read()
 else:
-    with open("Datos_variables.xlsx", "rb") as f:
-    archivo_variables_bytes = f.read()
+    archivo_variables_bytes = requests.get(URL_VARIABLES).content
 
 if archivo_cortinas is not None:
     archivo_cortinas_bytes = archivo_cortinas.read()
 else:
-    with open("Registro_Cortinas_Final.xlsx", "rb") as f:
-    archivo_cortinas_bytes = f.read()
+    archivo_cortinas_bytes = requests.get(URL_CORTINAS).content
 
 # 3. Funciones de carga de datos con corrección de FECHAS
 
