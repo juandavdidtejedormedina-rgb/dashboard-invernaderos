@@ -483,7 +483,12 @@ def _limpiar_columnas(df):
 
 
 def _leer_excel_desde_bytes(ruta_bytes, sheet_name, **kwargs):
-    return pd.read_excel(io.BytesIO(ruta_bytes), sheet_name=sheet_name, **kwargs)
+    return pd.read_excel(
+    io.BytesIO(ruta_bytes),
+    sheet_name=sheet_name,
+    engine="openpyxl",
+    **kwargs
+)
 
 
 @st.cache_data
