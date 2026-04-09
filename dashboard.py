@@ -453,6 +453,7 @@ div[data-testid="stDataFrame"] {{
 }}
 </style>
 """, unsafe_allow_html=True)
+# Este bloque dibuja el logo y el título en la pantalla
 st.markdown(
     f"""
     <div class="hero-card">
@@ -469,8 +470,8 @@ st.markdown(
         </div>
     </div>
     """,
-    unsafe_allow_html=True
-)
+    unsafe_allow_html=True 
+) # <-- Este es otro paréntesis independiente
 
 # --- CONFIGURACIÓN DE URLS (Mover aquí para evitar NameError) ---
 URL_VARIABLES = "https://raw.githubusercontent.com/juandavdidtejedormedina-rgb/dashboard-invernaderos/main/Datos_variables.xlsx"
