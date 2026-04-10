@@ -439,10 +439,9 @@ st.markdown(
         </div>
         <div class="hero-copy">
             <p class="hero-kicker">THE ELITE FLOWER • MANTENIMIENTO Y AUTOMATIZACIÓN</p>
-            <h1>Visualizacion Variables Invernaderos</h1>
+            <h1>Visualizacion Variables y Motores en Invernaderos</h1>
             <p class="hero-subtitle">
-                Panel ejecutivo para analizar sensores, cortinas y comportamiento operativo
-                por bloque.
+                Aplicacion para Analisis De Variables Y Motores Seccionado Por Bloques
             </p>
         </div>
     </div>
