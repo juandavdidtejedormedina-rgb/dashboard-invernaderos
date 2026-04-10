@@ -438,10 +438,10 @@ st.markdown(
             {logo_html}
         </div>
         <div class="hero-copy">
-            <p class="hero-kicker">THE ELITE FLOWER • MANTENIMIENTO Y AUTOMATIZACIÓN</p>
-            <h1>Visualizacion Variables y Motores en Invernaderos</h1>
+            <p class="hero-kicker">THE ELITE FLOWER • By Hannaford</p>
+            <h1>Soporte Electrico Y Automatizacion </h1>
             <p class="hero-subtitle">
-                Aplicacion para Analisis De Variables Y Motores Seccionado Por Bloques
+                Aplicación para Análisis De Variables Y Motores Seccionado Por Bloques
             </p>
         </div>
     </div>
@@ -1281,11 +1281,11 @@ with tab_correlacion:
     st.markdown(
         """
         <div class="section-intro">
-            <p class="section-kicker">Monitoreo Inteligente</p>
-            <h2 class="section-title">Correlación operativa de sensores y cortinas</h2>
+            <p class="section-kicker">Graficos</p>
+            <h2 class="section-title">Visualizacion Variables y Motores en Invernaderos</h2>
             <p class="section-text">
-                Visual ejecutivo para revisar comportamiento ambiental, apertura de cortinas
-                y eventos operativos por bloque, con una lectura clara para seguimiento diario
+                Aplicacion Para Estudio De Comportamiento De Variables medidas, apertura de cortinas
+                y eventos operativos por bloque, para seguimiento diario
                 o análisis de varios días.
             </p>
         </div>
