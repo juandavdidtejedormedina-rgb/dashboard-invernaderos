@@ -439,9 +439,9 @@ st.markdown(
         </div>
         <div class="hero-copy">
             <p class="hero-kicker">THE ELITE FLOWER • By Hannaford</p>
-            <h1>Soporte Electrico Y Automatizacion </h1>
+            <h1>Soporte Eléctrico y Automatización </h1>
             <p class="hero-subtitle">
-                Aplicación para Análisis De Variables Y Motores Seccionado Por Bloques
+                Aplicación para análisis de variables y motores, seccionado por bloques.
             </p>
         </div>
     </div>
@@ -1281,10 +1281,10 @@ with tab_correlacion:
     st.markdown(
         """
         <div class="section-intro">
-            <p class="section-kicker">Graficos</p>
-            <h2 class="section-title">Visualizacion Variables y Motores en Invernaderos</h2>
+            <p class="section-kicker">Gráficos</p>
+            <h2 class="section-title">Visualización de variables y motores en invernaderos</h2>
             <p class="section-text">
-                Aplicacion Para Estudio De Comportamiento De Variables medidas, apertura de cortinas
+                Aplicación para estudio del comportamiento de variables medidas, apertura de cortinas
                 y eventos operativos por bloque, para seguimiento diario
                 o análisis de varios días.
             </p>
