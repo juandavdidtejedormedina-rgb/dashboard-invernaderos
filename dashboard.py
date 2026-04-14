@@ -9,6 +9,8 @@ import html
 import base64
 from pathlib import Path
 from datetime import datetime, timedelta
+
+
 def _image_to_base64(image_path):
     try:
         return base64.b64encode(Path(image_path).read_bytes()).decode('utf-8')
@@ -482,6 +484,7 @@ else:
 # 3. Funciones de carga de datos con corrección de FECHAS
 
 def _limpiar_columnas(df):
+    # Homologa nombres de columnas para que todas las hojas se procesen igual.
     df = df.copy()
     df.columns = (
         df.columns.str.strip()
@@ -493,11 +496,112 @@ def _limpiar_columnas(df):
 
 def _leer_excel_desde_bytes(ruta_bytes, sheet_name, **kwargs):
     return pd.read_excel(
-    io.BytesIO(ruta_bytes),
-    sheet_name=sheet_name,
-    engine="openpyxl",
-    **kwargs
-)
+        io.BytesIO(ruta_bytes),
+        sheet_name=sheet_name,
+        engine="openpyxl",
+        **kwargs
+    )
+
+
+def _get_valid_sheet_names(xls):
+    return [sheet for sheet in xls.sheet_names if sheet.lower() != 'plantilla']
+
+
+def _to_numeric_series(series):
+    # Convierte columnas numéricas aunque vengan con coma decimal.
+    return pd.to_numeric(series.astype(str).str.replace(',', '.'), errors='coerce')
+
+
+def _extract_block_map(df):
+    if df.empty or 'Bloque' not in df.columns:
+        return {}
+    return {
+        block_code: block_name
+        for block_name in sorted(df['Bloque'].dropna().unique())
+        if (block_code := _extract_block_code(block_name))
+    }
+
+
+def _filter_by_block_and_dates(df, block_col, date_col, block_value, fecha_inicio, fecha_fin):
+    # Centraliza el filtrado repetido por bloque y rango de fechas.
+    return df[
+        (df[block_col] == block_value) &
+        (df[date_col] >= fecha_inicio) &
+        (df[date_col] <= fecha_fin)
+    ].copy()
+
+
+def _get_cortinas_date_range(fecha_cortinas):
+    return fecha_cortinas if isinstance(fecha_cortinas, tuple) else (fecha_cortinas, fecha_cortinas)
+
+
+def _get_axis_layout(num_axes, has_cortina_axis):
+    # Ajusta el espacio lateral según la cantidad de ejes visibles.
+    if has_cortina_axis:
+        if num_axes >= 4:
+            return 0.76, 0.80, 0.92, 0.965, 250
+        if num_axes == 3:
+            return 0.80, 0.84, 0.93, 0.97, 220
+        return 0.84, 0.87, 0.94, 0.98, 190
+
+    if num_axes >= 4:
+        return 0.82, 0.87, 0.95, None, 220
+    if num_axes == 3:
+        return 0.86, 0.90, 0.96, None, 190
+    if num_axes == 2:
+        return 0.90, 0.93, 0.97, None, 160
+    return 0.93, 0.95, 0.98, None, 130
+
+
+def _get_sensor_axis_range(serie, var_name):
+    min_val = float(serie[var_name].min())
+    max_val = float(serie[var_name].max())
+    padding = (
+        2 if var_name == 'Temperatura'
+        else 5 if var_name == 'Humedad Relativa'
+        else max(100, (max_val - min_val) * 0.08) if var_name == 'RadiaciÃ³n PAR'
+        else 2
+    )
+    range_min = max(0, min_val - padding) if min_val >= 0 else min_val - padding
+    if 'PAR' in var_name and min_val >= 0:
+        range_min = -max(35, padding * 0.35)
+    return [range_min, max_val + padding]
+
+
+def _build_sensor_trace(serie_plot, var_name, hover_time_format, color, order):
+    # Mantiene la configuración visual de cada sensor en un solo lugar.
+    is_par = var_name == 'RadiaciÃ³n PAR'
+    return dict(
+        x=serie_plot['DateTime'],
+        y=serie_plot[var_name],
+        name=var_name,
+        mode='lines+markers',
+        line=dict(color=color, width=3 if is_par else 2),
+        marker=dict(size=7 if is_par else 5, color=color),
+        opacity=0.78 if var_name == 'Gramos de agua' else 1.0,
+        legendrank=order,
+        hovertemplate=(
+            f'<b>%{{x|{hover_time_format}}}</b><br>'
+            f'{var_name}: %{{y:.2f}} {VARIABLE_UNITS.get(var_name, "")}<extra></extra>'
+        )
+    )
+
+
+def _build_cortina_trace(df_state, var_name, hover_time_format, color):
+    # Reutiliza el formato del trazo escalonado para aperturas de cortina.
+    return dict(
+        x=df_state['Hora'],
+        y=df_state['Apertura'],
+        name=str(var_name),
+        mode='lines+markers',
+        line=dict(color=color, width=3.2, shape='hv'),
+        marker=dict(size=5, color=color),
+        hovertemplate=(
+            f'<b>%{{x|{hover_time_format}}}</b><br>%{{customdata[0]}}'
+            '<br>Apertura: %{y:.0f}%<br>%{customdata[1]}<extra></extra>'
+        ),
+        customdata=df_state[['Evento', 'Detalle']]
+    )
 
 
 @st.cache_data
@@ -509,7 +613,7 @@ def cargar_datos(ruta_bytes):
         xls = pd.ExcelFile(io.BytesIO(ruta_bytes), engine="openpyxl")
         registros = []
 
-        for sheet in [s for s in xls.sheet_names if s.lower() != 'plantilla']:
+        for sheet in _get_valid_sheet_names(xls):
             df_sheet = _leer_excel_desde_bytes(ruta_bytes, sheet_name=sheet)
             df_sheet = _limpiar_columnas(df_sheet)
 
@@ -527,7 +631,7 @@ def cargar_datos(ruta_bytes):
 
             for col in SENSOR_VARIABLES:
                 if col in df_sheet.columns:
-                    df_sheet[col] = pd.to_numeric(df_sheet[col].astype(str).str.replace(',', '.'), errors='coerce')
+                    df_sheet[col] = _to_numeric_series(df_sheet[col])
 
             registros.append(df_sheet)
 
@@ -538,6 +642,7 @@ def cargar_datos(ruta_bytes):
 
 
 def parse_time(value):
+    # Acepta horas como datetime, time o texto con formatos mixtos AM/PM.
     if pd.isna(value):
         return None
     if isinstance(value, datetime):
@@ -557,15 +662,6 @@ def _sync_corr_bottom_to_top():
     st.session_state['variables_correlacion'] = st.session_state.get('variables_correlacion_bottom', []).copy()
 
 
-def _get_block_modification(block_name):
-    if not block_name:
-        return None
-    match = re.search(r'(\d+)', str(block_name))
-    if not match:
-        return None
-    return BLOCK_MODIFICATIONS.get(match.group(1))
-
-
 def _extract_block_code(block_name):
     if not block_name:
         return None
@@ -573,22 +669,13 @@ def _extract_block_code(block_name):
     return match.group(1) if match else None
 
 
+def _get_block_modification(block_name):
+    return BLOCK_MODIFICATIONS.get(_extract_block_code(block_name))
+
+
 def _get_shared_block_options(df_variables_all, df_cortinas_all):
-    variable_map = {}
-    cortina_map = {}
-
-    if not df_variables_all.empty and 'Bloque' in df_variables_all.columns:
-        for block_name in sorted(df_variables_all['Bloque'].dropna().unique()):
-            block_code = _extract_block_code(block_name)
-            if block_code:
-                variable_map[block_code] = block_name
-
-    if not df_cortinas_all.empty and 'Bloque' in df_cortinas_all.columns:
-        for block_name in sorted(df_cortinas_all['Bloque'].dropna().unique()):
-            block_code = _extract_block_code(block_name)
-            if block_code:
-                cortina_map[block_code] = block_name
-
+    variable_map = _extract_block_map(df_variables_all)
+    cortina_map = _extract_block_map(df_cortinas_all)
     shared_codes = sorted(set(variable_map) & set(cortina_map), key=lambda value: int(value))
     return shared_codes, variable_map, cortina_map
 
@@ -624,6 +711,7 @@ def _normalize_percent_value(value):
 
 
 def _build_cortina_apertura_profile(df_cortinas, elemento, config):
+    # Convierte eventos de apertura/cierre en una serie temporal escalonada.
     elemento_col = config['element_col']
     apertura_col = config['open_time_col']
     apertura_pct_col = config['open_pct_col']
@@ -749,17 +837,8 @@ def _get_shared_available_dates(df_variables_all, df_cortinas_all, bloque_variab
     if bloque_variables is None or bloque_cortinas is None:
         return []
 
-    fechas_variables = set(
-        pd.Series(
-            df_variables_all[df_variables_all['Bloque'] == bloque_variables]['Fecha_Filtro'].dropna().unique()
-        ).tolist()
-    )
-    fechas_cortinas = set(
-        pd.Series(
-            df_cortinas_all[df_cortinas_all['Bloque'] == bloque_cortinas]['Fecha'].dropna().unique()
-        ).tolist()
-    )
-
+    fechas_variables = set(df_variables_all[df_variables_all['Bloque'] == bloque_variables]['Fecha_Filtro'].dropna())
+    fechas_cortinas = set(df_cortinas_all[df_cortinas_all['Bloque'] == bloque_cortinas]['Fecha'].dropna())
     return sorted(fechas_variables & fechas_cortinas)
 
 
@@ -822,7 +901,7 @@ def cargar_cortinas(ruta_bytes):
         xls = pd.ExcelFile(io.BytesIO(ruta_bytes), engine="openpyxl")
         registros = []
 
-        for sheet in [s for s in xls.sheet_names if s.lower() != 'plantilla']:
+        for sheet in _get_valid_sheet_names(xls):
             raw = _leer_excel_desde_bytes(ruta_bytes, sheet_name=sheet, header=None)
             if raw.shape[0] < 4:
                 continue
@@ -862,27 +941,19 @@ def cargar_cortinas(ruta_bytes):
 
 
 def _render_correlacion(df_variables_all, df_cortinas_all, fecha_variables, fecha_cortinas, bloque_variables, bloque_seleccionado, variables_seleccionadas=None):
+    # Este grÃ¡fico combina sensores y estado de cortinas sobre un mismo eje temporal.
     fecha_inicio, fecha_fin = fecha_variables
     multi_day_view = fecha_inicio != fecha_fin
     hover_time_format = '%d/%m %H:%M' if multi_day_view else '%H:%M'
     xaxis_tickformat = '%H:%M\n%d/%m' if multi_day_view else '%H:%M'
     xaxis_title_text = '<b>Fecha y hora</b>' if multi_day_view else '<b>Hora del Día</b>'
-    if isinstance(fecha_cortinas, tuple):
-        fecha_cortinas_inicio, fecha_cortinas_fin = fecha_cortinas
-    else:
-        fecha_cortinas_inicio = fecha_cortinas
-        fecha_cortinas_fin = fecha_cortinas
-    df_variables = df_variables_all[
-        (df_variables_all['Fecha_Filtro'] >= fecha_inicio) &
-        (df_variables_all['Fecha_Filtro'] <= fecha_fin) &
-        (df_variables_all['Bloque'] == bloque_variables)
-    ].copy()
-    df_cortinas = df_cortinas_all
-    datos_cortinas_sel = df_cortinas[
-        (df_cortinas['Bloque'] == bloque_seleccionado) &
-        (df_cortinas['Fecha'] >= fecha_cortinas_inicio) &
-        (df_cortinas['Fecha'] <= fecha_cortinas_fin)
-    ].copy()
+    fecha_cortinas_inicio, fecha_cortinas_fin = _get_cortinas_date_range(fecha_cortinas)
+    df_variables = _filter_by_block_and_dates(
+        df_variables_all, 'Bloque', 'Fecha_Filtro', bloque_variables, fecha_inicio, fecha_fin
+    )
+    datos_cortinas_sel = _filter_by_block_and_dates(
+        df_cortinas_all, 'Bloque', 'Fecha', bloque_seleccionado, fecha_cortinas_inicio, fecha_cortinas_fin
+    )
 
     sensor_vars = [v for v in SENSOR_VARIABLES if v in df_variables.columns]
     selected_vars = variables_seleccionadas or []
@@ -927,32 +998,12 @@ def _render_correlacion(df_variables_all, df_cortinas_all, fecha_variables, fech
             if serie.empty:
                 continue
             serie_plot = _add_day_breaks_to_series(serie, var_name) if multi_day_view else serie
-            trace = dict(
-                x=serie_plot['DateTime'],
-                y=serie_plot[var_name],
-                name=var_name,
-                mode='lines+markers',
-                line=dict(
-                    color=VARIABLE_COLORS.get(var_name, palette[order % len(palette)]),
-                    width=3 if var_name == 'Radiación PAR' else 2
-                ),
-                marker=dict(
-                    size=7 if var_name == 'Radiación PAR' else 5,
-                    color=VARIABLE_COLORS.get(var_name, palette[order % len(palette)])
-                ),
-                opacity=0.78 if var_name == 'Gramos de agua' else 1.0,
-                legendrank=order,
-                hovertemplate=(
-                    f'<b>%{{x|{hover_time_format}}}</b><br>' +
-                    var_name + ': %{y:.2f} ' +
-                    VARIABLE_UNITS.get(var_name, '') +
-                    '<extra></extra>'
-                )
-            )
+            color = VARIABLE_COLORS.get(var_name, palette[order % len(palette)])
+            trace = _build_sensor_trace(serie_plot, var_name, hover_time_format, color, order)
             sensor_traces.append((
                 var_name,
                 trace,
-                VARIABLE_COLORS.get(var_name, palette[order % len(palette)]),
+                color,
                 sensor_render_priority.get(var_name, 0)
             ))
         elif var_name in selected_cortinas:
@@ -963,16 +1014,7 @@ def _render_correlacion(df_variables_all, df_cortinas_all, fecha_variables, fech
                 if df_state.empty:
                     continue
                 color = CORTINA_COLORS.get(str(var_name).upper(), palette[order % len(palette)])
-                trace = dict(
-                    x=df_state['Hora'],
-                    y=df_state['Apertura'],
-                    name=str(var_name),
-                    mode='lines+markers',
-                    line=dict(color=color, width=3.2, shape='hv'),
-                    marker=dict(size=5, color=color),
-                    hovertemplate=f'<b>%{{x|{hover_time_format}}}</b><br>%{{customdata[0]}}<br>Apertura: %{{y:.0f}}%<br>%{{customdata[1]}}<extra></extra>',
-                    customdata=df_state[['Evento', 'Detalle']]
-                )
+                trace = _build_cortina_trace(df_state, var_name, hover_time_format, color)
                 cortina_traces.append((var_name, trace, color))
                 break
 
@@ -984,47 +1026,9 @@ def _render_correlacion(df_variables_all, df_cortinas_all, fecha_variables, fech
     num_axes = len(sensor_traces)
     has_cortina_axis = bool(cortina_traces)
 
-    if has_cortina_axis:
-        if num_axes >= 4:
-            x_domain_end = 0.76
-            axis_start = 0.80
-            axis_end = 0.92
-            cortina_axis_position = 0.965
-            right_margin = 250
-        elif num_axes == 3:
-            x_domain_end = 0.80
-            axis_start = 0.84
-            axis_end = 0.93
-            cortina_axis_position = 0.97
-            right_margin = 220
-        else:
-            x_domain_end = 0.84
-            axis_start = 0.87
-            axis_end = 0.94
-            cortina_axis_position = 0.98
-            right_margin = 190
-    else:
-        if num_axes >= 4:
-            x_domain_end = 0.82
-            axis_start = 0.87
-            axis_end = 0.95
-            right_margin = 220
-        elif num_axes == 3:
-            x_domain_end = 0.86
-            axis_start = 0.90
-            axis_end = 0.96
-            right_margin = 190
-        elif num_axes == 2:
-            x_domain_end = 0.90
-            axis_start = 0.93
-            axis_end = 0.97
-            right_margin = 160
-        else:
-            x_domain_end = 0.93
-            axis_start = 0.95
-            axis_end = 0.98
-            right_margin = 130
-        cortina_axis_position = None
+    x_domain_end, axis_start, axis_end, cortina_axis_position, right_margin = _get_axis_layout(
+        num_axes, has_cortina_axis
+    )
 
     right_positions = [axis_start + i * ((axis_end - axis_start) / max(1, num_axes - 1)) for i in range(num_axes)]
     sensor_axis_names = ['y', 'y3', 'y4', 'y5']
@@ -1037,18 +1041,7 @@ def _render_correlacion(df_variables_all, df_cortinas_all, fecha_variables, fech
         fig_corr.add_trace(go.Scatter(**trace))
 
         serie = df_plot[['DateTime', var_name]].dropna(subset=[var_name]).copy()
-        min_val = float(serie[var_name].min())
-        max_val = float(serie[var_name].max())
-        padding = 2 if var_name == 'Temperatura' else 5 if var_name == 'Humedad Relativa' else max(100, (max_val - min_val) * 0.08) if var_name == 'Radiación PAR' else 2
-        range_min = min_val - padding
-        if min_val >= 0:
-            range_min = max(0, range_min)
-        if 'PAR' in var_name and min_val >= 0:
-            range_min = -max(35, padding * 0.35)
-        range_max = max_val + padding
-        axis_range = [range_min, range_max]
-
-        side = 'right'
+        axis_range = _get_sensor_axis_range(serie, var_name)
         position = right_positions[min(idx, len(right_positions) - 1)]
 
         axis_kwargs = dict(
@@ -1060,7 +1053,7 @@ def _render_correlacion(df_variables_all, df_cortinas_all, fecha_variables, fech
             tickcolor=color,
             range=axis_range,
             autorange=False,
-            side=side,
+            side='right',
             showgrid=False,
             showline=True,
             linecolor=color,
