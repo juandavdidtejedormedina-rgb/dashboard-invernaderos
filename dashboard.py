@@ -9,12 +9,6 @@ import html
 import base64
 from pathlib import Path
 from datetime import datetime, timedelta
-st.set_page_config(
-    page_title="Monitor Variables B34", 
-    page_icon="📊", 
-    layout="wide"  # Esto es lo que expande la pantalla
-)
-
 def _image_to_base64(image_path):
     try:
         return base64.b64encode(Path(image_path).read_bytes()).decode('utf-8')
@@ -56,7 +50,6 @@ BRAND_COLORS = {
     'paper': '#FAF8F3',
     'white': '#FFFFFF'
 }
-BRAND_KEYWORDS = ['Bold', 'Caring', 'Creative', 'Inspiring', 'Forward Looking']
 APP_DIR = Path(__file__).resolve().parent
 LOGO_PATH = APP_DIR / 'logo elite.png'
 CORR_AXIS_TITLES = {
@@ -129,7 +122,11 @@ SIDE_CONFIGS = {
 }
 
 # 1. Configuración de la página
-st.set_page_config(page_title="The Elite Flower | Monitor Variables B34", layout="wide")
+st.set_page_config(
+    page_title="The Elite Flower | Monitor Variables B34",
+    page_icon="📊",
+    layout="wide"
+)
 logo_base64 = _image_to_base64(LOGO_PATH)
 logo_html = (
     f'<img src="data:image/png;base64,{logo_base64}" alt="The Elite Flower" class="hero-logo-image">'
