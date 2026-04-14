@@ -220,6 +220,11 @@ st.markdown(f"""
         linear-gradient(135deg, rgba(84, 83, 134, 0.96) 0%, rgba(84, 83, 134, 0.88) 52%, rgba(56, 58, 53, 0.96) 100%);
     box-shadow: 0 24px 60px rgba(56, 58, 53, 0.18);
 }}
+.hero-brand-panel {{
+    display: flex;
+    flex-direction: column;
+    gap: 0.7rem;
+}}
 .hero-logo-shell {{
     display: flex;
     align-items: center;
@@ -228,6 +233,19 @@ st.markdown(f"""
     background: rgba(255, 255, 255, 0.98);
     min-height: 150px;
     padding: 1rem;
+}}
+.hero-brand-caption {{
+    margin: 0;
+    padding: 0.65rem 0.8rem;
+    border-radius: 16px;
+    background: rgba(255, 255, 255, 0.12);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    color: rgba(255, 255, 255, 0.82);
+    font-size: 0.74rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    font-weight: 700;
+    text-align: center;
 }}
 .hero-logo-image {{
     width: 100%;
@@ -247,14 +265,6 @@ st.markdown(f"""
     display: flex;
     flex-direction: column;
     justify-content: center;
-}}
-.hero-kicker {{
-    margin: 0 0 0.45rem 0;
-    color: rgba(255, 255, 255, 0.72);
-    font-size: 0.86rem;
-    letter-spacing: 0.18em;
-    text-transform: uppercase;
-    font-weight: 700;
 }}
 .hero-copy h1 {{
     margin: 0;
@@ -429,6 +439,9 @@ div[data-testid="stDataFrame"] {{
     .hero-card {{
         grid-template-columns: 1fr;
     }}
+    .hero-brand-caption {{
+        text-align: left;
+    }}
     .hero-copy h1 {{
         font-size: 1.7rem;
     }}
@@ -438,11 +451,13 @@ div[data-testid="stDataFrame"] {{
 st.markdown(
     f"""
     <div class="hero-card">
-        <div class="hero-logo-shell">
-            {logo_html}
+        <div class="hero-brand-panel">
+            <div class="hero-logo-shell">
+                {logo_html}
+            </div>
+            <p class="hero-brand-caption">The Elite Flower • By Hannaford</p>
         </div>
         <div class="hero-copy">
-            <p class="hero-kicker">THE ELITE FLOWER • By Hannaford</p>
             <h1>Soporte Eléctrico y Automatización </h1>
             <p class="hero-subtitle">
                 Aplicación para análisis de variables y motores, seccionado por bloques.
