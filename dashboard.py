@@ -7,6 +7,7 @@ import requests
 import re
 import html
 import base64
+import hmac
 from pathlib import Path
 from datetime import datetime, timedelta
 
@@ -122,6 +123,10 @@ SIDE_CONFIGS = {
         'chart_color': '#3498db'
     }
 }
+
+# Credenciales de acceso definidas directamente en el cÃ³digo.
+LOGIN_USERNAME = "admin"
+LOGIN_PASSWORD = "Elite2026"
 
 # 1. Configuración de la página
 st.set_page_config(
@@ -448,6 +453,78 @@ st.markdown(
     unsafe_allow_html=True
 )
 
+
+def _rerun_app():
+    try:
+        st.rerun()
+    except AttributeError:
+        st.experimental_rerun()
+
+
+def _credentials_are_valid(username, password):
+    # Compara las credenciales sin exponer la lógica en el flujo principal.
+    return (
+        hmac.compare_digest(str(username).strip(), LOGIN_USERNAME) and
+        hmac.compare_digest(str(password), LOGIN_PASSWORD)
+    )
+
+
+def _logout_dashboard():
+    for key in (
+        'dashboard_authenticated',
+        'dashboard_auth_user',
+        'dashboard_auth_error',
+        'graficar_correlacion',
+        'variables_correlacion',
+        'variables_correlacion_bottom',
+        'variables_correlacion_context'
+    ):
+        st.session_state.pop(key, None)
+
+
+def _require_login():
+    if st.session_state.get('dashboard_authenticated'):
+        return
+
+    st.sidebar.info("Inicia sesión para habilitar el dashboard.")
+
+    _, center_col, _ = st.columns([1, 1.2, 1])
+    with center_col:
+        st.markdown(
+            """
+            <div class="section-intro">
+                <p class="section-kicker">Acceso seguro</p>
+                <h2 class="section-title">Ingreso al dashboard</h2>
+                <p class="section-text">
+                    Ingresa tu usuario y contraseña para acceder al análisis de variables y cortinas.
+                </p>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+        with st.form("login_dashboard"):
+            username = st.text_input("Usuario")
+            password = st.text_input("Contraseña", type="password")
+            submitted = st.form_submit_button("Ingresar")
+
+        if submitted:
+            if _credentials_are_valid(username, password):
+                st.session_state['dashboard_authenticated'] = True
+                st.session_state['dashboard_auth_user'] = str(username).strip()
+                st.session_state.pop('dashboard_auth_error', None)
+                _rerun_app()
+            st.session_state['dashboard_auth_error'] = "Usuario o contraseña incorrectos."
+
+        if st.session_state.get('dashboard_auth_error'):
+            st.error(st.session_state['dashboard_auth_error'])
+        else:
+            st.info("Acceso restringido a personal autorizado.")
+
+    st.stop()
+
+
+_require_login()
+
 # --- CONFIGURACIÓN DE URLS (Mover aquí para evitar NameError) ---
 URL_VARIABLES = "https://raw.githubusercontent.com/juandavdidtejedormedina-rgb/dashboard-invernaderos/main/Datos_variables.xlsx"
 URL_CORTINAS = "https://raw.githubusercontent.com/juandavdidtejedormedina-rgb/dashboard-invernaderos/main/Registro_Cortinas_Final.xlsx"
@@ -464,6 +541,11 @@ def descargar_desde_github(url):
         return None
 
 # 2. Selector de archivos en la barra lateral
+st.sidebar.success(f"Sesión iniciada: {st.session_state.get('dashboard_auth_user', LOGIN_USERNAME)}")
+if st.sidebar.button("Cerrar sesión", key="logout_dashboard_button"):
+    _logout_dashboard()
+    _rerun_app()
+
 st.sidebar.header("Actualmente se estan leyendo datos de la nube, si desea leer otro archivo debe subirlo")
 st.sidebar.caption("Usa los archivos de la nube o sube unos nuevos.")
 
