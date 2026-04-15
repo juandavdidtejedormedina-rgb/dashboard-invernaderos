@@ -7,11 +7,8 @@ import requests
 import re
 import html
 import base64
-import hmac
 from pathlib import Path
 from datetime import datetime, timedelta
-
-
 def _image_to_base64(image_path):
     try:
         return base64.b64encode(Path(image_path).read_bytes()).decode('utf-8')
@@ -124,10 +121,6 @@ SIDE_CONFIGS = {
     }
 }
 
-# Credenciales de acceso definidas directamente en el cÃ³digo.
-LOGIN_USERNAME = "admin"
-LOGIN_PASSWORD = "Elite2026"
-
 # 1. Configuración de la página
 st.set_page_config(
     page_title="The Elite Flower | Monitor Variables B34",
@@ -220,11 +213,6 @@ st.markdown(f"""
         linear-gradient(135deg, rgba(84, 83, 134, 0.96) 0%, rgba(84, 83, 134, 0.88) 52%, rgba(56, 58, 53, 0.96) 100%);
     box-shadow: 0 24px 60px rgba(56, 58, 53, 0.18);
 }}
-.hero-brand-panel {{
-    display: flex;
-    flex-direction: column;
-    gap: 0.7rem;
-}}
 .hero-logo-shell {{
     display: flex;
     align-items: center;
@@ -233,19 +221,6 @@ st.markdown(f"""
     background: rgba(255, 255, 255, 0.98);
     min-height: 150px;
     padding: 1rem;
-}}
-.hero-brand-caption {{
-    margin: 0;
-    padding: 0.65rem 0.8rem;
-    border-radius: 16px;
-    background: rgba(255, 255, 255, 0.12);
-    border: 1px solid rgba(255, 255, 255, 0.14);
-    color: rgba(255, 255, 255, 0.82);
-    font-size: 0.74rem;
-    letter-spacing: 0.18em;
-    text-transform: uppercase;
-    font-weight: 700;
-    text-align: center;
 }}
 .hero-logo-image {{
     width: 100%;
@@ -265,6 +240,14 @@ st.markdown(f"""
     display: flex;
     flex-direction: column;
     justify-content: center;
+}}
+.hero-kicker {{
+    margin: 0 0 0.45rem 0;
+    color: rgba(255, 255, 255, 0.72);
+    font-size: 0.86rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    font-weight: 700;
 }}
 .hero-copy h1 {{
     margin: 0;
@@ -439,9 +422,6 @@ div[data-testid="stDataFrame"] {{
     .hero-card {{
         grid-template-columns: 1fr;
     }}
-    .hero-brand-caption {{
-        text-align: left;
-    }}
     .hero-copy h1 {{
         font-size: 1.7rem;
     }}
@@ -451,13 +431,11 @@ div[data-testid="stDataFrame"] {{
 st.markdown(
     f"""
     <div class="hero-card">
-        <div class="hero-brand-panel">
-            <div class="hero-logo-shell">
-                {logo_html}
-            </div>
-            <p class="hero-brand-caption">The Elite Flower • By Hannaford</p>
+        <div class="hero-logo-shell">
+            {logo_html}
         </div>
         <div class="hero-copy">
+            <p class="hero-kicker">THE ELITE FLOWER • By Hannaford</p>
             <h1>Soporte Eléctrico y Automatización </h1>
             <p class="hero-subtitle">
                 Aplicación para análisis de variables y motores, seccionado por bloques.
@@ -467,78 +445,6 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
-
-
-def _rerun_app():
-    try:
-        st.rerun()
-    except AttributeError:
-        st.experimental_rerun()
-
-
-def _credentials_are_valid(username, password):
-    # Compara las credenciales sin exponer la lógica en el flujo principal.
-    return (
-        hmac.compare_digest(str(username).strip(), LOGIN_USERNAME) and
-        hmac.compare_digest(str(password), LOGIN_PASSWORD)
-    )
-
-
-def _logout_dashboard():
-    for key in (
-        'dashboard_authenticated',
-        'dashboard_auth_user',
-        'dashboard_auth_error',
-        'graficar_correlacion',
-        'variables_correlacion',
-        'variables_correlacion_bottom',
-        'variables_correlacion_context'
-    ):
-        st.session_state.pop(key, None)
-
-
-def _require_login():
-    if st.session_state.get('dashboard_authenticated'):
-        return
-
-    st.sidebar.info("Inicia sesión para habilitar el dashboard.")
-
-    _, center_col, _ = st.columns([1, 1.2, 1])
-    with center_col:
-        st.markdown(
-            """
-            <div class="section-intro">
-                <p class="section-kicker">Acceso seguro</p>
-                <h2 class="section-title">Ingreso al dashboard</h2>
-                <p class="section-text">
-                    Ingresa tu usuario y contraseña para acceder al análisis de variables y cortinas.
-                </p>
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
-        with st.form("login_dashboard"):
-            username = st.text_input("Usuario")
-            password = st.text_input("Contraseña", type="password")
-            submitted = st.form_submit_button("Ingresar")
-
-        if submitted:
-            if _credentials_are_valid(username, password):
-                st.session_state['dashboard_authenticated'] = True
-                st.session_state['dashboard_auth_user'] = str(username).strip()
-                st.session_state.pop('dashboard_auth_error', None)
-                _rerun_app()
-            st.session_state['dashboard_auth_error'] = "Usuario o contraseña incorrectos."
-
-        if st.session_state.get('dashboard_auth_error'):
-            st.error(st.session_state['dashboard_auth_error'])
-        else:
-            st.info("Acceso restringido a personal autorizado.")
-
-    st.stop()
-
-
-_require_login()
 
 # --- CONFIGURACIÓN DE URLS (Mover aquí para evitar NameError) ---
 URL_VARIABLES = "https://raw.githubusercontent.com/juandavdidtejedormedina-rgb/dashboard-invernaderos/main/Datos_variables.xlsx"
@@ -556,11 +462,6 @@ def descargar_desde_github(url):
         return None
 
 # 2. Selector de archivos en la barra lateral
-st.sidebar.success(f"Sesión iniciada: {st.session_state.get('dashboard_auth_user', LOGIN_USERNAME)}")
-if st.sidebar.button("Cerrar sesión", key="logout_dashboard_button"):
-    _logout_dashboard()
-    _rerun_app()
-
 st.sidebar.header("Actualmente se estan leyendo datos de la nube, si desea leer otro archivo debe subirlo")
 st.sidebar.caption("Usa los archivos de la nube o sube unos nuevos.")
 
@@ -581,7 +482,6 @@ else:
 # 3. Funciones de carga de datos con corrección de FECHAS
 
 def _limpiar_columnas(df):
-    # Homologa nombres de columnas para que todas las hojas se procesen igual.
     df = df.copy()
     df.columns = (
         df.columns.str.strip()
@@ -593,112 +493,11 @@ def _limpiar_columnas(df):
 
 def _leer_excel_desde_bytes(ruta_bytes, sheet_name, **kwargs):
     return pd.read_excel(
-        io.BytesIO(ruta_bytes),
-        sheet_name=sheet_name,
-        engine="openpyxl",
-        **kwargs
-    )
-
-
-def _get_valid_sheet_names(xls):
-    return [sheet for sheet in xls.sheet_names if sheet.lower() != 'plantilla']
-
-
-def _to_numeric_series(series):
-    # Convierte columnas numéricas aunque vengan con coma decimal.
-    return pd.to_numeric(series.astype(str).str.replace(',', '.'), errors='coerce')
-
-
-def _extract_block_map(df):
-    if df.empty or 'Bloque' not in df.columns:
-        return {}
-    return {
-        block_code: block_name
-        for block_name in sorted(df['Bloque'].dropna().unique())
-        if (block_code := _extract_block_code(block_name))
-    }
-
-
-def _filter_by_block_and_dates(df, block_col, date_col, block_value, fecha_inicio, fecha_fin):
-    # Centraliza el filtrado repetido por bloque y rango de fechas.
-    return df[
-        (df[block_col] == block_value) &
-        (df[date_col] >= fecha_inicio) &
-        (df[date_col] <= fecha_fin)
-    ].copy()
-
-
-def _get_cortinas_date_range(fecha_cortinas):
-    return fecha_cortinas if isinstance(fecha_cortinas, tuple) else (fecha_cortinas, fecha_cortinas)
-
-
-def _get_axis_layout(num_axes, has_cortina_axis):
-    # Ajusta el espacio lateral según la cantidad de ejes visibles.
-    if has_cortina_axis:
-        if num_axes >= 4:
-            return 0.76, 0.80, 0.92, 0.965, 250
-        if num_axes == 3:
-            return 0.80, 0.84, 0.93, 0.97, 220
-        return 0.84, 0.87, 0.94, 0.98, 190
-
-    if num_axes >= 4:
-        return 0.82, 0.87, 0.95, None, 220
-    if num_axes == 3:
-        return 0.86, 0.90, 0.96, None, 190
-    if num_axes == 2:
-        return 0.90, 0.93, 0.97, None, 160
-    return 0.93, 0.95, 0.98, None, 130
-
-
-def _get_sensor_axis_range(serie, var_name):
-    min_val = float(serie[var_name].min())
-    max_val = float(serie[var_name].max())
-    padding = (
-        2 if var_name == 'Temperatura'
-        else 5 if var_name == 'Humedad Relativa'
-        else max(100, (max_val - min_val) * 0.08) if var_name == 'RadiaciÃ³n PAR'
-        else 2
-    )
-    range_min = max(0, min_val - padding) if min_val >= 0 else min_val - padding
-    if 'PAR' in var_name and min_val >= 0:
-        range_min = -max(35, padding * 0.35)
-    return [range_min, max_val + padding]
-
-
-def _build_sensor_trace(serie_plot, var_name, hover_time_format, color, order):
-    # Mantiene la configuración visual de cada sensor en un solo lugar.
-    is_par = var_name == 'RadiaciÃ³n PAR'
-    return dict(
-        x=serie_plot['DateTime'],
-        y=serie_plot[var_name],
-        name=var_name,
-        mode='lines+markers',
-        line=dict(color=color, width=3 if is_par else 2),
-        marker=dict(size=7 if is_par else 5, color=color),
-        opacity=0.78 if var_name == 'Gramos de agua' else 1.0,
-        legendrank=order,
-        hovertemplate=(
-            f'<b>%{{x|{hover_time_format}}}</b><br>'
-            f'{var_name}: %{{y:.2f}} {VARIABLE_UNITS.get(var_name, "")}<extra></extra>'
-        )
-    )
-
-
-def _build_cortina_trace(df_state, var_name, hover_time_format, color):
-    # Reutiliza el formato del trazo escalonado para aperturas de cortina.
-    return dict(
-        x=df_state['Hora'],
-        y=df_state['Apertura'],
-        name=str(var_name),
-        mode='lines+markers',
-        line=dict(color=color, width=3.2, shape='hv'),
-        marker=dict(size=5, color=color),
-        hovertemplate=(
-            f'<b>%{{x|{hover_time_format}}}</b><br>%{{customdata[0]}}'
-            '<br>Apertura: %{y:.0f}%<br>%{customdata[1]}<extra></extra>'
-        ),
-        customdata=df_state[['Evento', 'Detalle']]
-    )
+    io.BytesIO(ruta_bytes),
+    sheet_name=sheet_name,
+    engine="openpyxl",
+    **kwargs
+)
 
 
 @st.cache_data
@@ -710,7 +509,7 @@ def cargar_datos(ruta_bytes):
         xls = pd.ExcelFile(io.BytesIO(ruta_bytes), engine="openpyxl")
         registros = []
 
-        for sheet in _get_valid_sheet_names(xls):
+        for sheet in [s for s in xls.sheet_names if s.lower() != 'plantilla']:
             df_sheet = _leer_excel_desde_bytes(ruta_bytes, sheet_name=sheet)
             df_sheet = _limpiar_columnas(df_sheet)
 
@@ -728,7 +527,7 @@ def cargar_datos(ruta_bytes):
 
             for col in SENSOR_VARIABLES:
                 if col in df_sheet.columns:
-                    df_sheet[col] = _to_numeric_series(df_sheet[col])
+                    df_sheet[col] = pd.to_numeric(df_sheet[col].astype(str).str.replace(',', '.'), errors='coerce')
 
             registros.append(df_sheet)
 
@@ -739,7 +538,6 @@ def cargar_datos(ruta_bytes):
 
 
 def parse_time(value):
-    # Acepta horas como datetime, time o texto con formatos mixtos AM/PM.
     if pd.isna(value):
         return None
     if isinstance(value, datetime):
@@ -759,6 +557,15 @@ def _sync_corr_bottom_to_top():
     st.session_state['variables_correlacion'] = st.session_state.get('variables_correlacion_bottom', []).copy()
 
 
+def _get_block_modification(block_name):
+    if not block_name:
+        return None
+    match = re.search(r'(\d+)', str(block_name))
+    if not match:
+        return None
+    return BLOCK_MODIFICATIONS.get(match.group(1))
+
+
 def _extract_block_code(block_name):
     if not block_name:
         return None
@@ -766,13 +573,22 @@ def _extract_block_code(block_name):
     return match.group(1) if match else None
 
 
-def _get_block_modification(block_name):
-    return BLOCK_MODIFICATIONS.get(_extract_block_code(block_name))
-
-
 def _get_shared_block_options(df_variables_all, df_cortinas_all):
-    variable_map = _extract_block_map(df_variables_all)
-    cortina_map = _extract_block_map(df_cortinas_all)
+    variable_map = {}
+    cortina_map = {}
+
+    if not df_variables_all.empty and 'Bloque' in df_variables_all.columns:
+        for block_name in sorted(df_variables_all['Bloque'].dropna().unique()):
+            block_code = _extract_block_code(block_name)
+            if block_code:
+                variable_map[block_code] = block_name
+
+    if not df_cortinas_all.empty and 'Bloque' in df_cortinas_all.columns:
+        for block_name in sorted(df_cortinas_all['Bloque'].dropna().unique()):
+            block_code = _extract_block_code(block_name)
+            if block_code:
+                cortina_map[block_code] = block_name
+
     shared_codes = sorted(set(variable_map) & set(cortina_map), key=lambda value: int(value))
     return shared_codes, variable_map, cortina_map
 
@@ -808,7 +624,6 @@ def _normalize_percent_value(value):
 
 
 def _build_cortina_apertura_profile(df_cortinas, elemento, config):
-    # Convierte eventos de apertura/cierre en una serie temporal escalonada.
     elemento_col = config['element_col']
     apertura_col = config['open_time_col']
     apertura_pct_col = config['open_pct_col']
@@ -934,8 +749,17 @@ def _get_shared_available_dates(df_variables_all, df_cortinas_all, bloque_variab
     if bloque_variables is None or bloque_cortinas is None:
         return []
 
-    fechas_variables = set(df_variables_all[df_variables_all['Bloque'] == bloque_variables]['Fecha_Filtro'].dropna())
-    fechas_cortinas = set(df_cortinas_all[df_cortinas_all['Bloque'] == bloque_cortinas]['Fecha'].dropna())
+    fechas_variables = set(
+        pd.Series(
+            df_variables_all[df_variables_all['Bloque'] == bloque_variables]['Fecha_Filtro'].dropna().unique()
+        ).tolist()
+    )
+    fechas_cortinas = set(
+        pd.Series(
+            df_cortinas_all[df_cortinas_all['Bloque'] == bloque_cortinas]['Fecha'].dropna().unique()
+        ).tolist()
+    )
+
     return sorted(fechas_variables & fechas_cortinas)
 
 
@@ -998,7 +822,7 @@ def cargar_cortinas(ruta_bytes):
         xls = pd.ExcelFile(io.BytesIO(ruta_bytes), engine="openpyxl")
         registros = []
 
-        for sheet in _get_valid_sheet_names(xls):
+        for sheet in [s for s in xls.sheet_names if s.lower() != 'plantilla']:
             raw = _leer_excel_desde_bytes(ruta_bytes, sheet_name=sheet, header=None)
             if raw.shape[0] < 4:
                 continue
@@ -1038,19 +862,27 @@ def cargar_cortinas(ruta_bytes):
 
 
 def _render_correlacion(df_variables_all, df_cortinas_all, fecha_variables, fecha_cortinas, bloque_variables, bloque_seleccionado, variables_seleccionadas=None):
-    # Este grÃ¡fico combina sensores y estado de cortinas sobre un mismo eje temporal.
     fecha_inicio, fecha_fin = fecha_variables
     multi_day_view = fecha_inicio != fecha_fin
     hover_time_format = '%d/%m %H:%M' if multi_day_view else '%H:%M'
     xaxis_tickformat = '%H:%M\n%d/%m' if multi_day_view else '%H:%M'
     xaxis_title_text = '<b>Fecha y hora</b>' if multi_day_view else '<b>Hora del Día</b>'
-    fecha_cortinas_inicio, fecha_cortinas_fin = _get_cortinas_date_range(fecha_cortinas)
-    df_variables = _filter_by_block_and_dates(
-        df_variables_all, 'Bloque', 'Fecha_Filtro', bloque_variables, fecha_inicio, fecha_fin
-    )
-    datos_cortinas_sel = _filter_by_block_and_dates(
-        df_cortinas_all, 'Bloque', 'Fecha', bloque_seleccionado, fecha_cortinas_inicio, fecha_cortinas_fin
-    )
+    if isinstance(fecha_cortinas, tuple):
+        fecha_cortinas_inicio, fecha_cortinas_fin = fecha_cortinas
+    else:
+        fecha_cortinas_inicio = fecha_cortinas
+        fecha_cortinas_fin = fecha_cortinas
+    df_variables = df_variables_all[
+        (df_variables_all['Fecha_Filtro'] >= fecha_inicio) &
+        (df_variables_all['Fecha_Filtro'] <= fecha_fin) &
+        (df_variables_all['Bloque'] == bloque_variables)
+    ].copy()
+    df_cortinas = df_cortinas_all
+    datos_cortinas_sel = df_cortinas[
+        (df_cortinas['Bloque'] == bloque_seleccionado) &
+        (df_cortinas['Fecha'] >= fecha_cortinas_inicio) &
+        (df_cortinas['Fecha'] <= fecha_cortinas_fin)
+    ].copy()
 
     sensor_vars = [v for v in SENSOR_VARIABLES if v in df_variables.columns]
     selected_vars = variables_seleccionadas or []
@@ -1095,12 +927,32 @@ def _render_correlacion(df_variables_all, df_cortinas_all, fecha_variables, fech
             if serie.empty:
                 continue
             serie_plot = _add_day_breaks_to_series(serie, var_name) if multi_day_view else serie
-            color = VARIABLE_COLORS.get(var_name, palette[order % len(palette)])
-            trace = _build_sensor_trace(serie_plot, var_name, hover_time_format, color, order)
+            trace = dict(
+                x=serie_plot['DateTime'],
+                y=serie_plot[var_name],
+                name=var_name,
+                mode='lines+markers',
+                line=dict(
+                    color=VARIABLE_COLORS.get(var_name, palette[order % len(palette)]),
+                    width=3 if var_name == 'Radiación PAR' else 2
+                ),
+                marker=dict(
+                    size=7 if var_name == 'Radiación PAR' else 5,
+                    color=VARIABLE_COLORS.get(var_name, palette[order % len(palette)])
+                ),
+                opacity=0.78 if var_name == 'Gramos de agua' else 1.0,
+                legendrank=order,
+                hovertemplate=(
+                    f'<b>%{{x|{hover_time_format}}}</b><br>' +
+                    var_name + ': %{y:.2f} ' +
+                    VARIABLE_UNITS.get(var_name, '') +
+                    '<extra></extra>'
+                )
+            )
             sensor_traces.append((
                 var_name,
                 trace,
-                color,
+                VARIABLE_COLORS.get(var_name, palette[order % len(palette)]),
                 sensor_render_priority.get(var_name, 0)
             ))
         elif var_name in selected_cortinas:
@@ -1111,7 +963,16 @@ def _render_correlacion(df_variables_all, df_cortinas_all, fecha_variables, fech
                 if df_state.empty:
                     continue
                 color = CORTINA_COLORS.get(str(var_name).upper(), palette[order % len(palette)])
-                trace = _build_cortina_trace(df_state, var_name, hover_time_format, color)
+                trace = dict(
+                    x=df_state['Hora'],
+                    y=df_state['Apertura'],
+                    name=str(var_name),
+                    mode='lines+markers',
+                    line=dict(color=color, width=3.2, shape='hv'),
+                    marker=dict(size=5, color=color),
+                    hovertemplate=f'<b>%{{x|{hover_time_format}}}</b><br>%{{customdata[0]}}<br>Apertura: %{{y:.0f}}%<br>%{{customdata[1]}}<extra></extra>',
+                    customdata=df_state[['Evento', 'Detalle']]
+                )
                 cortina_traces.append((var_name, trace, color))
                 break
 
@@ -1123,9 +984,47 @@ def _render_correlacion(df_variables_all, df_cortinas_all, fecha_variables, fech
     num_axes = len(sensor_traces)
     has_cortina_axis = bool(cortina_traces)
 
-    x_domain_end, axis_start, axis_end, cortina_axis_position, right_margin = _get_axis_layout(
-        num_axes, has_cortina_axis
-    )
+    if has_cortina_axis:
+        if num_axes >= 4:
+            x_domain_end = 0.76
+            axis_start = 0.80
+            axis_end = 0.92
+            cortina_axis_position = 0.965
+            right_margin = 250
+        elif num_axes == 3:
+            x_domain_end = 0.80
+            axis_start = 0.84
+            axis_end = 0.93
+            cortina_axis_position = 0.97
+            right_margin = 220
+        else:
+            x_domain_end = 0.84
+            axis_start = 0.87
+            axis_end = 0.94
+            cortina_axis_position = 0.98
+            right_margin = 190
+    else:
+        if num_axes >= 4:
+            x_domain_end = 0.82
+            axis_start = 0.87
+            axis_end = 0.95
+            right_margin = 220
+        elif num_axes == 3:
+            x_domain_end = 0.86
+            axis_start = 0.90
+            axis_end = 0.96
+            right_margin = 190
+        elif num_axes == 2:
+            x_domain_end = 0.90
+            axis_start = 0.93
+            axis_end = 0.97
+            right_margin = 160
+        else:
+            x_domain_end = 0.93
+            axis_start = 0.95
+            axis_end = 0.98
+            right_margin = 130
+        cortina_axis_position = None
 
     right_positions = [axis_start + i * ((axis_end - axis_start) / max(1, num_axes - 1)) for i in range(num_axes)]
     sensor_axis_names = ['y', 'y3', 'y4', 'y5']
@@ -1138,7 +1037,18 @@ def _render_correlacion(df_variables_all, df_cortinas_all, fecha_variables, fech
         fig_corr.add_trace(go.Scatter(**trace))
 
         serie = df_plot[['DateTime', var_name]].dropna(subset=[var_name]).copy()
-        axis_range = _get_sensor_axis_range(serie, var_name)
+        min_val = float(serie[var_name].min())
+        max_val = float(serie[var_name].max())
+        padding = 2 if var_name == 'Temperatura' else 5 if var_name == 'Humedad Relativa' else max(100, (max_val - min_val) * 0.08) if var_name == 'Radiación PAR' else 2
+        range_min = min_val - padding
+        if min_val >= 0:
+            range_min = max(0, range_min)
+        if 'PAR' in var_name and min_val >= 0:
+            range_min = -max(35, padding * 0.35)
+        range_max = max_val + padding
+        axis_range = [range_min, range_max]
+
+        side = 'right'
         position = right_positions[min(idx, len(right_positions) - 1)]
 
         axis_kwargs = dict(
@@ -1150,7 +1060,7 @@ def _render_correlacion(df_variables_all, df_cortinas_all, fecha_variables, fech
             tickcolor=color,
             range=axis_range,
             autorange=False,
-            side='right',
+            side=side,
             showgrid=False,
             showline=True,
             linecolor=color,
