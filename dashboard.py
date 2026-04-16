@@ -629,7 +629,8 @@ def _selector_state_key(var_name):
 
 def _reset_correlacion_selector(options):
     st.session_state['variables_correlacion'] = options.copy()
-    for option in SENSOR_VARIABLES + MOTOR_VARIABLES:
+    known_options = list(dict.fromkeys((SENSOR_VARIABLES + MOTOR_VARIABLES) + list(options)))
+    for option in known_options:
         st.session_state[_selector_state_key(option)] = option in options
 
 
@@ -843,6 +844,24 @@ def _get_available_cortina_vars(datos_cortinas):
     return ordered_known + extras
 
 
+def _get_available_sensor_vars(df_variables):
+    if df_variables.empty:
+        return []
+
+    return [
+        var_name for var_name in SENSOR_VARIABLES
+        if var_name in df_variables.columns and df_variables[var_name].notna().any()
+    ]
+
+
+def _get_available_correlacion_vars(df_variables, datos_cortinas):
+    sensor_vars = _get_available_sensor_vars(df_variables)
+    if not sensor_vars:
+        return []
+    motor_vars = _get_available_cortina_vars(datos_cortinas)
+    return list(dict.fromkeys(sensor_vars + motor_vars))
+
+
 def _get_available_variable_dates(df_variables_all, bloque_variables):
     if bloque_variables is None:
         return []
@@ -853,6 +872,42 @@ def _get_available_variable_dates(df_variables_all, bloque_variables):
         ).tolist()
     )
     return sorted(fechas_variables)
+
+
+def _filter_variables_range(df_variables_all, bloque_variables, fecha_inicio, fecha_fin):
+    if (
+        df_variables_all.empty or
+        'Fecha_Filtro' not in df_variables_all.columns or
+        'Bloque' not in df_variables_all.columns or
+        bloque_variables is None or
+        fecha_inicio is None or
+        fecha_fin is None
+    ):
+        return pd.DataFrame()
+
+    return df_variables_all[
+        (df_variables_all['Fecha_Filtro'] >= fecha_inicio) &
+        (df_variables_all['Fecha_Filtro'] <= fecha_fin) &
+        (df_variables_all['Bloque'] == bloque_variables)
+    ].copy()
+
+
+def _filter_cortinas_range(df_cortinas_all, bloque_seleccionado, fecha_inicio, fecha_fin):
+    if (
+        df_cortinas_all.empty or
+        'Fecha' not in df_cortinas_all.columns or
+        'Bloque' not in df_cortinas_all.columns or
+        bloque_seleccionado is None or
+        fecha_inicio is None or
+        fecha_fin is None
+    ):
+        return pd.DataFrame()
+
+    return df_cortinas_all[
+        (df_cortinas_all['Bloque'] == bloque_seleccionado) &
+        (df_cortinas_all['Fecha'] >= fecha_inicio) &
+        (df_cortinas_all['Fecha'] <= fecha_fin)
+    ].copy()
 
 
 def _get_daily_annotations(datos_cortinas):
@@ -953,38 +1008,16 @@ def cargar_cortinas(ruta_bytes):
         return pd.DataFrame()
 
 
-def _render_correlacion(df_variables_all, df_cortinas_all, fecha_variables, fecha_cortinas, bloque_variables, bloque_seleccionado, variables_seleccionadas=None):
+def _render_correlacion(df_variables, datos_cortinas_sel, fecha_variables, variables_seleccionadas=None):
     fecha_inicio, fecha_fin = fecha_variables
     multi_day_view = fecha_inicio != fecha_fin
     hover_time_format = '%d/%m %H:%M' if multi_day_view else '%H:%M'
     xaxis_tickformat = '%H:%M\n%d/%m' if multi_day_view else '%H:%M'
     xaxis_title_text = '<b>Fecha y hora</b>' if multi_day_view else '<b>Hora del Día</b>'
-    if isinstance(fecha_cortinas, tuple):
-        fecha_cortinas_inicio, fecha_cortinas_fin = fecha_cortinas
-    else:
-        fecha_cortinas_inicio = fecha_cortinas
-        fecha_cortinas_fin = fecha_cortinas
-    df_variables = df_variables_all[
-        (df_variables_all['Fecha_Filtro'] >= fecha_inicio) &
-        (df_variables_all['Fecha_Filtro'] <= fecha_fin) &
-        (df_variables_all['Bloque'] == bloque_variables)
-    ].copy()
-    df_cortinas = df_cortinas_all
-    if (
-        df_cortinas.empty or
-        'Bloque' not in df_cortinas.columns or
-        'Fecha' not in df_cortinas.columns or
-        bloque_seleccionado is None
-    ):
-        datos_cortinas_sel = pd.DataFrame()
-    else:
-        datos_cortinas_sel = df_cortinas[
-            (df_cortinas['Bloque'] == bloque_seleccionado) &
-            (df_cortinas['Fecha'] >= fecha_cortinas_inicio) &
-            (df_cortinas['Fecha'] <= fecha_cortinas_fin)
-        ].copy()
 
-    sensor_vars = [v for v in SENSOR_VARIABLES if v in df_variables.columns]
+    sensor_vars = _get_available_sensor_vars(df_variables)
+    available_cortinas = _get_available_cortina_vars(datos_cortinas_sel)
+    available_vars = list(dict.fromkeys(sensor_vars + available_cortinas))
     selected_vars = variables_seleccionadas or []
     if df_variables.empty or not sensor_vars:
         st.warning("No hay datos de variables disponibles para la combinación seleccionada.")
@@ -994,14 +1027,15 @@ def _render_correlacion(df_variables_all, df_cortinas_all, fecha_variables, fech
         st.warning("Selecciona al menos una variable para mostrar la correlación.")
         return
 
-    available_cortinas = _get_available_cortina_vars(datos_cortinas_sel)
-
     selected_sensors = [v for v in selected_vars if v in sensor_vars]
-    selected_cortinas = [v for v in selected_vars if v in MOTOR_VARIABLES]
-    missing_cortinas = [v for v in selected_cortinas if v not in available_cortinas]
+    selected_cortinas = [v for v in selected_vars if v in available_cortinas]
 
     if not selected_sensors and not selected_cortinas:
-        st.warning("No se detectaron variables seleccionadas válidas para graficar.")
+        if available_vars:
+            disponibles_texto = ', '.join(VARIABLE_SELECTOR_LABELS.get(var, var) for var in available_vars)
+            st.warning(f"No se detectaron variables seleccionadas válidas para graficar. Disponibles en este rango: {disponibles_texto}.")
+        else:
+            st.warning("No se detectaron variables válidas para graficar en el rango seleccionado.")
         return
 
     df_plot = df_variables[['DateTime'] + selected_sensors].copy() if selected_sensors else pd.DataFrame()
@@ -1280,9 +1314,6 @@ def _render_correlacion(df_variables_all, df_cortinas_all, fecha_variables, fech
 
     if selected_cortinas and not cortina_traces and selected_sensors:
         st.info('No hay información de motores para el rango seleccionado. Se muestran únicamente las variables ambientales.')
-    elif missing_cortinas:
-        motores_sin_datos = ', '.join(missing_cortinas)
-        st.caption(f"Sin información de motores en este rango: {motores_sin_datos}.")
 
 # 4. Datos cargados en memoria para evitar recálculos repetidos
 _df_variables_all = cargar_datos(archivo_variables_bytes) if archivo_variables_bytes else pd.DataFrame()
@@ -1389,15 +1420,38 @@ with st.sidebar.expander("Filtros Fechas", expanded=True):
                     fecha_variables = (fecha_inicio, fecha_fin)
                     fecha_cortinas = (fecha_inicio, fecha_fin)
 
+df_variables_corr = pd.DataFrame()
+datos_cortinas_sel = pd.DataFrame()
+available_correlacion_vars = []
+
+if fecha_variables is not None and bloque_variables is not None:
+    fecha_inicio, fecha_fin = fecha_variables
+    df_variables_corr = _filter_variables_range(
+        _df_variables_all,
+        bloque_variables,
+        fecha_inicio,
+        fecha_fin
+    )
+
+if fecha_cortinas is not None:
+    fecha_cortinas_inicio, fecha_cortinas_fin = fecha_cortinas
+    datos_cortinas_sel = _filter_cortinas_range(
+        _df_cortinas_all,
+        bloque_seleccionado,
+        fecha_cortinas_inicio,
+        fecha_cortinas_fin
+    )
+
+available_correlacion_vars = _get_available_correlacion_vars(df_variables_corr, datos_cortinas_sel)
+
 selected_vars_sidebar = []
-selector_options = SENSOR_VARIABLES + MOTOR_VARIABLES
 with st.sidebar.expander("Variables visibles", expanded=True):
     st.markdown(
         """
         <div class="sidebar-panel-card">
             <p class="sidebar-panel-title">Variables visibles</p>
             <p class="sidebar-panel-help">
-                Activa o desactiva las 8 series del análisis. Los motores se mostrarán cuando exista información para el rango seleccionado.
+                Activa o desactiva las series encontradas en el rango seleccionado. Si ese rango solo tiene variables ambientales, verás 4; si también hay motores, aparecerán las adicionales.
             </p>
         </div>
         """,
@@ -1406,14 +1460,21 @@ with st.sidebar.expander("Variables visibles", expanded=True):
 
     if bloque_variables is None or fecha_variables is None:
         st.write("Selecciona bloque y fechas para elegir qué series mostrar.")
+    elif not available_correlacion_vars:
+        st.write("No se encontraron variables con datos para el rango seleccionado.")
     else:
-        selector_context = tuple(selector_options)
+        selector_context = (
+            str(bloque_variables),
+            str(fecha_variables[0]),
+            str(fecha_variables[1]),
+            tuple(available_correlacion_vars)
+        )
         previous_context = st.session_state.get('variables_correlacion_context')
         if previous_context != selector_context:
-            _reset_correlacion_selector(selector_options)
+            _reset_correlacion_selector(available_correlacion_vars)
             st.session_state['variables_correlacion_context'] = selector_context
 
-        for option in selector_options:
+        for option in available_correlacion_vars:
             state_key = _selector_state_key(option)
             if state_key not in st.session_state:
                 st.session_state[state_key] = True
@@ -1422,7 +1483,7 @@ with st.sidebar.expander("Variables visibles", expanded=True):
                 key=state_key
             )
 
-        selected_vars_sidebar = _get_selected_correlacion_vars(selector_options)
+        selected_vars_sidebar = _get_selected_correlacion_vars(available_correlacion_vars)
 
 # Vista principal
 tab_correlacion = st.container()
@@ -1449,31 +1510,12 @@ with tab_correlacion:
         st.warning("Selecciona bloque y fechas en los filtros de la barra lateral.")
     else:
         fecha_inicio, fecha_fin = fecha_variables
-        fecha_cortinas_inicio, fecha_cortinas_fin = fecha_cortinas
         rango_multiple = fecha_inicio != fecha_fin
-        df_variables_corr = _df_variables_all[
-            (_df_variables_all['Fecha_Filtro'] >= fecha_inicio) &
-            (_df_variables_all['Fecha_Filtro'] <= fecha_fin) &
-            (_df_variables_all['Bloque'] == bloque_variables)
-        ].copy()
-        variables_sensor = [v for v in SENSOR_VARIABLES if v in df_variables_corr.columns]
+        variables_sensor = _get_available_sensor_vars(df_variables_corr)
         datos_sensores_corr = (
             df_variables_corr[['DateTime'] + variables_sensor].dropna(how='all', subset=variables_sensor)
             if variables_sensor else pd.DataFrame()
         )
-        if (
-            _df_cortinas_all.empty or
-            'Bloque' not in _df_cortinas_all.columns or
-            'Fecha' not in _df_cortinas_all.columns or
-            bloque_seleccionado is None
-        ):
-            datos_cortinas_sel = pd.DataFrame()
-        else:
-            datos_cortinas_sel = _df_cortinas_all[
-                (_df_cortinas_all['Bloque'] == bloque_seleccionado) &
-                (_df_cortinas_all['Fecha'] >= fecha_cortinas_inicio) &
-                (_df_cortinas_all['Fecha'] <= fecha_cortinas_fin)
-            ].copy()
 
         dias_sin_motores = _get_missing_motor_dates(df_variables_corr, datos_cortinas_sel)
         block_label = bloque_seleccionado or bloque_variables
@@ -1510,7 +1552,14 @@ with tab_correlacion:
             if not st.session_state.graficar_correlacion:
                 st.info("Usa el botón de la barra lateral para graficar u ocultar la correlación.")
             else:
-                if not datos_cortinas_sel.empty and dias_sin_motores:
+                selected_vars = selected_vars_sidebar or st.session_state.get('variables_correlacion', available_correlacion_vars.copy())
+
+                if df_variables_corr.empty:
+                    fecha_label = fecha_inicio.strftime('%Y-%m-%d') if not rango_multiple else f"{fecha_inicio.strftime('%Y-%m-%d')} a {fecha_fin.strftime('%Y-%m-%d')}"
+                    st.warning(f"No se encontraron datos de variables para el rango seleccionado: {fecha_label}.")
+                elif not available_correlacion_vars:
+                    st.warning("No se encontraron variables con datos para graficar en el rango seleccionado.")
+                elif not datos_cortinas_sel.empty and dias_sin_motores:
                     fechas_sin_motores = ', '.join(fecha.strftime('%Y-%m-%d') for fecha in dias_sin_motores[:5])
                     sufijo_fechas = '...' if len(dias_sin_motores) > 5 else ''
                     st.info(
@@ -1520,17 +1569,15 @@ with tab_correlacion:
                 elif datos_cortinas_sel.empty:
                     st.info("No hay informacion de motores para este rango. Se mostraran las variables ambientales disponibles.")
 
-                selected_vars = selected_vars_sidebar or st.session_state.get('variables_correlacion', selector_options.copy())
-                if not selected_vars:
+                if df_variables_corr.empty or not available_correlacion_vars:
+                    pass
+                elif not selected_vars:
                     st.warning('Selecciona al menos una variable para mostrar la correlación.')
                 else:
                     _render_correlacion(
-                        _df_variables_all,
-                        _df_cortinas_all,
+                        df_variables_corr,
+                        datos_cortinas_sel,
                         fecha_variables,
-                        fecha_cortinas,
-                        bloque_variables,
-                        bloque_seleccionado,
                         selected_vars
                     )
 
