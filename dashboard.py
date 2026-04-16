@@ -8,7 +8,7 @@ import re
 import html
 import base64
 from pathlib import Path
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 def _image_to_base64(image_path):
     try:
         return base64.b64encode(Path(image_path).read_bytes()).decode('utf-8')
@@ -610,6 +610,16 @@ def parse_time(value):
         return parsed.time() if not pd.isna(parsed) else None
     except Exception:
         return None
+
+
+def _coerce_sidebar_date(value, fallback):
+    if isinstance(value, datetime):
+        return value.date()
+    if isinstance(value, pd.Timestamp):
+        return value.date()
+    if isinstance(value, date):
+        return value
+    return fallback
 
 
 def _selector_state_key(var_name):
@@ -1325,12 +1335,16 @@ with st.sidebar.expander("Filtros Fechas", expanded=True):
             max_fecha = max(fechas_compartidas)
 
             if min_fecha == max_fecha:
-                st.caption("Solo hay una fecha disponible para esa combinación de bloques.")
-                fecha_unica = st.selectbox(
+                st.caption("Solo hay una fecha con datos en variables para este bloque, pero puedes consultar cualquier día desde el calendario.")
+                fecha_unica_default = _coerce_sidebar_date(
+                    st.session_state.get("fecha_calendario_unica", max_fecha),
+                    max_fecha
+                )
+                fecha_unica = st.date_input(
                     "Seleccionar fecha:",
-                    options=fechas_compartidas,
-                    format_func=lambda d: d.strftime('%Y-%m-%d'),
-                    key="fecha_compartida_unica"
+                    value=fecha_unica_default,
+                    key="fecha_calendario_unica",
+                    help="Puedes elegir cualquier día. Si no existen datos para esa fecha, el tablero mostrará el aviso correspondiente."
                 )
                 fecha_variables = (fecha_unica, fecha_unica)
                 fecha_cortinas = (fecha_unica, fecha_unica)
@@ -1343,12 +1357,15 @@ with st.sidebar.expander("Filtros Fechas", expanded=True):
                 )
 
                 if modo_fechas == "Un día":
-                    fecha_unica = st.selectbox(
+                    fecha_unica_default = _coerce_sidebar_date(
+                        st.session_state.get("fecha_calendario_un_dia", max_fecha),
+                        max_fecha
+                    )
+                    fecha_unica = st.date_input(
                         "Seleccionar fecha:",
-                        options=fechas_compartidas,
-                        index=len(fechas_compartidas) - 1,
-                        format_func=lambda d: d.strftime('%Y-%m-%d'),
-                        key="fecha_compartida_un_dia"
+                        value=fecha_unica_default,
+                        key="fecha_calendario_un_dia",
+                        help="Puedes elegir cualquier día. Si no existen datos para esa fecha, el tablero mostrará el aviso correspondiente."
                     )
                     fecha_variables = (fecha_unica, fecha_unica)
                     fecha_cortinas = (fecha_unica, fecha_unica)
