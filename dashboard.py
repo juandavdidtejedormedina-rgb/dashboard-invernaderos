@@ -1451,7 +1451,6 @@ def _render_main_view(df_variables_all, df_cortinas_all, bloque_variables, bloqu
             st.info("ℹ️ Sin datos de variables")
     with col2:
         if tiene_datos_cortinas:
-            from dashboard_data import _get_available_cortina_vars
             num_cortinas = len(_get_available_cortina_vars(datos_cortinas_sel))
             st.success(f"✅ Datos de cortinas disponibles ({num_cortinas} cortinas)")
         else:
