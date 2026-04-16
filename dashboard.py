@@ -7,6 +7,7 @@ import requests
 import re
 import html
 import base64
+import unicodedata
 from pathlib import Path
 from datetime import date, datetime, timedelta
 def _image_to_base64(image_path):
@@ -559,6 +560,67 @@ def _leer_excel_desde_bytes(ruta_bytes, sheet_name, **kwargs):
 )
 
 
+def _build_normalized_text_key(value):
+    normalized = unicodedata.normalize('NFKD', str(value))
+    normalized = ''.join(char for char in normalized if not unicodedata.combining(char))
+    normalized = normalized.replace('µ', 'u').replace('°', ' ')
+    normalized = normalized.lower()
+    normalized = re.sub(r'[^a-z0-9]+', ' ', normalized)
+    return re.sub(r'\s+', ' ', normalized).strip()
+
+
+def _normalize_variable_column_name(column_name):
+    text = re.sub(r'\s+', ' ', str(column_name).strip())
+    normalized_key = _build_normalized_text_key(text)
+
+    if normalized_key == 'datetime':
+        return 'DateTime'
+    if normalized_key == 'fecha':
+        return 'Fecha'
+    if normalized_key == 'hora':
+        return 'Hora'
+
+    normalized_key = re.sub(r'\bb\d+\b', ' ', normalized_key)
+    normalized_key = re.sub(r'\bumol\b.*$', ' ', normalized_key)
+    normalized_key = re.sub(r'\bg\b$', ' ', normalized_key)
+    normalized_key = re.sub(r'\bc\b$', ' ', normalized_key)
+    normalized_key = re.sub(r'\s+', ' ', normalized_key).strip()
+
+    if normalized_key.startswith('temperatura'):
+        return 'Temperatura'
+    if normalized_key.startswith('humedad relativa'):
+        return 'Humedad Relativa'
+    if normalized_key.startswith('radiacion par'):
+        return 'Radiación PAR'
+    if normalized_key.startswith('gramos de agua'):
+        return 'Gramos de agua'
+
+    return text
+
+
+def _combine_fecha_hora_columns(df):
+    if 'Fecha' not in df.columns or 'Hora' not in df.columns:
+        return df
+
+    df = df.copy()
+    fecha_series = pd.to_datetime(df['Fecha'], errors='coerce', dayfirst=True)
+    hora_series = df['Hora'].astype(str).str.strip()
+    hora_series = hora_series.replace({'NaT': '', 'nan': '', 'None': ''})
+    df['DateTime'] = pd.to_datetime(
+        fecha_series.dt.strftime('%Y-%m-%d') + ' ' + hora_series,
+        errors='coerce'
+    )
+    return df
+
+
+def _prepare_variables_sheet(df_sheet):
+    df_sheet = df_sheet.copy()
+    df_sheet.columns = [_normalize_variable_column_name(col) for col in df_sheet.columns]
+    if 'DateTime' not in df_sheet.columns and {'Fecha', 'Hora'}.issubset(df_sheet.columns):
+        df_sheet = _combine_fecha_hora_columns(df_sheet)
+    return df_sheet
+
+
 @st.cache_data
 def cargar_datos(ruta_bytes):
     if not ruta_bytes:
@@ -569,12 +631,14 @@ def cargar_datos(ruta_bytes):
         registros = []
 
         for sheet in [s for s in xls.sheet_names if s.lower() != 'plantilla']:
-            df_sheet = _leer_excel_desde_bytes(ruta_bytes, sheet_name=sheet)
-            df_sheet = _limpiar_columnas(df_sheet)
+            df_sheet = pd.DataFrame()
 
-            if 'DateTime' not in df_sheet.columns and len(df_sheet):
-                df_sheet = _leer_excel_desde_bytes(ruta_bytes, sheet_name=sheet, skiprows=1)
-                df_sheet = _limpiar_columnas(df_sheet)
+            for read_kwargs in ({}, {'skiprows': 1}):
+                candidate = _leer_excel_desde_bytes(ruta_bytes, sheet_name=sheet, **read_kwargs)
+                candidate = _prepare_variables_sheet(candidate)
+                if 'DateTime' in candidate.columns:
+                    df_sheet = candidate
+                    break
 
             if 'DateTime' not in df_sheet.columns:
                 continue
