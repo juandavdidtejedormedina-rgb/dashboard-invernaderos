@@ -524,21 +524,19 @@ def descargar_desde_github(url):
         st.error(f"Error al conectar con GitHub: {e}")
         return None
 
-
 # 2. Fuentes de datos en la barra lateral
 st.sidebar.header("Fuente de datos")
-archivo_variables_bytes = descargar_desde_github(URL_VARIABLES)
-archivo_cortinas_bytes = descargar_desde_github(URL_CORTINAS)
-
 st.sidebar.markdown(
     """
     <div class="sidebar-source-pill">
-        Variables y cortinas se leen directamente desde los archivos publicados en GitHub.
-        Si una fecha no aparece en el dashboard, hay que revisar que el archivo remoto del repositorio ya tenga esa información.
+        Variables y cortinas se leen directamente desde la nube. Ya no es necesario cargar archivos de Excel manualmente.
     </div>
     """,
     unsafe_allow_html=True
 )
+
+archivo_variables_bytes = descargar_desde_github(URL_VARIABLES)
+archivo_cortinas_bytes = descargar_desde_github(URL_CORTINAS)
 
 # 3. Funciones de carga de datos con corrección de FECHAS
 
