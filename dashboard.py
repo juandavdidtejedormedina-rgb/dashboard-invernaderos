@@ -237,6 +237,9 @@ st.markdown(f"""
     line-height: 1.45;
     margin-bottom: 0.4rem;
 }}
+[data-testid="stSidebar"] div.stButton > button {{
+    width: 100%;
+}}
 [data-testid="stSidebar"] .stFileUploader {{
     background: rgba(255, 255, 255, 0.06);
     border-radius: 16px;
@@ -1278,8 +1281,9 @@ _df_cortinas_all = cargar_cortinas(archivo_cortinas_bytes) if archivo_cortinas_b
 if 'graficar_correlacion' not in st.session_state:
     st.session_state.graficar_correlacion = False
 
-if st.sidebar.button("Detener / limpiar gráficos", key="boton_detener_graficos"):
-    st.session_state.graficar_correlacion = False
+toggle_chart_label = "Graficar correlación" if not st.session_state.graficar_correlacion else "Ocultar correlación"
+if st.sidebar.button(toggle_chart_label, key="boton_toggle_graficos", use_container_width=True):
+    st.session_state.graficar_correlacion = not st.session_state.graficar_correlacion
 
 st.sidebar.header("Filtros")
 
@@ -1485,12 +1489,8 @@ with tab_correlacion:
         tab_corr_graf, tab_corr_regs = st.tabs(["Correlación", "Registros"])
 
         with tab_corr_graf:
-            graficar_corr = st.button("Graficar correlación", key="boton_graficar_correlacion")
-            if graficar_corr:
-                st.session_state.graficar_correlacion = True
-
             if not st.session_state.graficar_correlacion:
-                st.info("Presiona el botón Graficar para generar el análisis de correlación.")
+                st.info("Usa el botón de la barra lateral para graficar u ocultar la correlación.")
             else:
                 if not datos_cortinas_sel.empty and dias_sin_motores:
                     fechas_sin_motores = ', '.join(fecha.strftime('%Y-%m-%d') for fecha in dias_sin_motores[:5])
