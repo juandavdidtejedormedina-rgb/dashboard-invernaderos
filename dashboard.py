@@ -187,19 +187,6 @@ SIDE_CONFIGS = {
 # DATA LOADING FUNCTIONS
 # ============================================================================
 
-BLOCK_MODIFICATIONS,
-    CORTINAS_COLUMNAS,
-    CORTINAS_COLUMNAS_CON_DIA,
-    CORTINAS_NUMERIC_COLUMNS,
-    CORTINAS_TIME_COLUMNS,
-    LOCAL_CORTINAS_PATH,
-    LOCAL_VARIABLES_PATH,
-    SENSOR_VARIABLES,
-    SIDE_CONFIGS,
-    URL_CORTINAS,
-    URL_VARIABLES,
-    WEEKDAY_ES,
-)
 @st.cache_data(show_spinner="Descargando datos desde el repositorio...")
 def descargar_desde_github(url):
     """Fallback remoto para cuando no hay archivos cargados ni archivos locales."""
@@ -631,20 +618,6 @@ def cargar_cortinas(ruta_bytes):
 # PLOTTING FUNCTIONS
 # ============================================================================
 
-BRAND_COLORS,
-    CORR_AXIS_TITLES,
-    CORTINA_COLORS,
-    FALLBACK_PLOTLY_COLORS,
-    SENSOR_RENDER_PRIORITY,
-    SENSOR_VARIABLES,
-    SIDE_CONFIGS,
-    VARIABLE_COLORS,
-    VARIABLE_UNITS,
-)
-    _add_day_breaks_to_series,
-    _build_cortina_apertura_profile,
-    _get_available_cortina_vars,
-)
 def _get_time_axis_config(multi_day_view):
     return {
         "hover_time_format": "%d/%m %H:%M" if multi_day_view else "%H:%M",
@@ -891,12 +864,6 @@ def render_correlacion(datos_sensores_corr, datos_cortinas_sel, multi_day_view, 
 # UI FUNCTIONS
 # ============================================================================
 
-_get_shared_available_dates,
-    _get_shared_block_options,
-    _get_variables_available_dates,
-    _get_cortinas_available_dates,
-    resolve_default_sources,
-)
 def _image_to_base64(image_path):
     try:
         return base64.b64encode(Path(image_path).read_bytes()).decode("utf-8")
@@ -1424,24 +1391,6 @@ def render_shared_filters(df_variables_all, df_cortinas_all):
 # MAIN APPLICATION LOGIC
 # ============================================================================
 
-_filter_cortinas_data,
-    _filter_variables_data,
-    _get_available_correlacion_vars,
-    _get_block_modification,
-    _get_culatas_daily_observation,
-    _get_daily_annotations,
-    _get_sensor_records,
-    cargar_cortinas,
-    cargar_datos,
-)
-    build_block_note_html,
-    build_logo_html,
-    get_app_styles,
-    render_data_sources_sidebar,
-    render_hero,
-    render_section_intro,
-    render_shared_filters,
-)
 def _sync_corr_bottom_to_top():
     st.session_state["variables_correlacion"] = st.session_state.get("variables_correlacion_bottom", []).copy()
 def _sync_variable_selection_state(available_vars, context):
