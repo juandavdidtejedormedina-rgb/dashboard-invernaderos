@@ -40,6 +40,17 @@ CORTINA_COLORS = {
     'PUERTA 1': '#9F6C76',
     'PUERTA 2': '#F4C7CE'
 }
+MOTOR_VARIABLES = list(CORTINA_COLORS.keys())
+VARIABLE_SELECTOR_LABELS = {
+    'Temperatura': 'Temperatura (°C)',
+    'Humedad Relativa': 'Humedad Relativa (%)',
+    'Radiación PAR': 'Radiación PAR',
+    'Gramos de agua': 'Gramos de agua (g)',
+    'FRENTE 1': 'Frente 1',
+    'FRENTE 2': 'Frente 2',
+    'PUERTA 1': 'Puerta 1',
+    'PUERTA 2': 'Puerta 2'
+}
 BRAND_COLORS = {
     'hero': '#545386',
     'sky': '#C2DFEA',
@@ -176,6 +187,55 @@ st.markdown(f"""
 [data-testid="stSidebar"] .stExpander details summary {{
     background: rgba(255, 255, 255, 0.06);
     padding: 0.35rem 0.65rem;
+}}
+[data-testid="stSidebar"] [data-testid="stCheckbox"] {{
+    margin-bottom: 0.15rem;
+}}
+[data-testid="stSidebar"] [data-testid="stCheckbox"] label {{
+    width: 100%;
+    padding: 0.38rem 0.48rem;
+    border-radius: 14px;
+    border: 1px solid rgba(255, 255, 255, 0.10);
+    background: rgba(255, 255, 255, 0.06);
+    transition: background 0.2s ease, transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}}
+[data-testid="stSidebar"] [data-testid="stCheckbox"] label:hover {{
+    background: rgba(255, 255, 255, 0.11);
+    border-color: rgba(194, 223, 234, 0.35);
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.12);
+    transform: translateX(2px);
+}}
+.sidebar-panel-card {{
+    padding: 0.9rem 0.95rem;
+    border-radius: 18px;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.06));
+    box-shadow: 0 14px 28px rgba(0, 0, 0, 0.10);
+    margin-bottom: 0.65rem;
+}}
+.sidebar-panel-title {{
+    margin: 0;
+    color: #ffffff;
+    font-family: 'Montserrat', sans-serif;
+    font-size: 0.96rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+}}
+.sidebar-panel-help {{
+    margin: 0.28rem 0 0 0;
+    color: rgba(247, 247, 251, 0.78);
+    font-size: 0.82rem;
+    line-height: 1.45;
+}}
+.sidebar-source-pill {{
+    padding: 0.8rem 0.95rem;
+    border-radius: 16px;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.14), rgba(194, 223, 234, 0.12));
+    color: #f7f7fb;
+    font-size: 0.88rem;
+    line-height: 1.45;
+    margin-bottom: 0.4rem;
 }}
 [data-testid="stSidebar"] .stFileUploader {{
     background: rgba(255, 255, 255, 0.06);
@@ -454,30 +514,26 @@ URL_CORTINAS = "https://raw.githubusercontent.com/juandavdidtejedormedina-rgb/da
 @st.cache_data(show_spinner="Descargando datos desde el repositorio...")
 def descargar_desde_github(url):
     try:
-        response = requests.get(url)
+        response = requests.get(url, timeout=30)
         response.raise_for_status()
         return response.content
     except Exception as e:
         st.error(f"Error al conectar con GitHub: {e}")
         return None
 
-# 2. Selector de archivos en la barra lateral
-st.sidebar.header("Actualmente se estan leyendo datos de la nube, si desea leer otro archivo debe subirlo")
-st.sidebar.caption("Usa los archivos de la nube o sube unos nuevos.")
+# 2. Fuentes de datos en la barra lateral
+st.sidebar.header("Fuente de datos")
+st.sidebar.markdown(
+    """
+    <div class="sidebar-source-pill">
+        Variables y cortinas se leen directamente desde la nube. Ya no es necesario cargar archivos de Excel manualmente.
+    </div>
+    """,
+    unsafe_allow_html=True
+)
 
-archivo_variables = st.sidebar.file_uploader("Sube archivo variables (Opcional)", type=["xlsx"])
-archivo_cortinas = st.sidebar.file_uploader("Sube archivo cortinas (Opcional)", type=["xlsx"])
-
-# Lógica de asignación de datos
-if archivo_variables:
-    archivo_variables_bytes = archivo_variables.read()
-else:
-    archivo_variables_bytes = descargar_desde_github(URL_VARIABLES)
-
-if archivo_cortinas:
-    archivo_cortinas_bytes = archivo_cortinas.read()
-else:
-    archivo_cortinas_bytes = descargar_desde_github(URL_CORTINAS)
+archivo_variables_bytes = descargar_desde_github(URL_VARIABLES)
+archivo_cortinas_bytes = descargar_desde_github(URL_CORTINAS)
 
 # 3. Funciones de carga de datos con corrección de FECHAS
 
@@ -553,8 +609,34 @@ def parse_time(value):
         return None
 
 
-def _sync_corr_bottom_to_top():
-    st.session_state['variables_correlacion'] = st.session_state.get('variables_correlacion_bottom', []).copy()
+def _selector_state_key(var_name):
+    safe_name = re.sub(r'[^a-z0-9]+', '_', str(var_name).lower()).strip('_')
+    return f'variables_correlacion_{safe_name}'
+
+
+def _reset_correlacion_selector(options):
+    st.session_state['variables_correlacion'] = options.copy()
+    for option in SENSOR_VARIABLES + MOTOR_VARIABLES:
+        st.session_state[_selector_state_key(option)] = option in options
+
+
+def _get_selected_correlacion_vars(options):
+    selected_vars = [option for option in options if st.session_state.get(_selector_state_key(option), True)]
+    st.session_state['variables_correlacion'] = selected_vars
+    return selected_vars
+
+
+def _get_missing_motor_dates(df_variables, datos_cortinas):
+    if df_variables.empty or 'Fecha_Filtro' not in df_variables.columns:
+        return []
+
+    fechas_variables = set(pd.Series(df_variables['Fecha_Filtro'].dropna().unique()).tolist())
+    fechas_cortinas = set()
+
+    if not datos_cortinas.empty and 'Fecha' in datos_cortinas.columns:
+        fechas_cortinas = set(pd.Series(datos_cortinas['Fecha'].dropna().unique()).tolist())
+
+    return sorted(fechas_variables - fechas_cortinas)
 
 
 def _get_block_modification(block_name):
@@ -573,7 +655,7 @@ def _extract_block_code(block_name):
     return match.group(1) if match else None
 
 
-def _get_shared_block_options(df_variables_all, df_cortinas_all):
+def _get_block_options(df_variables_all, df_cortinas_all):
     variable_map = {}
     cortina_map = {}
 
@@ -589,8 +671,8 @@ def _get_shared_block_options(df_variables_all, df_cortinas_all):
             if block_code:
                 cortina_map[block_code] = block_name
 
-    shared_codes = sorted(set(variable_map) & set(cortina_map), key=lambda value: int(value))
-    return shared_codes, variable_map, cortina_map
+    block_codes = sorted(variable_map, key=lambda value: int(value))
+    return block_codes, variable_map, cortina_map
 
 
 def _find_cortinas_data_start(raw_df):
@@ -742,11 +824,14 @@ def _get_available_cortina_vars(datos_cortinas):
         element_col = config['element_col']
         if element_col in datos_cortinas.columns:
             available.extend([str(v).strip() for v in datos_cortinas[element_col].dropna().unique() if str(v).strip()])
-    return sorted(set(available))
+    available_set = set(available)
+    ordered_known = [motor for motor in MOTOR_VARIABLES if motor in available_set]
+    extras = sorted(available_set - set(MOTOR_VARIABLES))
+    return ordered_known + extras
 
 
-def _get_shared_available_dates(df_variables_all, df_cortinas_all, bloque_variables, bloque_cortinas):
-    if bloque_variables is None or bloque_cortinas is None:
+def _get_available_variable_dates(df_variables_all, bloque_variables):
+    if bloque_variables is None:
         return []
 
     fechas_variables = set(
@@ -754,13 +839,7 @@ def _get_shared_available_dates(df_variables_all, df_cortinas_all, bloque_variab
             df_variables_all[df_variables_all['Bloque'] == bloque_variables]['Fecha_Filtro'].dropna().unique()
         ).tolist()
     )
-    fechas_cortinas = set(
-        pd.Series(
-            df_cortinas_all[df_cortinas_all['Bloque'] == bloque_cortinas]['Fecha'].dropna().unique()
-        ).tolist()
-    )
-
-    return sorted(fechas_variables & fechas_cortinas)
+    return sorted(fechas_variables)
 
 
 def _get_daily_annotations(datos_cortinas):
@@ -878,16 +957,24 @@ def _render_correlacion(df_variables_all, df_cortinas_all, fecha_variables, fech
         (df_variables_all['Bloque'] == bloque_variables)
     ].copy()
     df_cortinas = df_cortinas_all
-    datos_cortinas_sel = df_cortinas[
-        (df_cortinas['Bloque'] == bloque_seleccionado) &
-        (df_cortinas['Fecha'] >= fecha_cortinas_inicio) &
-        (df_cortinas['Fecha'] <= fecha_cortinas_fin)
-    ].copy()
+    if (
+        df_cortinas.empty or
+        'Bloque' not in df_cortinas.columns or
+        'Fecha' not in df_cortinas.columns or
+        bloque_seleccionado is None
+    ):
+        datos_cortinas_sel = pd.DataFrame()
+    else:
+        datos_cortinas_sel = df_cortinas[
+            (df_cortinas['Bloque'] == bloque_seleccionado) &
+            (df_cortinas['Fecha'] >= fecha_cortinas_inicio) &
+            (df_cortinas['Fecha'] <= fecha_cortinas_fin)
+        ].copy()
 
     sensor_vars = [v for v in SENSOR_VARIABLES if v in df_variables.columns]
     selected_vars = variables_seleccionadas or []
-    if df_variables.empty or datos_cortinas_sel.empty or not sensor_vars:
-        st.warning("No hay datos disponibles para la combinación seleccionada o no se detectaron las columnas de sensor.")
+    if df_variables.empty or not sensor_vars:
+        st.warning("No hay datos de variables disponibles para la combinación seleccionada.")
         return
 
     if not selected_vars:
@@ -897,7 +984,8 @@ def _render_correlacion(df_variables_all, df_cortinas_all, fecha_variables, fech
     available_cortinas = _get_available_cortina_vars(datos_cortinas_sel)
 
     selected_sensors = [v for v in selected_vars if v in sensor_vars]
-    selected_cortinas = [v for v in selected_vars if v in available_cortinas]
+    selected_cortinas = [v for v in selected_vars if v in MOTOR_VARIABLES]
+    missing_cortinas = [v for v in selected_cortinas if v not in available_cortinas]
 
     if not selected_sensors and not selected_cortinas:
         st.warning("No se detectaron variables seleccionadas válidas para graficar.")
@@ -976,8 +1064,15 @@ def _render_correlacion(df_variables_all, df_cortinas_all, fecha_variables, fech
                 cortina_traces.append((var_name, trace, color))
                 break
 
+    if not selected_sensors and selected_cortinas and not cortina_traces:
+        st.warning('No hay información de motores para el rango seleccionado.')
+        return
+
     if not sensor_traces and not cortina_traces:
-        st.warning('No hay datos disponibles para las variables seleccionadas.')
+        if selected_cortinas and not selected_sensors:
+            st.warning('No hay informacion de motores para el rango seleccionado. Elige otra fecha o activa alguna variable ambiental.')
+        else:
+            st.warning('No hay datos disponibles para las variables seleccionadas.')
         return
 
     axis_configs = {}
@@ -1170,6 +1265,12 @@ def _render_correlacion(df_variables_all, df_cortinas_all, fecha_variables, fech
 
     st.plotly_chart(fig_corr, width='stretch')
 
+    if selected_cortinas and not cortina_traces and selected_sensors:
+        st.info('No hay información de motores para el rango seleccionado. Se muestran únicamente las variables ambientales.')
+    elif missing_cortinas:
+        motores_sin_datos = ', '.join(missing_cortinas)
+        st.caption(f"Sin información de motores en este rango: {motores_sin_datos}.")
+
 # 4. Datos cargados en memoria para evitar recálculos repetidos
 _df_variables_all = cargar_datos(archivo_variables_bytes) if archivo_variables_bytes else pd.DataFrame()
 _df_cortinas_all = cargar_cortinas(archivo_cortinas_bytes) if archivo_cortinas_bytes else pd.DataFrame()
@@ -1180,21 +1281,21 @@ if 'graficar_correlacion' not in st.session_state:
 if st.sidebar.button("Detener / limpiar gráficos", key="boton_detener_graficos"):
     st.session_state.graficar_correlacion = False
 
-st.sidebar.header("Filtros compartidos")
+st.sidebar.header("Filtros")
 
-shared_block_codes, variable_block_map, cortina_block_map = _get_shared_block_options(_df_variables_all, _df_cortinas_all)
+block_codes, variable_block_map, cortina_block_map = _get_block_options(_df_variables_all, _df_cortinas_all)
 bloque_variables = None
 bloque_seleccionado = None
 
 with st.sidebar.expander("Filtros Bloque", expanded=True):
-    if _df_variables_all.empty or _df_cortinas_all.empty:
-        st.write("Carga ambos archivos para habilitar el bloque compartido.")
-    elif not shared_block_codes:
-        st.warning("No hay bloques en común entre variables y cortinas.")
+    if _df_variables_all.empty:
+        st.write("No se encontraron datos de variables para habilitar los bloques.")
+    elif not block_codes:
+        st.warning("No se detectaron bloques válidos dentro del archivo de variables.")
     else:
         selected_block_code = st.selectbox(
             "Seleccionar bloque:",
-            options=shared_block_codes,
+            options=block_codes,
             format_func=lambda code: f"Bloque {code}",
             key="bloque_compartido"
         )
@@ -1205,20 +1306,15 @@ with st.sidebar.expander("Filtros Fechas", expanded=True):
     fecha_variables = None
     fecha_cortinas = None
 
-    if _df_variables_all.empty or _df_cortinas_all.empty:
-        st.write("Carga ambos archivos para habilitar el filtro compartido de fechas.")
-    elif bloque_variables is None or bloque_seleccionado is None:
-        st.write("Selecciona primero el bloque de variables y el bloque de cortinas.")
+    if _df_variables_all.empty:
+        st.write("No hay datos de variables para habilitar el filtro de fechas.")
+    elif bloque_variables is None:
+        st.write("Selecciona primero el bloque.")
     else:
-        fechas_compartidas = _get_shared_available_dates(
-            _df_variables_all,
-            _df_cortinas_all,
-            bloque_variables,
-            bloque_seleccionado
-        )
+        fechas_compartidas = _get_available_variable_dates(_df_variables_all, bloque_variables)
 
         if not fechas_compartidas:
-            st.warning("No hay fechas comunes entre los bloques seleccionados.")
+            st.warning("No hay fechas disponibles en variables para el bloque seleccionado.")
         else:
             min_fecha = min(fechas_compartidas)
             max_fecha = max(fechas_compartidas)
@@ -1271,6 +1367,41 @@ with st.sidebar.expander("Filtros Fechas", expanded=True):
                     fecha_variables = (fecha_inicio, fecha_fin)
                     fecha_cortinas = (fecha_inicio, fecha_fin)
 
+selected_vars_sidebar = []
+selector_options = SENSOR_VARIABLES + MOTOR_VARIABLES
+with st.sidebar.expander("Variables visibles", expanded=True):
+    st.markdown(
+        """
+        <div class="sidebar-panel-card">
+            <p class="sidebar-panel-title">Variables visibles</p>
+            <p class="sidebar-panel-help">
+                Activa o desactiva las 8 series del análisis. Los motores se mostrarán cuando exista información para el rango seleccionado.
+            </p>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+    if bloque_variables is None or fecha_variables is None:
+        st.write("Selecciona bloque y fechas para elegir qué series mostrar.")
+    else:
+        selector_context = tuple(selector_options)
+        previous_context = st.session_state.get('variables_correlacion_context')
+        if previous_context != selector_context:
+            _reset_correlacion_selector(selector_options)
+            st.session_state['variables_correlacion_context'] = selector_context
+
+        for option in selector_options:
+            state_key = _selector_state_key(option)
+            if state_key not in st.session_state:
+                st.session_state[state_key] = True
+            st.checkbox(
+                VARIABLE_SELECTOR_LABELS.get(option, option),
+                key=state_key
+            )
+
+        selected_vars_sidebar = _get_selected_correlacion_vars(selector_options)
+
 # Vista principal
 tab_correlacion = st.container()
 
@@ -1290,9 +1421,9 @@ with tab_correlacion:
         unsafe_allow_html=True
     )
 
-    if _df_variables_all.empty or _df_cortinas_all.empty:
-        st.warning("Debes cargar ambos archivos (variables y cortinas) para ver este análisis.")
-    elif fecha_variables is None or fecha_cortinas is None or bloque_seleccionado is None or bloque_variables is None:
+    if _df_variables_all.empty:
+        st.warning("No se encontraron datos de variables para visualizar este análisis.")
+    elif fecha_variables is None or fecha_cortinas is None or bloque_variables is None:
         st.warning("Selecciona bloque y fechas en los filtros de la barra lateral.")
     else:
         fecha_inicio, fecha_fin = fecha_variables
@@ -1308,12 +1439,21 @@ with tab_correlacion:
             df_variables_corr[['DateTime'] + variables_sensor].dropna(how='all', subset=variables_sensor)
             if variables_sensor else pd.DataFrame()
         )
-        datos_cortinas_sel = _df_cortinas_all[
-            (_df_cortinas_all['Bloque'] == bloque_seleccionado) &
-            (_df_cortinas_all['Fecha'] >= fecha_cortinas_inicio) &
-            (_df_cortinas_all['Fecha'] <= fecha_cortinas_fin)
-        ].copy()
+        if (
+            _df_cortinas_all.empty or
+            'Bloque' not in _df_cortinas_all.columns or
+            'Fecha' not in _df_cortinas_all.columns or
+            bloque_seleccionado is None
+        ):
+            datos_cortinas_sel = pd.DataFrame()
+        else:
+            datos_cortinas_sel = _df_cortinas_all[
+                (_df_cortinas_all['Bloque'] == bloque_seleccionado) &
+                (_df_cortinas_all['Fecha'] >= fecha_cortinas_inicio) &
+                (_df_cortinas_all['Fecha'] <= fecha_cortinas_fin)
+            ].copy()
 
+        dias_sin_motores = _get_missing_motor_dates(df_variables_corr, datos_cortinas_sel)
         block_label = bloque_seleccionado or bloque_variables
         block_modification = _get_block_modification(block_label)
         culatas_observation = _get_culatas_daily_observation(datos_cortinas_sel)
@@ -1352,43 +1492,17 @@ with tab_correlacion:
             if not st.session_state.graficar_correlacion:
                 st.info("Presiona el botón Graficar para generar el análisis de correlación.")
             else:
-                available_vars = [v for v in SENSOR_VARIABLES if v in _df_variables_all.columns]
-                cortina_vars = _get_available_cortina_vars(datos_cortinas_sel)
+                if not datos_cortinas_sel.empty and dias_sin_motores:
+                    fechas_sin_motores = ', '.join(fecha.strftime('%Y-%m-%d') for fecha in dias_sin_motores[:5])
+                    sufijo_fechas = '...' if len(dias_sin_motores) > 5 else ''
+                    st.info(
+                        f"Hay {len(dias_sin_motores)} dia(s) del rango sin informacion de motores: "
+                        f"{fechas_sin_motores}{sufijo_fechas}. Los motores se grafican solo donde existen registros."
+                    )
+                elif datos_cortinas_sel.empty:
+                    st.info("No hay informacion de motores para este rango. Se mostraran las variables ambientales disponibles.")
 
-                available_vars += cortina_vars
-                current_context = (
-                    str(bloque_variables),
-                    str(bloque_seleccionado),
-                    str(fecha_inicio),
-                    str(fecha_fin),
-                    str(fecha_cortinas),
-                    tuple(available_vars)
-                )
-                previous_context = st.session_state.get('variables_correlacion_context')
-                if previous_context != current_context:
-                    st.session_state['variables_correlacion'] = available_vars.copy()
-                    st.session_state['variables_correlacion_bottom'] = available_vars.copy()
-                    st.session_state['variables_correlacion_context'] = current_context
-
-                current_top = [v for v in st.session_state.get('variables_correlacion', available_vars.copy()) if v in available_vars]
-                current_bottom = [v for v in st.session_state.get('variables_correlacion_bottom', current_top) if v in available_vars]
-
-                st.session_state['variables_correlacion'] = current_top
-                if 'variables_correlacion_bottom' not in st.session_state:
-                    st.session_state['variables_correlacion_bottom'] = current_top
-                else:
-                    st.session_state['variables_correlacion_bottom'] = current_bottom
-
-                st.pills(
-                    'Mostrar u ocultar variables:',
-                    options=available_vars,
-                    default=st.session_state['variables_correlacion_bottom'],
-                    selection_mode='multi',
-                    format_func=lambda v: VARIABLE_LABELS.get(v, v),
-                    key='variables_correlacion_bottom',
-                    on_change=_sync_corr_bottom_to_top
-                )
-                selected_vars = st.session_state['variables_correlacion_bottom']
+                selected_vars = selected_vars_sidebar or st.session_state.get('variables_correlacion', selector_options.copy())
                 if not selected_vars:
                     st.warning('Selecciona al menos una variable para mostrar la correlación.')
                 else:
