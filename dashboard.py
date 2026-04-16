@@ -1284,6 +1284,7 @@ if 'graficar_correlacion' not in st.session_state:
 toggle_chart_label = "Graficar correlación" if not st.session_state.graficar_correlacion else "Ocultar correlación"
 if st.sidebar.button(toggle_chart_label, key="boton_toggle_graficos", use_container_width=True):
     st.session_state.graficar_correlacion = not st.session_state.graficar_correlacion
+    st.rerun()
 
 st.sidebar.header("Filtros")
 
