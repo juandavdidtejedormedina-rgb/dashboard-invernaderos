@@ -30,16 +30,16 @@ VARIABLE_UNITS = {
     'Gramos de agua': 'g'
 }
 VARIABLE_COLORS = {
-    'Temperatura': '#6FAEF7',
-    'Humedad Relativa': '#2F3136',
-    'Radiación PAR': '#7ED957',
-    'Gramos de agua': '#F5A14B'
+    'Temperatura': '#6E97F2',
+    'Humedad Relativa': '#5B6275',
+    'Radiación PAR': '#8CBD63',
+    'Gramos de agua': '#D39A58'
 }
 CORTINA_COLORS = {
-    'FRENTE 1': '#545386',
-    'FRENTE 2': '#8D86BE',
-    'PUERTA 1': '#9F6C76',
-    'PUERTA 2': '#F4C7CE'
+    'FRENTE 1': '#524B82',
+    'FRENTE 2': '#8077AE',
+    'PUERTA 1': '#9E6F7F',
+    'PUERTA 2': '#D8B7C0'
 }
 MOTOR_VARIABLES = list(CORTINA_COLORS.keys())
 VARIABLE_SELECTOR_LABELS = {
@@ -53,13 +53,13 @@ VARIABLE_SELECTOR_LABELS = {
     'PUERTA 2': 'Puerta 2'
 }
 BRAND_COLORS = {
-    'hero': '#545386',
-    'sky': '#C2DFEA',
-    'rose': '#F4C7CE',
-    'beige': '#D8D2C4',
-    'graphite': '#383A35',
-    'ink': '#26282F',
-    'paper': '#FAF8F3',
+    'hero': '#4C4678',
+    'sky': '#D6E5EC',
+    'rose': '#E7D2DA',
+    'beige': '#D9CDBA',
+    'graphite': '#2D3040',
+    'ink': '#1F2430',
+    'paper': '#F7F4EE',
     'white': '#FFFFFF'
 }
 APP_DIR = Path(__file__).resolve().parent
@@ -135,7 +135,7 @@ SIDE_CONFIGS = {
 
 # 1. Configuración de la página
 st.set_page_config(
-    page_title="The Elite Flower | Monitor Variables B34",
+    page_title="The Elite Flower | Dashboard Ejecutivo",
     page_icon="📊",
     layout="wide"
 )
@@ -147,7 +147,7 @@ logo_html = (
 
 st.markdown(f"""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@500;600;700;800&family=Roboto:wght@300;400;500;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=Manrope:wght@400;500;600;700;800&display=swap');
 
 :root {{
     --elite-hero: {BRAND_COLORS['hero']};
@@ -158,17 +158,21 @@ st.markdown(f"""
     --elite-ink: {BRAND_COLORS['ink']};
     --elite-paper: {BRAND_COLORS['paper']};
     --elite-white: {BRAND_COLORS['white']};
+    --font-display: 'Manrope', sans-serif;
+    --font-body: 'Manrope', sans-serif;
+    --font-brand: 'Cormorant Garamond', serif;
 }}
 
 .stApp {{
     background:
-        radial-gradient(circle at top right, rgba(194, 223, 234, 0.45), transparent 25%),
-        linear-gradient(180deg, #fffdf8 0%, var(--elite-paper) 100%);
+        radial-gradient(circle at 12% 18%, rgba(217, 205, 186, 0.22), transparent 22%),
+        radial-gradient(circle at 88% 10%, rgba(214, 229, 236, 0.34), transparent 28%),
+        linear-gradient(180deg, #fcfaf6 0%, var(--elite-paper) 58%, #f2eee6 100%);
     color: var(--elite-ink);
-    font-family: 'Roboto', sans-serif;
+    font-family: var(--font-body);
 }}
 [data-testid="stAppViewContainer"] > .main {{
-    padding-top: 1.25rem;
+    padding-top: 1.4rem;
 }}
 [data-testid="stAppViewContainer"] > .main .block-container {{
     max-width: 1180px;
@@ -207,8 +211,10 @@ section[data-testid="stSidebar"] > div {{
 }}
 [data-testid="stSidebar"] {{
     background:
-        linear-gradient(180deg, rgba(84, 83, 134, 0.97) 0%, rgba(56, 58, 53, 0.98) 100%);
+        radial-gradient(circle at top left, rgba(231, 210, 218, 0.18), transparent 24%),
+        linear-gradient(180deg, rgba(76, 70, 120, 0.98) 0%, rgba(31, 36, 48, 0.99) 100%);
     border-right: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 18px 0 42px rgba(31, 36, 48, 0.18);
 }}
 [data-testid="stSidebar"] * {{
     color: #f7f7fb;
@@ -219,10 +225,10 @@ section[data-testid="stSidebar"] > div {{
     gap: 0.5rem;
     margin: 0.2rem 0 0.8rem 0.15rem;
     color: #ffffff;
-    font-family: 'Montserrat', sans-serif;
-    font-size: 1.35rem;
-    font-weight: 700;
-    letter-spacing: 0.01em;
+    font-family: var(--font-display);
+    font-size: 1.42rem;
+    font-weight: 800;
+    letter-spacing: 0.02em;
 }}
 .sidebar-title-icon {{
     display: inline-flex;
@@ -238,10 +244,11 @@ section[data-testid="stSidebar"] > div {{
     gap: 0.42rem;
     margin: 0.05rem 0 0.3rem 0.15rem;
     color: rgba(247, 247, 251, 0.92);
-    font-family: 'Montserrat', sans-serif;
-    font-size: 0.8rem;
+    font-family: var(--font-display);
+    font-size: 0.78rem;
     font-weight: 700;
-    letter-spacing: 0.03em;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
 }}
 .sidebar-field-icon {{
     display: inline-flex;
@@ -262,20 +269,20 @@ section[data-testid="stSidebar"] > div {{
     stroke-linejoin: round;
 }}
 [data-testid="stSidebar"] .stExpander {{
-    background: rgba(255, 255, 255, 0.08);
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    border-radius: 15px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.10), rgba(255, 255, 255, 0.05));
+    border: 1px solid rgba(255, 255, 255, 0.10);
+    border-radius: 18px;
     overflow: hidden;
-    box-shadow: 0 14px 30px rgba(0, 0, 0, 0.14);
-    margin-bottom: 0.7rem;
+    box-shadow: 0 18px 34px rgba(0, 0, 0, 0.16);
+    margin-bottom: 0.78rem;
 }}
 [data-testid="stSidebar"] .stExpander details summary {{
-    background: rgba(255, 255, 255, 0.06);
-    padding: 0.3rem 0.65rem;
+    background: rgba(255, 255, 255, 0.08);
+    padding: 0.42rem 0.75rem;
 }}
 [data-testid="stSidebar"] .stExpander details summary p {{
-    font-family: 'Montserrat', sans-serif;
-    font-size: 0.98rem;
+    font-family: var(--font-display);
+    font-size: 0.95rem;
     font-weight: 700;
 }}
 [data-testid="stSidebar"] [data-testid="stCheckbox"] {{
@@ -283,22 +290,22 @@ section[data-testid="stSidebar"] > div {{
 }}
 [data-testid="stSidebar"] [data-testid="stCheckbox"] label {{
     width: 100%;
-    padding: 0.34rem 0.52rem;
-    border-radius: 16px;
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    background: linear-gradient(180deg, rgba(255,255,255,0.11), rgba(255,255,255,0.05));
-    box-shadow: 0 8px 18px rgba(0, 0, 0, 0.10);
+    padding: 0.38rem 0.56rem;
+    border-radius: 18px;
+    border: 1px solid rgba(255, 255, 255, 0.10);
+    background: linear-gradient(180deg, rgba(255,255,255,0.13), rgba(255,255,255,0.06));
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.12);
     transition: background 0.2s ease, transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
 }}
 [data-testid="stSidebar"] [data-testid="stCheckbox"] label:hover {{
-    background: linear-gradient(180deg, rgba(255,255,255,0.16), rgba(255,255,255,0.08));
-    border-color: rgba(194, 223, 234, 0.36);
-    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.14);
+    background: linear-gradient(180deg, rgba(255,255,255,0.18), rgba(255,255,255,0.10));
+    border-color: rgba(214, 229, 236, 0.42);
+    box-shadow: 0 14px 28px rgba(0, 0, 0, 0.16);
     transform: translateX(2px);
 }}
 [data-testid="stSidebar"] [data-testid="stCheckbox"] p {{
     font-size: 0.9rem;
-    font-weight: 500;
+    font-weight: 600;
     letter-spacing: 0.01em;
 }}
 [data-testid="stSidebar"] [data-testid="stCheckbox"] svg {{
@@ -309,21 +316,22 @@ section[data-testid="stSidebar"] > div {{
 }}
 [data-testid="stSidebar"] div.stButton > button {{
     width: 100%;
-    min-height: 2.8rem;
+    min-height: 2.95rem;
     border-radius: 999px;
-    border: 1px solid rgba(255, 255, 255, 0.16);
-    background: linear-gradient(180deg, rgba(126, 121, 190, 0.98) 0%, rgba(94, 90, 160, 0.98) 100%);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    background: linear-gradient(135deg, #6a639c 0%, #4c4678 100%);
     color: var(--elite-white);
-    font-family: 'Montserrat', sans-serif;
-    font-weight: 700;
+    font-family: var(--font-display);
+    font-weight: 800;
     font-size: 0.92rem;
-    letter-spacing: 0.01em;
-    box-shadow: inset 0 1px 0 rgba(255,255,255,0.16), 0 18px 30px rgba(29, 24, 74, 0.28);
+    letter-spacing: 0.02em;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.16), 0 18px 32px rgba(27, 23, 53, 0.32);
 }}
 [data-testid="stSidebar"] div.stButton > button:hover {{
-    border-color: rgba(255, 255, 255, 0.24);
-    background: linear-gradient(180deg, rgba(139, 133, 206, 0.98) 0%, rgba(103, 99, 171, 0.98) 100%);
+    border-color: rgba(255, 255, 255, 0.22);
+    background: linear-gradient(135deg, #776fb0 0%, #575184 100%);
     color: var(--elite-white);
+    transform: translateY(-1px);
 }}
 .sidebar-source-pill {{
     padding: 0.85rem 0.95rem;
@@ -346,7 +354,7 @@ section[data-testid="stSidebar"] > div {{
 .sidebar-panel-title {{
     margin: 0;
     color: #ffffff;
-    font-family: 'Montserrat', sans-serif;
+    font-family: var(--font-display);
     font-size: 0.96rem;
     font-weight: 700;
     letter-spacing: 0.03em;
@@ -381,26 +389,39 @@ section[data-testid="stSidebar"] > div {{
     color: var(--elite-ink) !important;
 }}
 .hero-card {{
+    position: relative;
     display: grid;
     grid-template-columns: 200px minmax(0, 1fr);
     gap: 1.15rem;
     align-items: stretch;
-    padding: 1.2rem;
-    margin: 0 0 1.2rem 0;
-    border: 1px solid rgba(84, 83, 134, 0.12);
-    border-radius: 24px;
+    padding: 1.45rem 1.5rem;
+    margin: 0 0 1.35rem 0;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 30px;
     background:
-        linear-gradient(135deg, rgba(84, 83, 134, 0.96) 0%, rgba(84, 83, 134, 0.88) 52%, rgba(56, 58, 53, 0.96) 100%);
-    box-shadow: 0 24px 60px rgba(56, 58, 53, 0.18);
+        radial-gradient(circle at 18% 18%, rgba(255,255,255,0.16), transparent 18%),
+        linear-gradient(135deg, #5f598f 0%, #4c4678 38%, #2d3040 100%);
+    box-shadow: 0 28px 68px rgba(35, 30, 58, 0.22);
+    overflow: hidden;
+}}
+.hero-card::before {{
+    content: '';
+    position: absolute;
+    inset: 1px;
+    border-radius: 29px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    pointer-events: none;
 }}
 .hero-logo-shell {{
     display: flex;
     align-items: center;
     justify-content: center;
-    border-radius: 20px;
-    background: rgba(255, 255, 255, 0.98);
+    border-radius: 24px;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(247, 244, 238, 0.95));
     min-height: 150px;
-    padding: 1rem;
+    padding: 1.1rem;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.70), 0 20px 34px rgba(36, 31, 61, 0.18);
 }}
 .hero-logo-image {{
     width: 100%;
@@ -409,8 +430,8 @@ section[data-testid="stSidebar"] > div {{
     object-fit: contain;
 }}
 .hero-logo-fallback {{
-    font-family: 'Montserrat', sans-serif;
-    font-weight: 800;
+    font-family: var(--font-brand);
+    font-weight: 700;
     color: var(--elite-hero);
     text-align: center;
     letter-spacing: 0.08em;
@@ -423,26 +444,28 @@ section[data-testid="stSidebar"] > div {{
 }}
 .hero-kicker {{
     margin: 0 0 0.45rem 0;
-    color: rgba(255, 255, 255, 0.72);
-    font-size: 0.86rem;
-    letter-spacing: 0.18em;
+    color: rgba(255, 244, 238, 0.84);
+    font-family: var(--font-brand);
+    font-size: 1rem;
+    letter-spacing: 0.16em;
     text-transform: uppercase;
     font-weight: 700;
 }}
 .hero-copy h1 {{
     margin: 0;
     color: var(--elite-white);
-    font-family: 'Montserrat', sans-serif;
+    font-family: var(--font-display);
     font-weight: 800;
-    font-size: 2.15rem;
-    line-height: 1.06;
+    font-size: 2.35rem;
+    line-height: 1.02;
+    letter-spacing: -0.04em;
 }}
 .hero-subtitle {{
-    margin: 0.75rem 0 0.85rem 0;
-    max-width: 48rem;
-    color: rgba(255, 255, 255, 0.86);
-    font-size: 1rem;
-    line-height: 1.6;
+    margin: 0.85rem 0 0.1rem 0;
+    max-width: 44rem;
+    color: rgba(255, 255, 255, 0.82);
+    font-size: 1.03rem;
+    line-height: 1.7;
 }}
 .section-intro {{
     margin: 0.4rem 0 0.85rem 0;
@@ -462,9 +485,10 @@ section[data-testid="stSidebar"] > div {{
 .section-title {{
     margin: 0;
     color: var(--elite-graphite);
-    font-family: 'Montserrat', sans-serif;
+    font-family: var(--font-display);
     font-size: 1.45rem;
-    font-weight: 700;
+    font-weight: 800;
+    letter-spacing: -0.03em;
 }}
 .section-text {{
     margin: 0.45rem 0 0 0;
@@ -480,18 +504,19 @@ section[data-testid="stSidebar"] > div {{
 }}
 .summary-card {{
     position: relative;
-    padding: 1rem 1rem 0.95rem 1rem;
-    border-radius: 22px;
-    border: 1px solid rgba(84, 83, 134, 0.12);
-    background: linear-gradient(180deg, rgba(255,255,255,0.97) 0%, rgba(250,248,243,0.92) 100%);
-    box-shadow: 0 18px 36px rgba(56, 58, 53, 0.08);
+    padding: 1.08rem 1.08rem 1rem 1.08rem;
+    border-radius: 24px;
+    border: 1px solid rgba(76, 70, 120, 0.10);
+    background: linear-gradient(180deg, rgba(255,255,255,0.92) 0%, rgba(247,244,238,0.96) 100%);
+    box-shadow: 0 18px 40px rgba(45, 48, 64, 0.09);
     overflow: hidden;
+    backdrop-filter: blur(12px);
 }}
 .summary-card::before {{
     content: '';
     position: absolute;
     inset: 0 0 auto 0;
-    height: 4px;
+    height: 5px;
     background: linear-gradient(90deg, var(--summary-accent), var(--summary-accent-soft));
 }}
 .summary-card::after {{
@@ -534,7 +559,7 @@ section[data-testid="stSidebar"] > div {{
 }}
 .summary-card-label {{
     color: #646874;
-    font-family: 'Montserrat', sans-serif;
+    font-family: var(--font-display);
     font-size: 0.88rem;
     font-weight: 700;
     letter-spacing: 0.01em;
@@ -552,15 +577,16 @@ section[data-testid="stSidebar"] > div {{
 }}
 .summary-card-number {{
     color: var(--elite-graphite);
-    font-family: 'Montserrat', sans-serif;
-    font-size: 2.08rem;
+    font-family: var(--font-display);
+    font-size: 2.18rem;
     font-weight: 800;
     line-height: 1;
     font-variant-numeric: tabular-nums;
+    letter-spacing: -0.04em;
 }}
 .summary-card-unit {{
     margin-bottom: 0.3rem;
-    color: #5c5f68;
+    color: #5f6472;
     font-size: 0.88rem;
     font-weight: 600;
 }}
@@ -615,14 +641,15 @@ section[data-testid="stSidebar"] > div {{
     flex-direction: column;
     overflow: hidden;
     min-height: 232px;
-    padding: 1.15rem 1.18rem 1.12rem 1.18rem;
+    padding: 1.18rem 1.22rem 1.14rem 1.22rem;
     border-radius: 26px;
-    border: 1px solid rgba(84, 83, 134, 0.10);
+    border: 1px solid rgba(76, 70, 120, 0.08);
     background:
-        linear-gradient(135deg, rgba(255,255,255,0.99) 0%, rgba(250,248,243,0.96) 58%, rgba(255,255,255,0.93) 100%);
+        linear-gradient(180deg, rgba(255,255,255,0.94) 0%, rgba(247,244,238,0.96) 100%);
     box-shadow:
-        0 16px 34px rgba(56, 58, 53, 0.07),
+        0 20px 42px rgba(45, 48, 64, 0.08),
         inset 0 1px 0 rgba(255,255,255,0.70);
+    backdrop-filter: blur(12px);
 }}
 .info-panel-card::before {{
     content: '';
@@ -702,11 +729,11 @@ section[data-testid="stSidebar"] > div {{
 .info-panel-title {{
     margin: 0;
     color: var(--elite-graphite);
-    font-family: 'Montserrat', sans-serif;
-    font-size: 1rem;
-    font-weight: 700;
+    font-family: var(--font-display);
+    font-size: 1.02rem;
+    font-weight: 800;
     line-height: 1.16;
-    letter-spacing: -0.01em;
+    letter-spacing: -0.03em;
     word-break: keep-all;
     overflow-wrap: normal;
     hyphens: none;
@@ -718,12 +745,13 @@ section[data-testid="stSidebar"] > div {{
     border-radius: 999px;
     background: var(--info-accent-soft);
     color: var(--info-accent);
-    border: 1px solid rgba(84, 83, 134, 0.08);
+    border: 1px solid rgba(76, 70, 120, 0.08);
     box-shadow: inset 0 1px 0 rgba(255,255,255,0.62);
-    font-size: 0.67rem;
-    font-weight: 700;
-    letter-spacing: 0.02em;
+    font-size: 0.68rem;
+    font-weight: 800;
+    letter-spacing: 0.05em;
     white-space: nowrap;
+    text-transform: uppercase;
 }}
 .info-panel-body {{
     flex: 1 1 auto;
@@ -753,10 +781,11 @@ section[data-testid="stSidebar"] > div {{
 }}
 .info-panel-stat-value {{
     color: var(--elite-graphite);
-    font-family: 'Montserrat', sans-serif;
+    font-family: var(--font-display);
     font-size: 2.15rem;
     font-weight: 800;
     line-height: 1;
+    letter-spacing: -0.04em;
 }}
 .info-panel-stat-caption {{
     margin-bottom: 0.22rem;
@@ -776,9 +805,9 @@ section[data-testid="stSidebar"] > div {{
 }}
 .info-panel-empty-title {{
     color: var(--elite-graphite);
-    font-family: 'Montserrat', sans-serif;
+    font-family: var(--font-display);
     font-size: 1rem;
-    font-weight: 700;
+    font-weight: 800;
     line-height: 1.3;
 }}
 .info-panel-empty {{
@@ -811,8 +840,8 @@ section[data-testid="stSidebar"] > div {{
 .info-panel-day-card {{
     padding: 0.72rem 0.78rem;
     border-radius: 16px;
-    border: 1px solid rgba(84, 83, 134, 0.08);
-    background: linear-gradient(180deg, rgba(255,255,255,0.72), rgba(250,248,243,0.56));
+    border: 1px solid rgba(76, 70, 120, 0.07);
+    background: linear-gradient(180deg, rgba(255,255,255,0.86), rgba(246,242,235,0.84));
 }}
 .info-panel-day-header {{
     display: flex;
@@ -823,7 +852,7 @@ section[data-testid="stSidebar"] > div {{
 }}
 .info-panel-day-date {{
     color: var(--elite-graphite);
-    font-family: 'Montserrat', sans-serif;
+    font-family: var(--font-display);
     font-size: 0.8rem;
     font-weight: 700;
     line-height: 1.3;
@@ -833,7 +862,7 @@ section[data-testid="stSidebar"] > div {{
     align-items: center;
     padding: 0.22rem 0.56rem;
     border-radius: 999px;
-    background: rgba(84, 83, 134, 0.08);
+    background: rgba(76, 70, 120, 0.08);
     color: var(--elite-hero);
     font-size: 0.68rem;
     font-weight: 700;
@@ -901,9 +930,9 @@ section[data-testid="stSidebar"] > div {{
 }}
 .info-panel-state-text {{
     color: var(--elite-graphite);
-    font-family: 'Montserrat', sans-serif;
+    font-family: var(--font-display);
     font-size: 0.98rem;
-    font-weight: 700;
+    font-weight: 800;
     line-height: 1.3;
 }}
 .info-panel-meta {{
@@ -933,6 +962,7 @@ section[data-testid="stSidebar"] > div {{
     font-weight: 700;
     letter-spacing: 0.08em;
     text-transform: uppercase;
+    font-family: var(--font-display);
 }}
 .block-note-text {{
     margin: 0;
@@ -948,64 +978,67 @@ section[data-testid="stSidebar"] > div {{
 }}
 div.stButton > button {{
     border-radius: 999px;
-    border: 1px solid rgba(84, 83, 134, 0.2);
-    background: linear-gradient(135deg, var(--elite-hero) 0%, #6967a4 100%);
+    border: 1px solid rgba(76, 70, 120, 0.18);
+    background: linear-gradient(135deg, #5e578f 0%, #433d6b 100%);
     color: var(--elite-white);
-    font-family: 'Montserrat', sans-serif;
-    font-weight: 700;
-    padding: 0.52rem 1.05rem;
-    box-shadow: 0 14px 28px rgba(84, 83, 134, 0.22);
+    font-family: var(--font-display);
+    font-weight: 800;
+    padding: 0.56rem 1.1rem;
+    letter-spacing: 0.01em;
+    box-shadow: 0 14px 30px rgba(46, 39, 79, 0.24);
 }}
 div.stButton > button:hover {{
-    border-color: rgba(84, 83, 134, 0.35);
+    border-color: rgba(76, 70, 120, 0.30);
     color: var(--elite-white);
-    background: linear-gradient(135deg, #49487b 0%, var(--elite-hero) 100%);
+    background: linear-gradient(135deg, #6a639c 0%, #4c4678 100%);
+    transform: translateY(-1px);
 }}
 div[data-testid="stPills"] {{
     margin: 0.5rem 0 1rem 0;
 }}
 div[data-testid="stPills"] button {{
     border-radius: 999px;
-    border: 1px solid rgba(84, 83, 134, 0.18);
-    background: rgba(255, 255, 255, 0.92);
+    border: 1px solid rgba(76, 70, 120, 0.14);
+    background: rgba(255, 255, 255, 0.88);
     color: var(--elite-graphite);
-    font-family: 'Roboto', sans-serif;
-    font-weight: 500;
-    padding: 0.35rem 0.85rem;
+    font-family: var(--font-body);
+    font-weight: 600;
+    padding: 0.38rem 0.9rem;
     transition: all 0.2s ease;
-    box-shadow: 0 6px 18px rgba(56, 58, 53, 0.05);
+    box-shadow: 0 10px 22px rgba(45, 48, 64, 0.06);
 }}
 div[data-testid="stPills"] button:hover {{
-    border-color: rgba(84, 83, 134, 0.32);
-    background: rgba(194, 223, 234, 0.32);
+    border-color: rgba(76, 70, 120, 0.26);
+    background: rgba(214, 229, 236, 0.24);
     color: var(--elite-hero);
 }}
 div[data-testid="stPills"] button[aria-pressed="true"] {{
-    border-color: rgba(84, 83, 134, 0.4);
-    background: linear-gradient(135deg, rgba(84, 83, 134, 0.16), rgba(244, 199, 206, 0.34));
+    border-color: rgba(76, 70, 120, 0.24);
+    background: linear-gradient(135deg, rgba(76, 70, 120, 0.12), rgba(231, 210, 218, 0.26));
     color: var(--elite-hero);
-    font-weight: 700;
+    font-weight: 800;
 }}
 button[data-baseweb="tab"] {{
-    font-family: 'Montserrat', sans-serif;
-    font-weight: 700;
+    font-family: var(--font-display);
+    font-weight: 800;
 }}
 button[data-baseweb="tab"][aria-selected="true"] {{
     color: var(--elite-hero) !important;
 }}
 div[data-testid="stPlotlyChart"],
 div[data-testid="stDataFrame"] {{
-    border-radius: 22px;
-    border: 1px solid rgba(84, 83, 134, 0.08);
-    background: rgba(255, 255, 255, 0.82);
-    box-shadow: 0 18px 40px rgba(56, 58, 53, 0.08);
+    border-radius: 24px;
+    border: 1px solid rgba(76, 70, 120, 0.08);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.86), rgba(247, 244, 238, 0.82));
+    box-shadow: 0 20px 46px rgba(45, 48, 64, 0.07);
     padding: 0.45rem 0.45rem 0.2rem 0.45rem;
+    backdrop-filter: blur(12px);
 }}
 [data-testid="stMetric"] {{
-    background: rgba(255, 255, 255, 0.8);
+    background: rgba(255, 255, 255, 0.82);
     border-radius: 18px;
-    border: 1px solid rgba(84, 83, 134, 0.1);
-    box-shadow: 0 12px 28px rgba(84, 83, 134, 0.06);
+    border: 1px solid rgba(76, 70, 120, 0.08);
+    box-shadow: 0 12px 28px rgba(45, 48, 64, 0.06);
     padding: 0.35rem 0.6rem;
 }}
 [data-testid="stInfo"],
@@ -1019,7 +1052,7 @@ div[data-testid="stDataFrame"] {{
 [data-testid="stSelectbox"] label,
 [data-testid="stDateInput"] label,
 [data-testid="stFileUploader"] label {{
-    font-family: 'Roboto', sans-serif;
+    font-family: var(--font-body);
     font-weight: 500;
 }}
 [data-testid="stSidebar"] .stRadio > div,
@@ -1107,10 +1140,10 @@ st.markdown(
             {logo_html}
         </div>
         <div class="hero-copy">
-            <p class="hero-kicker">THE ELITE FLOWER • By Hannaford</p>
-            <h1>Soporte Eléctrico y Automatización </h1>
+            <p class="hero-kicker">The Elite Flower • Dashboard Ejecutivo</p>
+            <h1>Monitoreo de Variables y Automatización</h1>
             <p class="hero-subtitle">
-                Aplicación para análisis de variables y motores, seccionado por bloques.
+                Vista ejecutiva para el seguimiento de variables ambientales, cortinas y operación por bloques.
             </p>
         </div>
     </div>
@@ -1383,7 +1416,7 @@ def _get_summary_metric_config(var_name):
         }
     if normalized_key.startswith('radiacion par'):
         return {
-            'label': 'Radiacion PAR',
+            'label': 'Radiación PAR',
             'unit_html': 'umol m<sup>-2</sup> s<sup>-1</sup>',
             'decimals': 0,
             'icon_svg': (
@@ -1432,7 +1465,7 @@ def _build_summary_cards_html(df_variables, fecha_variables):
 
     fecha_inicio, fecha_fin = fecha_variables
     single_day = fecha_inicio == fecha_fin
-    period_chip = 'Promedio del día' if single_day else 'Promedio del rango'
+    period_chip = 'Promedio diario' if single_day else 'Promedio del periodo'
     period_text = (
         fecha_inicio.strftime('%d/%m/%Y')
         if single_day else
@@ -1523,8 +1556,8 @@ def _render_info_panels(
     annotations_by_day=None,
     culatas_by_day=None
 ):
-    period_context = 'del rango' if rango_multiple else 'del día'
-    period_tag = 'Del rango' if rango_multiple else 'Del día'
+    period_context = 'del periodo' if rango_multiple else 'del día'
+    period_tag = 'Periodo' if rango_multiple else 'Día'
     observation_title = 'Observaciones'
     culatas_title = 'Estado de culatas'
     block_title = 'Modificación aplicada'
@@ -1572,7 +1605,7 @@ def _render_info_panels(
             f'<span class="info-panel-stat-caption">{html.escape(annotation_label)}</span>'
             '</div>'
             f'<div class="info-panel-day-scroll"><div class="info-panel-day-groups">{"".join(day_groups)}</div></div>'
-            '<p class="info-panel-footer-note">Eventos organizados por fecha dentro del rango seleccionado.</p>'
+            '<p class="info-panel-footer-note">Eventos organizados por fecha dentro del periodo seleccionado.</p>'
             '</div>'
         )
     elif daily_annotations:
@@ -1603,17 +1636,17 @@ def _render_info_panels(
             '<div class="info-panel-body">'
             '<div class="info-panel-empty-state info-panel-empty-state--centered">'
             '<span class="info-panel-state-badge" style="background: rgba(244, 199, 206, 0.18); color: #B56576;">Sin novedades</span>'
-            '<p class="info-panel-empty-title">Operación sin eventos reportados</p>'
-            f'<p class="info-panel-empty">No hay anotaciones registradas {period_context}.</p>'
+            '<p class="info-panel-empty-title">Sin novedades operativas</p>'
+            f'<p class="info-panel-empty">No se registran anotaciones {period_context}.</p>'
             '</div>'
             '</div>'
         )
 
-    mod_text = block_modification or 'No hay una modificación registrada para este bloque.'
+    mod_text = block_modification or 'No hay una modificación documentada para este bloque.'
     mod_html = (
         '<div class="info-panel-body">'
         f'<p class="info-panel-copy">{html.escape(mod_text)}</p>'
-        f'<p class="info-panel-footer-note">Configuración vigente para {block_tag}.</p>'
+        f'<p class="info-panel-footer-note">Configuración de referencia para {block_tag}.</p>'
         '</div>'
     )
 
@@ -1646,7 +1679,7 @@ def _render_info_panels(
         culatas_html = (
             '<div class="info-panel-body">'
             f'<div class="info-panel-day-scroll"><div class="info-panel-day-groups">{"".join(day_states)}</div></div>'
-            '<p class="info-panel-footer-note">Estado registrado por día dentro del rango seleccionado.</p>'
+            '<p class="info-panel-footer-note">Estado consolidado por fecha dentro del periodo seleccionado.</p>'
             '</div>'
         )
     else:
@@ -1656,13 +1689,13 @@ def _render_info_panels(
             f'<span class="info-panel-state-badge" style="background:{culatas_badge_bg}; color:{culatas_badge_color};">{html.escape(culatas_tag)}</span>'
             f'<span class="info-panel-state-text">{html.escape(culatas_state)}</span>'
             '</div>'
-            f'<p class="info-panel-copy">Resumen operativo {period_context} para {html.escape(block_tag_text.lower()) if block_label else "el bloque seleccionado"}.</p>'
+            f'<p class="info-panel-copy">Estado operativo {period_context} para {html.escape(block_tag_text.lower()) if block_label else "el bloque seleccionado"}.</p>'
             '</div>'
         )
 
     info_cards = {
         'observaciones': (
-            f'<div class="info-panel-card info-panel-card--observaciones" style="--info-accent: {BRAND_COLORS["rose"]}; --info-accent-soft: rgba(244, 199, 206, 0.18);">'
+            f'<div class="info-panel-card info-panel-card--observaciones" style="--info-accent: {BRAND_COLORS["rose"]}; --info-accent-soft: rgba(231, 210, 218, 0.22);">'
             '<div class="info-panel-header">'
             '<div class="info-panel-header-main">'
             f'<span class="info-panel-icon">{_info_panel_icon_svg("observaciones")}</span>'
@@ -1676,7 +1709,7 @@ def _render_info_panels(
             '</div>'
         ),
         'modificacion': (
-            f'<div class="info-panel-card info-panel-card--compact" style="--info-accent: {BRAND_COLORS["hero"]}; --info-accent-soft: rgba(84, 83, 134, 0.14);">'
+            f'<div class="info-panel-card info-panel-card--compact" style="--info-accent: {BRAND_COLORS["hero"]}; --info-accent-soft: rgba(76, 70, 120, 0.15);">'
             '<div class="info-panel-header">'
             '<div class="info-panel-header-main">'
             f'<span class="info-panel-icon">{_info_panel_icon_svg("modificacion")}</span>'
@@ -1690,7 +1723,7 @@ def _render_info_panels(
             '</div>'
         ),
         'culatas': (
-            f'<div class="info-panel-card info-panel-card--compact" style="--info-accent: {BRAND_COLORS["sky"]}; --info-accent-soft: rgba(194, 223, 234, 0.24);">'
+            f'<div class="info-panel-card info-panel-card--compact" style="--info-accent: {BRAND_COLORS["sky"]}; --info-accent-soft: rgba(214, 229, 236, 0.28);">'
             '<div class="info-panel-header">'
             '<div class="info-panel-header-main">'
             f'<span class="info-panel-icon">{_info_panel_icon_svg("culatas")}</span>'
@@ -2322,7 +2355,7 @@ def _render_correlacion(df_variables, datos_cortinas_sel, fecha_variables, varia
 
     if not sensor_traces and not cortina_traces:
         if selected_cortinas and not selected_sensors:
-            st.warning('No hay informacion de motores para el rango seleccionado. Elige otra fecha o activa alguna variable ambiental.')
+            st.warning('No hay información de motores para el periodo seleccionado. Elige otra fecha o activa alguna variable ambiental.')
         else:
             st.warning('No hay datos disponibles para las variables seleccionadas.')
         return
@@ -2401,9 +2434,9 @@ def _render_correlacion(df_variables, datos_cortinas_sel, fecha_variables, varia
         axis_kwargs = dict(
             title=dict(
                 text=CORR_AXIS_TITLES.get(var_name, var_name),
-                font=dict(color=color, size=11, family='Montserrat, sans-serif')
+                font=dict(color=color, size=11, family='Manrope, sans-serif')
             ),
-            tickfont=dict(color=color, size=10, family='Roboto, sans-serif'),
+            tickfont=dict(color=color, size=10, family='Manrope, sans-serif'),
             tickcolor=color,
             range=axis_range,
             autorange=False,
@@ -2444,9 +2477,9 @@ def _render_correlacion(df_variables, datos_cortinas_sel, fecha_variables, varia
         axis_configs['y2'] = dict(
             title=dict(
                 text=CORR_AXIS_TITLES['% Apertura Cortinas'],
-                font=dict(color=cortina_color, size=11, family='Montserrat, sans-serif')
+                font=dict(color=cortina_color, size=11, family='Manrope, sans-serif')
             ),
-            tickfont=dict(color=cortina_color, size=10, family='Roboto, sans-serif'),
+            tickfont=dict(color=cortina_color, size=10, family='Manrope, sans-serif'),
             tickcolor=cortina_color,
             range=[-4, 100],
             autorange=False,
@@ -2468,35 +2501,35 @@ def _render_correlacion(df_variables, datos_cortinas_sel, fecha_variables, varia
 
     fig_corr.update_layout(
         title=dict(
-            text='Correlación: Sensores y Estado de Cortinas',
+            text='Correlación entre Variables y Cortinas',
             x=0,
             xanchor='left',
             y=0.98,
             yanchor='top',
             pad=dict(b=20),
-            font=dict(size=22, color=BRAND_COLORS['graphite'], family='Montserrat, sans-serif')
+            font=dict(size=22, color=BRAND_COLORS['graphite'], family='Manrope, sans-serif')
         ),
         xaxis=dict(
             title=dict(
                 text=xaxis_title_text,
-                font=dict(size=14, family='Montserrat, sans-serif', color=BRAND_COLORS['graphite'])
+                font=dict(size=14, family='Manrope, sans-serif', color=BRAND_COLORS['graphite'])
             ),
             tickformat=xaxis_tickformat,
-            tickfont=dict(size=11, family='Roboto, sans-serif', color=BRAND_COLORS['graphite']),
+            tickfont=dict(size=11, family='Manrope, sans-serif', color=BRAND_COLORS['graphite']),
             domain=[0, x_domain_end],
             showgrid=True,
-            gridcolor='rgba(84, 83, 134, 0.08)',
+            gridcolor='rgba(76, 70, 120, 0.07)',
             zeroline=False
         ),
         hovermode='x unified',
         template='plotly_white',
-        font=dict(family='Roboto, sans-serif', color=BRAND_COLORS['graphite']),
-        paper_bgcolor='rgba(255,255,255,0.78)',
-        plot_bgcolor='rgba(255,255,255,0.94)',
+        font=dict(family='Manrope, sans-serif', color=BRAND_COLORS['graphite']),
+        paper_bgcolor='rgba(255,255,255,0)',
+        plot_bgcolor='rgba(250,248,243,0.65)',
         hoverlabel=dict(
-            bgcolor='rgba(250, 248, 243, 0.97)',
-            bordercolor='rgba(84, 83, 134, 0.22)',
-            font=dict(family='Roboto, sans-serif', color=BRAND_COLORS['graphite'], size=12)
+            bgcolor='rgba(249, 246, 240, 0.98)',
+            bordercolor='rgba(76, 70, 120, 0.16)',
+            font=dict(family='Manrope, sans-serif', color=BRAND_COLORS['graphite'], size=12)
         ),
         height=620,
         legend=dict(
@@ -2506,9 +2539,9 @@ def _render_correlacion(df_variables, datos_cortinas_sel, fecha_variables, varia
             xanchor='left',
             x=0,
             traceorder='normal',
-            font=dict(size=11, family='Roboto, sans-serif', color=BRAND_COLORS['graphite']),
-            bgcolor='rgba(255,255,255,0.68)',
-            bordercolor='rgba(84, 83, 134, 0.10)',
+            font=dict(size=11, family='Manrope, sans-serif', color=BRAND_COLORS['graphite']),
+            bgcolor='rgba(255,255,255,0.76)',
+            bordercolor='rgba(76, 70, 120, 0.08)',
             borderwidth=1
         ),
         margin=dict(l=50, r=right_margin, t=142, b=55),
@@ -2518,7 +2551,7 @@ def _render_correlacion(df_variables, datos_cortinas_sel, fecha_variables, varia
     st.plotly_chart(fig_corr, width='stretch')
 
     if selected_cortinas and not cortina_traces and selected_sensors:
-        st.info('No hay información de motores para el rango seleccionado. Se muestran únicamente las variables ambientales.')
+        st.info('No hay información de motores para el periodo seleccionado. Se muestran únicamente las variables ambientales.')
 
 # 4. Datos cargados en memoria para evitar recálculos repetidos
 _df_variables_all = cargar_datos(archivo_variables_bytes) if archivo_variables_bytes else pd.DataFrame()
@@ -2547,7 +2580,7 @@ if selected_block_code_current in variable_block_map:
     bloque_variables = variable_block_map.get(selected_block_code_current)
     bloque_seleccionado = cortina_block_map.get(selected_block_code_current)
 
-with st.sidebar.expander("Fechas", expanded=True):
+with st.sidebar.expander("Periodo", expanded=True):
     fecha_variables = None
     fecha_cortinas = None
 
@@ -2660,7 +2693,7 @@ if fecha_cortinas is not None:
 available_correlacion_vars = _get_available_correlacion_vars(df_variables_corr, datos_cortinas_sel)
 
 selected_vars_sidebar = []
-with st.sidebar.expander("Variables visibles", expanded=True):
+with st.sidebar.expander("Series visibles", expanded=True):
     if bloque_variables is None or fecha_variables is None:
         st.write("Selecciona bloque y fechas para elegir qué series mostrar.")
     elif not available_correlacion_vars:
@@ -2688,7 +2721,7 @@ with st.sidebar.expander("Variables visibles", expanded=True):
 
         selected_vars_sidebar = _get_selected_correlacion_vars(available_correlacion_vars)
 
-toggle_chart_label = "Graficar correlación" if not st.session_state.graficar_correlacion else "Parar gráfico"
+toggle_chart_label = "Mostrar correlación" if not st.session_state.graficar_correlacion else "Ocultar correlación"
 if st.sidebar.button(toggle_chart_label, key="boton_toggle_graficos", use_container_width=True):
     st.session_state.graficar_correlacion = not st.session_state.graficar_correlacion
     st.rerun()
@@ -2739,7 +2772,7 @@ with tab_correlacion:
 
         with tab_corr_graf:
             if not st.session_state.graficar_correlacion:
-                st.info("Usa el botón de la barra lateral para graficar o parar el análisis de correlación.")
+                st.info("Usa el botón lateral para mostrar u ocultar el análisis de correlación.")
             else:
                 selected_vars = selected_vars_sidebar or st.session_state.get('variables_correlacion', available_correlacion_vars.copy())
 
@@ -2749,7 +2782,7 @@ with tab_correlacion:
                 elif not available_correlacion_vars:
                     st.warning("No se encontraron variables con datos para graficar en el rango seleccionado.")
                 elif datos_cortinas_sel.empty:
-                    st.info("No hay informacion de motores para este rango. Se mostraran las variables ambientales disponibles.")
+                    st.info("No hay información de motores para este periodo. Se mostrarán las variables ambientales disponibles.")
 
                 if df_variables_corr.empty or not available_correlacion_vars:
                     pass
