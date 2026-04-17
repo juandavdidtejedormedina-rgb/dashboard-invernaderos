@@ -447,6 +447,129 @@ section[data-testid="stSidebar"] > div {{
     font-size: 0.97rem;
     line-height: 1.55;
 }}
+.summary-grid {{
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.85rem;
+    margin: 0.35rem 0 1.15rem 0;
+}}
+.summary-card {{
+    position: relative;
+    padding: 1rem 1rem 0.95rem 1rem;
+    border-radius: 22px;
+    border: 1px solid rgba(84, 83, 134, 0.12);
+    background: linear-gradient(180deg, rgba(255,255,255,0.97) 0%, rgba(250,248,243,0.92) 100%);
+    box-shadow: 0 18px 36px rgba(56, 58, 53, 0.08);
+    overflow: hidden;
+}}
+.summary-card::before {{
+    content: '';
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: 4px;
+    background: linear-gradient(90deg, var(--summary-accent), var(--summary-accent-soft));
+}}
+.summary-card::after {{
+    content: '';
+    position: absolute;
+    top: -34px;
+    right: -20px;
+    width: 118px;
+    height: 118px;
+    background: radial-gradient(circle, var(--summary-accent-soft) 0%, rgba(255,255,255,0) 72%);
+    pointer-events: none;
+}}
+.summary-card-header {{
+    position: relative;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    gap: 0.68rem;
+    margin-bottom: 0.9rem;
+}}
+.summary-card-icon {{
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.45rem;
+    height: 2.45rem;
+    border-radius: 16px;
+    background: var(--summary-accent-soft);
+    color: var(--summary-accent);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.62), 0 10px 22px rgba(56, 58, 53, 0.06);
+}}
+.summary-card-icon svg {{
+    width: 1.18rem;
+    height: 1.18rem;
+    stroke: currentColor;
+    fill: none;
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}}
+.summary-card-label {{
+    color: #646874;
+    font-family: 'Montserrat', sans-serif;
+    font-size: 0.88rem;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+}}
+.summary-card-value {{
+    position: relative;
+    z-index: 1;
+    display: flex;
+    align-items: flex-end;
+    gap: 0.34rem;
+    min-height: 3.1rem;
+}}
+.summary-card-value.is-empty {{
+    align-items: center;
+}}
+.summary-card-number {{
+    color: var(--elite-graphite);
+    font-family: 'Montserrat', sans-serif;
+    font-size: 2.08rem;
+    font-weight: 800;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+}}
+.summary-card-unit {{
+    margin-bottom: 0.3rem;
+    color: #5c5f68;
+    font-size: 0.88rem;
+    font-weight: 600;
+}}
+.summary-card-empty {{
+    color: #757985;
+    font-size: 1rem;
+    font-weight: 600;
+}}
+.summary-card-footer {{
+    position: relative;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-top: 0.72rem;
+}}
+.summary-card-chip {{
+    display: inline-flex;
+    align-items: center;
+    padding: 0.24rem 0.62rem;
+    border-radius: 999px;
+    background: var(--summary-accent-soft);
+    color: var(--summary-accent);
+    font-size: 0.74rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+}}
+.summary-card-period {{
+    color: #6a6d76;
+    font-size: 0.78rem;
+    font-weight: 500;
+    text-align: right;
+}}
 .block-note {{
     margin: 0.5rem 0 1.1rem 0;
     padding: 1rem 1.05rem;
@@ -584,6 +707,23 @@ div[data-testid="stDataFrame"] {{
     }}
     .hero-copy h1 {{
         font-size: 1.7rem;
+    }}
+}}
+@media (max-width: 1180px) {{
+    .summary-grid {{
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }}
+}}
+@media (max-width: 680px) {{
+    .summary-grid {{
+        grid-template-columns: 1fr;
+    }}
+    .summary-card-footer {{
+        flex-direction: column;
+        align-items: flex-start;
+    }}
+    .summary-card-period {{
+        text-align: left;
     }}
 }}
 </style>
@@ -818,6 +958,162 @@ def _sidebar_field_label(icon_name, text):
         ),
         unsafe_allow_html=True
     )
+
+
+def _hex_to_rgba(hex_color, alpha):
+    color = str(hex_color).strip().lstrip('#')
+    if len(color) != 6:
+        return f'rgba(84, 83, 134, {alpha})'
+
+    try:
+        red = int(color[0:2], 16)
+        green = int(color[2:4], 16)
+        blue = int(color[4:6], 16)
+    except ValueError:
+        return f'rgba(84, 83, 134, {alpha})'
+
+    return f'rgba({red}, {green}, {blue}, {alpha})'
+
+
+def _format_summary_number(value, decimals):
+    if decimals <= 0:
+        return f"{round(value):,.0f}".replace(',', '.')
+
+    formatted = f"{value:,.{decimals}f}"
+    return formatted.replace(',', '_').replace('.', ',').replace('_', '.')
+
+
+def _get_summary_metric_config(var_name):
+    normalized_key = _build_normalized_text_key(var_name)
+
+    if normalized_key.startswith('temperatura'):
+        return {
+            'label': 'Temperatura',
+            'unit_html': '&deg;C',
+            'decimals': 1,
+            'icon_svg': (
+                '<svg viewBox="0 0 24 24" aria-hidden="true">'
+                '<path d="M10 14.5V6a2 2 0 1 1 4 0v8.5a4 4 0 1 1-4 0Z"></path>'
+                '<path d="M12 9v5"></path>'
+                '</svg>'
+            )
+        }
+    if normalized_key.startswith('humedad relativa'):
+        return {
+            'label': 'Humedad Relativa',
+            'unit_html': '%',
+            'decimals': 1,
+            'icon_svg': (
+                '<svg viewBox="0 0 24 24" aria-hidden="true">'
+                '<path d="M12 3C9.2 7.1 6.5 9.8 6.5 13a5.5 5.5 0 0 0 11 0C17.5 9.8 14.8 7.1 12 3Z"></path>'
+                '</svg>'
+            )
+        }
+    if normalized_key.startswith('radiacion par'):
+        return {
+            'label': 'Radiacion PAR',
+            'unit_html': 'umol m<sup>-2</sup> s<sup>-1</sup>',
+            'decimals': 0,
+            'icon_svg': (
+                '<svg viewBox="0 0 24 24" aria-hidden="true">'
+                '<circle cx="12" cy="12" r="3.5"></circle>'
+                '<path d="M12 2.5v2.4"></path>'
+                '<path d="M12 19.1v2.4"></path>'
+                '<path d="M4.9 4.9 6.6 6.6"></path>'
+                '<path d="M17.4 17.4 19.1 19.1"></path>'
+                '<path d="M2.5 12h2.4"></path>'
+                '<path d="M19.1 12h2.4"></path>'
+                '<path d="M4.9 19.1 6.6 17.4"></path>'
+                '<path d="M17.4 6.6 19.1 4.9"></path>'
+                '</svg>'
+            )
+        }
+    if normalized_key.startswith('gramos de agua'):
+        return {
+            'label': 'Gramos de agua',
+            'unit_html': 'g',
+            'decimals': 1,
+            'icon_svg': (
+                '<svg viewBox="0 0 24 24" aria-hidden="true">'
+                '<path d="M4 15c1.4 0 1.4-1.8 2.8-1.8S8.2 15 9.6 15s1.4-1.8 2.8-1.8S13.8 15 15.2 15s1.4-1.8 2.8-1.8S19.4 15 20.8 15"></path>'
+                '<path d="M4 18.8c1.4 0 1.4-1.8 2.8-1.8s1.4 1.8 2.8 1.8 1.4-1.8 2.8-1.8 1.4 1.8 2.8 1.8 1.4-1.8 2.8-1.8 1.4 1.8 2.8 1.8"></path>'
+                '<path d="M7 9.2h10"></path>'
+                '</svg>'
+            )
+        }
+
+    return {
+        'label': str(var_name),
+        'unit_html': '',
+        'decimals': 1,
+        'icon_svg': (
+            '<svg viewBox="0 0 24 24" aria-hidden="true">'
+            '<circle cx="12" cy="12" r="5"></circle>'
+            '</svg>'
+        )
+    }
+
+
+def _build_summary_cards_html(df_variables, fecha_variables):
+    if fecha_variables is None:
+        return ''
+
+    fecha_inicio, fecha_fin = fecha_variables
+    single_day = fecha_inicio == fecha_fin
+    period_chip = 'Promedio del dia' if single_day else 'Promedio del rango'
+    period_text = (
+        fecha_inicio.strftime('%d/%m/%Y')
+        if single_day else
+        f"{fecha_inicio.strftime('%d/%m/%Y')} - {fecha_fin.strftime('%d/%m/%Y')}"
+    )
+
+    cards_html = []
+
+    for var_name in SENSOR_VARIABLES:
+        config = _get_summary_metric_config(var_name)
+        accent_color = VARIABLE_COLORS.get(var_name, BRAND_COLORS['hero'])
+        accent_soft = _hex_to_rgba(accent_color, 0.14)
+        value_markup = (
+            '<div class="summary-card-value is-empty">'
+            '<span class="summary-card-empty">Sin datos</span>'
+            '</div>'
+        )
+
+        if not df_variables.empty and var_name in df_variables.columns:
+            serie = pd.to_numeric(df_variables[var_name], errors='coerce').dropna()
+            if not serie.empty:
+                average_value = float(serie.mean())
+                number_text = _format_summary_number(average_value, config['decimals'])
+                value_markup = (
+                    '<div class="summary-card-value">'
+                    f'<span class="summary-card-number">{number_text}</span>'
+                    f'<span class="summary-card-unit">{config["unit_html"]}</span>'
+                    '</div>'
+                )
+
+        cards_html.append(
+            f"""
+            <div class="summary-card" style="--summary-accent: {accent_color}; --summary-accent-soft: {accent_soft};">
+                <div class="summary-card-header">
+                    <span class="summary-card-icon">{config['icon_svg']}</span>
+                    <span class="summary-card-label">{html.escape(config['label'])}</span>
+                </div>
+                {value_markup}
+                <div class="summary-card-footer">
+                    <span class="summary-card-chip">{period_chip}</span>
+                    <span class="summary-card-period">{period_text}</span>
+                </div>
+            </div>
+            """
+        )
+
+    return f'<div class="summary-grid">{"".join(cards_html)}</div>'
+
+
+def _render_summary_cards(df_variables, fecha_variables):
+    cards_html = _build_summary_cards_html(df_variables, fecha_variables)
+    if cards_html:
+        st.markdown(cards_html, unsafe_allow_html=True)
 
 
 def _selector_state_key(var_name):
@@ -1725,6 +2021,7 @@ with tab_correlacion:
             df_variables_corr[['DateTime'] + variables_sensor].dropna(how='all', subset=variables_sensor)
             if variables_sensor else pd.DataFrame()
         )
+        _render_summary_cards(df_variables_corr, fecha_variables)
 
         block_label = bloque_seleccionado or bloque_variables
         block_modification = _get_block_modification(block_label)
