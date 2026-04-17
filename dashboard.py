@@ -788,6 +788,66 @@ section[data-testid="stSidebar"] > div {{
     overflow: auto;
     padding-right: 0.2rem;
 }}
+.info-panel-day-scroll {{
+    max-height: 168px;
+    overflow: auto;
+    padding-right: 0.2rem;
+}}
+.info-panel-day-groups {{
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+}}
+.info-panel-day-card {{
+    padding: 0.72rem 0.78rem;
+    border-radius: 16px;
+    border: 1px solid rgba(84, 83, 134, 0.08);
+    background: linear-gradient(180deg, rgba(255,255,255,0.72), rgba(250,248,243,0.56));
+}}
+.info-panel-day-header {{
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.65rem;
+    margin-bottom: 0.45rem;
+}}
+.info-panel-day-date {{
+    color: var(--elite-graphite);
+    font-family: 'Montserrat', sans-serif;
+    font-size: 0.8rem;
+    font-weight: 700;
+    line-height: 1.3;
+}}
+.info-panel-day-chip {{
+    display: inline-flex;
+    align-items: center;
+    padding: 0.22rem 0.56rem;
+    border-radius: 999px;
+    background: rgba(84, 83, 134, 0.08);
+    color: var(--elite-hero);
+    font-size: 0.68rem;
+    font-weight: 700;
+    white-space: nowrap;
+}}
+.info-panel-day-lines {{
+    display: flex;
+    flex-direction: column;
+    gap: 0.28rem;
+}}
+.info-panel-day-line {{
+    color: #4f545f;
+    font-size: 0.88rem;
+    line-height: 1.42;
+}}
+.info-panel-day-line.is-muted {{
+    color: #7a7e89;
+}}
+.info-panel-day-state-row {{
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.55rem;
+}}
 .info-panel-list-item {{
     display: flex;
     align-items: flex-start;
@@ -1444,7 +1504,15 @@ def _info_panel_icon_svg(icon_name):
     return icons.get(icon_name, '')
 
 
-def _render_info_panels(block_label, block_modification, culatas_observation, daily_annotations, rango_multiple):
+def _render_info_panels(
+    block_label,
+    block_modification,
+    culatas_observation,
+    daily_annotations,
+    rango_multiple,
+    annotations_by_day=None,
+    culatas_by_day=None
+):
     period_context = 'del rango' if rango_multiple else 'del día'
     period_tag = 'Del rango' if rango_multiple else 'Del día'
     observation_title = 'Observaciones'
@@ -1452,9 +1520,52 @@ def _render_info_panels(block_label, block_modification, culatas_observation, da
     block_title = 'Modificación aplicada'
     block_tag_text = str(block_label) if block_label else 'Sin bloque'
     block_tag = html.escape(block_tag_text)
+    annotations_by_day = annotations_by_day or []
+    culatas_by_day = culatas_by_day or []
 
     observations_html = ''
-    if daily_annotations:
+    if rango_multiple and annotations_by_day:
+        annotation_count = sum(len(item.get('entries', [])) for item in annotations_by_day)
+        annotation_label = 'evento registrado' if annotation_count == 1 else 'eventos registrados'
+        day_groups = []
+
+        for item in annotations_by_day:
+            fecha_label = _format_info_day_label(item.get('fecha'))
+            entries = item.get('entries', [])
+            day_chip_text = 'Sin novedades' if not entries else (
+                '1 evento' if len(entries) == 1 else f'{len(entries)} eventos'
+            )
+            day_lines = (
+                ''.join(
+                    f'<p class="info-panel-day-line">{html.escape(entry)}</p>'
+                    for entry in entries
+                )
+                if entries else
+                '<p class="info-panel-day-line is-muted">Sin anotaciones registradas.</p>'
+            )
+            day_groups.append(
+                (
+                    '<div class="info-panel-day-card">'
+                    '<div class="info-panel-day-header">'
+                    f'<span class="info-panel-day-date">{html.escape(fecha_label)}</span>'
+                    f'<span class="info-panel-day-chip">{html.escape(day_chip_text)}</span>'
+                    '</div>'
+                    f'<div class="info-panel-day-lines">{day_lines}</div>'
+                    '</div>'
+                )
+            )
+
+        observations_html = (
+            '<div class="info-panel-body">'
+            '<div class="info-panel-stat-row">'
+            f'<span class="info-panel-stat-value">{annotation_count}</span>'
+            f'<span class="info-panel-stat-caption">{html.escape(annotation_label)}</span>'
+            '</div>'
+            f'<div class="info-panel-day-scroll"><div class="info-panel-day-groups">{"".join(day_groups)}</div></div>'
+            '<p class="info-panel-footer-note">Eventos organizados por fecha dentro del rango seleccionado.</p>'
+            '</div>'
+        )
+    elif daily_annotations:
         annotation_count = len(daily_annotations)
         annotation_label = 'evento registrado' if annotation_count == 1 else 'eventos registrados'
         observation_items = []
@@ -1497,29 +1608,47 @@ def _render_info_panels(block_label, block_modification, culatas_observation, da
     )
 
     culatas_state = culatas_observation or 'Sin información disponible'
-    culatas_state_lower = culatas_state.lower()
-    if 'abiertas' in culatas_state_lower:
-        culatas_badge_bg = 'rgba(112, 200, 140, 0.18)'
-        culatas_badge_color = '#3C8C57'
-        culatas_tag = 'Estado abierto'
-    elif 'cerradas' in culatas_state_lower:
-        culatas_badge_bg = 'rgba(84, 83, 134, 0.16)'
-        culatas_badge_color = BRAND_COLORS['hero']
-        culatas_tag = 'Estado cerrado'
-    else:
-        culatas_badge_bg = 'rgba(124, 129, 138, 0.16)'
-        culatas_badge_color = '#6D727D'
-        culatas_tag = 'Sin dato'
+    culatas_style = _get_culatas_state_style(culatas_state)
+    culatas_badge_bg = culatas_style['badge_bg']
+    culatas_badge_color = culatas_style['badge_color']
+    culatas_tag = culatas_style['tag']
 
-    culatas_html = (
-        '<div class="info-panel-body">'
-        '<div class="info-panel-state">'
-        f'<span class="info-panel-state-badge" style="background:{culatas_badge_bg}; color:{culatas_badge_color};">{html.escape(culatas_tag)}</span>'
-        f'<span class="info-panel-state-text">{html.escape(culatas_state)}</span>'
-        '</div>'
-        f'<p class="info-panel-copy">Resumen operativo {period_context} para {html.escape(block_tag_text.lower()) if block_label else "el bloque seleccionado"}.</p>'
-        '</div>'
-    )
+    if rango_multiple and culatas_by_day:
+        day_states = []
+        for item in culatas_by_day:
+            fecha_label = _format_info_day_label(item.get('fecha'))
+            state_text = item.get('state') or 'Sin información disponible'
+            state_style = _get_culatas_state_style(state_text)
+            day_states.append(
+                (
+                    '<div class="info-panel-day-card">'
+                    '<div class="info-panel-day-header">'
+                    f'<span class="info-panel-day-date">{html.escape(fecha_label)}</span>'
+                    '</div>'
+                    '<div class="info-panel-day-state-row">'
+                    f'<span class="info-panel-state-badge" style="background:{state_style["badge_bg"]}; color:{state_style["badge_color"]};">{html.escape(state_style["tag"])}</span>'
+                    f'<span class="info-panel-day-line">{html.escape(state_text)}</span>'
+                    '</div>'
+                    '</div>'
+                )
+            )
+
+        culatas_html = (
+            '<div class="info-panel-body">'
+            f'<div class="info-panel-day-scroll"><div class="info-panel-day-groups">{"".join(day_states)}</div></div>'
+            '<p class="info-panel-footer-note">Estado registrado por día dentro del rango seleccionado.</p>'
+            '</div>'
+        )
+    else:
+        culatas_html = (
+            '<div class="info-panel-body">'
+            '<div class="info-panel-state">'
+            f'<span class="info-panel-state-badge" style="background:{culatas_badge_bg}; color:{culatas_badge_color};">{html.escape(culatas_tag)}</span>'
+            f'<span class="info-panel-state-text">{html.escape(culatas_state)}</span>'
+            '</div>'
+            f'<p class="info-panel-copy">Resumen operativo {period_context} para {html.escape(block_tag_text.lower()) if block_label else "el bloque seleccionado"}.</p>'
+            '</div>'
+        )
 
     info_cards = {
         'observaciones': (
@@ -1791,6 +1920,36 @@ def _get_culatas_daily_observation(datos_cortinas):
     return 'Culatas abiertas' if ultimo_valor > 0 else 'Culatas cerradas'
 
 
+def _get_culatas_observation_by_day(datos_cortinas):
+    if (
+        datos_cortinas.empty or
+        'Fecha' not in datos_cortinas.columns or
+        'Culatas %' not in datos_cortinas.columns
+    ):
+        return []
+
+    observations = []
+    datos_ordenados = datos_cortinas.sort_values('Fecha')
+
+    for fecha, datos_dia in datos_ordenados.groupby('Fecha', sort=True):
+        valores_culatas = datos_dia['Culatas %'].dropna()
+        if valores_culatas.empty:
+            state = 'Sin información disponible'
+        else:
+            ultimo_valor = _normalize_percent_value(valores_culatas.iloc[-1])
+            if ultimo_valor is None:
+                state = 'Sin información disponible'
+            else:
+                state = 'Culatas abiertas' if ultimo_valor > 0 else 'Culatas cerradas'
+
+        observations.append({
+            'fecha': fecha,
+            'state': state
+        })
+
+    return observations
+
+
 def _get_available_cortina_vars(datos_cortinas):
     if datos_cortinas.empty:
         return []
@@ -1902,6 +2061,76 @@ def _get_daily_annotations(datos_cortinas):
                 annotations.append(entry)
 
     return annotations
+
+
+def _get_annotations_by_day(datos_cortinas):
+    if datos_cortinas.empty or 'Fecha' not in datos_cortinas.columns:
+        return []
+
+    annotation_pairs = [
+        ('Frente A', 'Anotacion A'),
+        ('Puerta B', 'Anotacion B')
+    ]
+    grouped_annotations = []
+    datos_ordenados = datos_cortinas.sort_values('Fecha')
+
+    for fecha, datos_dia in datos_ordenados.groupby('Fecha', sort=True):
+        entries = []
+
+        for _, row in datos_dia.iterrows():
+            for label_col, note_col in annotation_pairs:
+                note_value = row.get(note_col)
+                if pd.isna(note_value):
+                    continue
+
+                note_text = str(note_value).strip()
+                if not note_text or note_text.lower() in {'nan', 'none'}:
+                    continue
+
+                label_value = row.get(label_col)
+                label_text = str(label_value).strip() if pd.notna(label_value) else label_col
+                entry = f"{label_text}: {note_text}"
+                if entry not in entries:
+                    entries.append(entry)
+
+        grouped_annotations.append({
+            'fecha': fecha,
+            'entries': entries
+        })
+
+    return grouped_annotations
+
+
+def _format_info_day_label(fecha_value):
+    timestamp = pd.to_datetime(fecha_value, errors='coerce')
+    if pd.isna(timestamp):
+        return str(fecha_value)
+
+    weekday = WEEKDAY_ES.get(timestamp.weekday())
+    if weekday:
+        return f"{weekday} {timestamp.strftime('%d/%m/%Y')}"
+    return timestamp.strftime('%d/%m/%Y')
+
+
+def _get_culatas_state_style(culatas_state):
+    culatas_state_lower = str(culatas_state).lower()
+    if 'abiertas' in culatas_state_lower:
+        return {
+            'badge_bg': 'rgba(112, 200, 140, 0.18)',
+            'badge_color': '#3C8C57',
+            'tag': 'Estado abierto'
+        }
+    if 'cerradas' in culatas_state_lower:
+        return {
+            'badge_bg': 'rgba(84, 83, 134, 0.16)',
+            'badge_color': BRAND_COLORS['hero'],
+            'tag': 'Estado cerrado'
+        }
+    return {
+        'badge_bg': 'rgba(124, 129, 138, 0.16)',
+        'badge_color': '#6D727D',
+        'tag': 'Sin dato'
+    }
 
 
 def _add_day_breaks_to_series(serie, value_col):
@@ -2475,14 +2704,25 @@ with tab_correlacion:
         block_label = bloque_seleccionado or bloque_variables
         block_modification = _get_block_modification(block_label)
         culatas_observation = _get_culatas_daily_observation(datos_cortinas_sel)
+        culatas_by_day = _get_culatas_observation_by_day(datos_cortinas_sel)
         daily_annotations = _get_daily_annotations(datos_cortinas_sel)
-        if block_label or block_modification or culatas_observation or daily_annotations:
+        annotations_by_day = _get_annotations_by_day(datos_cortinas_sel)
+        if (
+            block_label or
+            block_modification or
+            culatas_observation or
+            daily_annotations or
+            culatas_by_day or
+            annotations_by_day
+        ):
             _render_info_panels(
                 block_label,
                 block_modification,
                 culatas_observation,
                 daily_annotations,
-                rango_multiple
+                rango_multiple,
+                annotations_by_day=annotations_by_day,
+                culatas_by_day=culatas_by_day
             )
 
         tab_corr_graf, tab_corr_regs = st.tabs(["Correlación", "Registros"])
