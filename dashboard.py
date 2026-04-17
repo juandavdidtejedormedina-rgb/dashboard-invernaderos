@@ -552,17 +552,6 @@ def descargar_desde_github(url):
         st.error(f"Error al conectar con GitHub: {e}")
         return None
 
-# 2. Fuente de datos en la barra lateral
-st.sidebar.header("Fuente de datos")
-st.sidebar.markdown(
-    """
-    <div class="sidebar-source-pill">
-        Variables y cortinas se leen directamente desde la nube. La carga manual de archivos quedó desactivada para trabajar siempre con la misma fuente.
-    </div>
-    """,
-    unsafe_allow_html=True
-)
-
 archivo_variables_bytes = descargar_desde_github(URL_VARIABLES)
 archivo_cortinas_bytes = descargar_desde_github(URL_CORTINAS)
 
@@ -1421,33 +1410,19 @@ _df_cortinas_all = cargar_cortinas(archivo_cortinas_bytes) if archivo_cortinas_b
 if 'graficar_correlacion' not in st.session_state:
     st.session_state.graficar_correlacion = False
 
-toggle_chart_label = "Graficar correlación" if not st.session_state.graficar_correlacion else "Parar gráfico"
-if st.sidebar.button(toggle_chart_label, key="boton_toggle_graficos", use_container_width=True):
-    st.session_state.graficar_correlacion = not st.session_state.graficar_correlacion
-    st.rerun()
-
 st.sidebar.header("Filtros")
 
 block_codes, variable_block_map, cortina_block_map = _get_block_options(_df_variables_all, _df_cortinas_all)
 bloque_variables = None
 bloque_seleccionado = None
+selected_block_code_current = st.session_state.get("bloque_compartido")
+if not selected_block_code_current and block_codes:
+    selected_block_code_current = block_codes[0]
+if selected_block_code_current in variable_block_map:
+    bloque_variables = variable_block_map.get(selected_block_code_current)
+    bloque_seleccionado = cortina_block_map.get(selected_block_code_current)
 
-with st.sidebar.expander("Filtros Bloque", expanded=True):
-    if _df_variables_all.empty:
-        st.write("No se encontraron datos de variables para habilitar los bloques.")
-    elif not block_codes:
-        st.warning("No se detectaron bloques válidos dentro del archivo de variables.")
-    else:
-        selected_block_code = st.selectbox(
-            "Seleccionar bloque:",
-            options=block_codes,
-            format_func=lambda code: f"Bloque {code}",
-            key="bloque_compartido"
-        )
-        bloque_variables = variable_block_map.get(selected_block_code)
-        bloque_seleccionado = cortina_block_map.get(selected_block_code)
-
-with st.sidebar.expander("Filtros Fechas", expanded=True):
+with st.sidebar.expander("Fechas", expanded=True):
     fecha_variables = None
     fecha_cortinas = None
 
@@ -1515,6 +1490,21 @@ with st.sidebar.expander("Filtros Fechas", expanded=True):
                     fecha_variables = (fecha_inicio, fecha_fin)
                     fecha_cortinas = (fecha_inicio, fecha_fin)
 
+with st.sidebar.expander("Bloque", expanded=True):
+    if _df_variables_all.empty:
+        st.write("No se encontraron datos de variables para habilitar los bloques.")
+    elif not block_codes:
+        st.warning("No se detectaron bloques válidos dentro del archivo de variables.")
+    else:
+        selected_block_code = st.selectbox(
+            "Seleccionar bloque:",
+            options=block_codes,
+            format_func=lambda code: f"Bloque {code}",
+            key="bloque_compartido"
+        )
+        bloque_variables = variable_block_map.get(selected_block_code)
+        bloque_seleccionado = cortina_block_map.get(selected_block_code)
+
 df_variables_corr = pd.DataFrame()
 datos_cortinas_sel = pd.DataFrame()
 available_correlacion_vars = []
@@ -1541,18 +1531,6 @@ available_correlacion_vars = _get_available_correlacion_vars(df_variables_corr, 
 
 selected_vars_sidebar = []
 with st.sidebar.expander("Variables visibles", expanded=True):
-    st.markdown(
-        """
-        <div class="sidebar-panel-card">
-            <p class="sidebar-panel-title">Variables visibles</p>
-            <p class="sidebar-panel-help">
-                Activa o desactiva las series encontradas en el rango seleccionado. Si ese rango solo tiene variables ambientales, verás 4; si también hay motores, aparecerán las adicionales.
-            </p>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
-
     if bloque_variables is None or fecha_variables is None:
         st.write("Selecciona bloque y fechas para elegir qué series mostrar.")
     elif not available_correlacion_vars:
@@ -1579,6 +1557,11 @@ with st.sidebar.expander("Variables visibles", expanded=True):
             )
 
         selected_vars_sidebar = _get_selected_correlacion_vars(available_correlacion_vars)
+
+toggle_chart_label = "Graficar correlación" if not st.session_state.graficar_correlacion else "Parar gráfico"
+if st.sidebar.button(toggle_chart_label, key="boton_toggle_graficos", use_container_width=True):
+    st.session_state.graficar_correlacion = not st.session_state.graficar_correlacion
+    st.rerun()
 
 # Vista principal
 tab_correlacion = st.container()
