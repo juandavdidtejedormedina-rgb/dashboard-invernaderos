@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 import io
 import warnings
 import requests
@@ -1509,6 +1510,220 @@ def cargar_cortinas(ruta_bytes):
         return pd.DataFrame()
 
 
+def _render_variables_ambientales(df_variables, fecha_variables):
+    sensor_vars = _get_available_sensor_vars(df_variables)
+    if df_variables.empty or not sensor_vars:
+        st.info("No hay datos de variables ambientales para el rango seleccionado.")
+        return
+
+    fecha_inicio, fecha_fin = fecha_variables
+    multi_day_view = fecha_inicio != fecha_fin
+    hover_time_format = '%d/%m %H:%M' if multi_day_view else '%H:%M'
+    xaxis_tickformat = '%H:%M\n%d/%m' if multi_day_view else '%H:%M'
+    xaxis_title_text = 'Fecha y hora' if multi_day_view else 'Hora del día'
+
+    subplot_titles = [VARIABLE_LABELS.get(var_name, var_name) for var_name in sensor_vars]
+    fig_env = make_subplots(
+        rows=len(sensor_vars),
+        cols=1,
+        shared_xaxes=True,
+        vertical_spacing=0.045,
+        subplot_titles=subplot_titles
+    )
+
+    for row_index, var_name in enumerate(sensor_vars, start=1):
+        serie = df_variables[['DateTime', var_name]].dropna(subset=[var_name]).copy()
+        if serie.empty:
+            continue
+
+        serie_plot = _add_day_breaks_to_series(serie, var_name) if multi_day_view else serie
+        color = VARIABLE_COLORS.get(var_name, BRAND_COLORS['hero'])
+        label = VARIABLE_LABELS.get(var_name, var_name)
+        unit = VARIABLE_UNITS.get(var_name, '')
+        decimals = 0 if var_name == 'Radiación PAR' else 2
+
+        fig_env.add_trace(
+            go.Scatter(
+                x=serie_plot['DateTime'],
+                y=serie_plot[var_name],
+                name=label,
+                mode='lines',
+                line=dict(color=color, width=2.4),
+                hovertemplate=(
+                    f'<b>%{{x|{hover_time_format}}}</b><br>'
+                    f'{label}: %{{y:.{decimals}f}} {unit}'
+                    '<extra></extra>'
+                ),
+                showlegend=False
+            ),
+            row=row_index,
+            col=1
+        )
+
+        fig_env.update_yaxes(
+            title_text=unit,
+            row=row_index,
+            col=1,
+            showgrid=True,
+            gridcolor='rgba(84, 83, 134, 0.08)',
+            zeroline=False,
+            tickfont=dict(size=10, family='Roboto, sans-serif', color=color),
+            title_font=dict(size=11, family='Montserrat, sans-serif', color=color)
+        )
+
+    fig_env.update_xaxes(
+        tickformat=xaxis_tickformat,
+        showgrid=True,
+        gridcolor='rgba(84, 83, 134, 0.08)',
+        zeroline=False,
+        tickfont=dict(size=11, family='Roboto, sans-serif', color=BRAND_COLORS['graphite'])
+    )
+    fig_env.update_xaxes(
+        title_text=xaxis_title_text,
+        row=len(sensor_vars),
+        col=1,
+        title_font=dict(size=13, family='Montserrat, sans-serif', color=BRAND_COLORS['graphite'])
+    )
+
+    fig_env.update_layout(
+        title=dict(
+            text='Variables Ambientales',
+            x=0,
+            xanchor='left',
+            font=dict(size=22, color=BRAND_COLORS['graphite'], family='Montserrat, sans-serif')
+        ),
+        template='plotly_white',
+        font=dict(family='Roboto, sans-serif', color=BRAND_COLORS['graphite']),
+        paper_bgcolor='rgba(255,255,255,0.78)',
+        plot_bgcolor='rgba(255,255,255,0.94)',
+        hovermode='x unified',
+        hoverlabel=dict(
+            bgcolor='rgba(250, 248, 243, 0.97)',
+            bordercolor='rgba(84, 83, 134, 0.22)',
+            font=dict(family='Roboto, sans-serif', color=BRAND_COLORS['graphite'], size=12)
+        ),
+        height=max(420, 160 * len(sensor_vars) + 90),
+        margin=dict(l=72, r=36, t=88, b=60)
+    )
+
+    for annotation in fig_env.layout.annotations:
+        annotation.update(
+            font=dict(size=12, family='Montserrat, sans-serif', color=BRAND_COLORS['graphite'])
+        )
+
+    st.plotly_chart(fig_env, width='stretch')
+
+
+def _render_comportamiento_motores(datos_cortinas_sel, fecha_variables):
+    available_cortinas = _get_available_cortina_vars(datos_cortinas_sel)
+    if datos_cortinas_sel.empty or not available_cortinas:
+        st.info("No hay información de motores para el rango seleccionado.")
+        return
+
+    fecha_inicio, fecha_fin = fecha_variables
+    multi_day_view = fecha_inicio != fecha_fin
+    hover_time_format = '%d/%m %H:%M' if multi_day_view else '%H:%M'
+    xaxis_tickformat = '%H:%M\n%d/%m' if multi_day_view else '%H:%M'
+    xaxis_title_text = 'Fecha y hora' if multi_day_view else 'Hora del día'
+
+    fig_motor = go.Figure()
+    traces_added = 0
+
+    for var_name in available_cortinas:
+        for config in SIDE_CONFIGS.values():
+            if config['element_col'] not in datos_cortinas_sel.columns:
+                continue
+
+            df_state = _build_cortina_apertura_profile(datos_cortinas_sel, var_name, config)
+            if df_state.empty:
+                continue
+
+            color = CORTINA_COLORS.get(str(var_name).upper(), BRAND_COLORS['hero'])
+            fig_motor.add_trace(
+                go.Scatter(
+                    x=df_state['Hora'],
+                    y=df_state['Apertura'],
+                    name=VARIABLE_SELECTOR_LABELS.get(var_name, var_name),
+                    mode='lines+markers',
+                    line=dict(color=color, width=3, shape='hv'),
+                    marker=dict(size=4.5, color=color),
+                    hovertemplate=(
+                        f'<b>%{{x|{hover_time_format}}}</b><br>'
+                        '%{customdata[0]}<br>'
+                        'Apertura: %{y:.0f}%<br>'
+                        '%{customdata[1]}'
+                        '<extra></extra>'
+                    ),
+                    customdata=df_state[['Evento', 'Detalle']]
+                )
+            )
+            traces_added += 1
+            break
+
+    if traces_added == 0:
+        st.info("No hay información utilizable de motores para el rango seleccionado.")
+        return
+
+    fig_motor.update_layout(
+        title=dict(
+            text='Comportamiento de Motores',
+            x=0,
+            xanchor='left',
+            font=dict(size=22, color=BRAND_COLORS['graphite'], family='Montserrat, sans-serif')
+        ),
+        xaxis=dict(
+            title=dict(
+                text=xaxis_title_text,
+                font=dict(size=13, family='Montserrat, sans-serif', color=BRAND_COLORS['graphite'])
+            ),
+            tickformat=xaxis_tickformat,
+            tickfont=dict(size=11, family='Roboto, sans-serif', color=BRAND_COLORS['graphite']),
+            showgrid=True,
+            gridcolor='rgba(84, 83, 134, 0.08)',
+            zeroline=False
+        ),
+        yaxis=dict(
+            title=dict(
+                text='% Apertura',
+                font=dict(size=13, family='Montserrat, sans-serif', color=BRAND_COLORS['graphite'])
+            ),
+            range=[-4, 100],
+            tickmode='array',
+            tickvals=[0, 25, 50, 75, 100],
+            ticksuffix='%',
+            showgrid=True,
+            gridcolor='rgba(84, 83, 134, 0.08)',
+            zeroline=False,
+            tickfont=dict(size=11, family='Roboto, sans-serif', color=BRAND_COLORS['graphite'])
+        ),
+        template='plotly_white',
+        font=dict(family='Roboto, sans-serif', color=BRAND_COLORS['graphite']),
+        paper_bgcolor='rgba(255,255,255,0.78)',
+        plot_bgcolor='rgba(255,255,255,0.94)',
+        hovermode='x unified',
+        hoverlabel=dict(
+            bgcolor='rgba(250, 248, 243, 0.97)',
+            bordercolor='rgba(84, 83, 134, 0.22)',
+            font=dict(family='Roboto, sans-serif', color=BRAND_COLORS['graphite'], size=12)
+        ),
+        height=420,
+        legend=dict(
+            orientation='h',
+            yanchor='bottom',
+            y=1.03,
+            xanchor='left',
+            x=0,
+            font=dict(size=11, family='Roboto, sans-serif', color=BRAND_COLORS['graphite']),
+            bgcolor='rgba(255,255,255,0.68)',
+            bordercolor='rgba(84, 83, 134, 0.10)',
+            borderwidth=1
+        ),
+        margin=dict(l=60, r=36, t=92, b=58)
+    )
+
+    st.plotly_chart(fig_motor, width='stretch')
+
+
 def _render_correlacion(df_variables, datos_cortinas_sel, fecha_variables, variables_seleccionadas=None):
     fecha_inicio, fecha_fin = fecha_variables
     multi_day_view = fecha_inicio != fecha_fin
@@ -2064,20 +2279,22 @@ with tab_correlacion:
                     st.warning(f"No se encontraron datos de variables para el rango seleccionado: {fecha_label}.")
                 elif not available_correlacion_vars:
                     st.warning("No se encontraron variables con datos para graficar en el rango seleccionado.")
-                elif datos_cortinas_sel.empty:
-                    st.info("No hay informacion de motores para este rango. Se mostraran las variables ambientales disponibles.")
 
                 if df_variables_corr.empty or not available_correlacion_vars:
                     pass
-                elif not selected_vars:
-                    st.warning('Selecciona al menos una variable para mostrar la correlación.')
                 else:
-                    _render_correlacion(
-                        df_variables_corr,
-                        datos_cortinas_sel,
-                        fecha_variables,
-                        selected_vars
-                    )
+                    _render_variables_ambientales(df_variables_corr, fecha_variables)
+                    _render_comportamiento_motores(datos_cortinas_sel, fecha_variables)
+
+                    if not selected_vars:
+                        st.warning('Selecciona al menos una variable para mostrar la correlación.')
+                    else:
+                        _render_correlacion(
+                            df_variables_corr,
+                            datos_cortinas_sel,
+                            fecha_variables,
+                            selected_vars
+                        )
 
         with tab_corr_regs:
             reg_sensores_tab, reg_cortinas_tab = st.tabs(["Registros sensores", "Registros cortinas"])
