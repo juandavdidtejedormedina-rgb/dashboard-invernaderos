@@ -170,6 +170,16 @@ st.markdown(f"""
 [data-testid="stAppViewContainer"] > .main {{
     padding-top: 1.25rem;
 }}
+section[data-testid="stSidebar"] {{
+    min-width: 268px !important;
+    max-width: 268px !important;
+}}
+section[data-testid="stSidebar"] > div {{
+    width: 268px !important;
+}}
+[data-testid="stSidebar"] .block-container {{
+    padding: 0.8rem 0.7rem 1rem 0.7rem;
+}}
 [data-testid="stSidebar"] {{
     background:
         linear-gradient(180deg, rgba(84, 83, 134, 0.97) 0%, rgba(56, 58, 53, 0.98) 100%);
@@ -178,37 +188,75 @@ st.markdown(f"""
 [data-testid="stSidebar"] * {{
     color: #f7f7fb;
 }}
+.sidebar-title {{
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0.2rem 0 0.8rem 0.15rem;
+    color: #ffffff;
+    font-family: 'Montserrat', sans-serif;
+    font-size: 1.35rem;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+}}
+.sidebar-title-icon {{
+    font-size: 1rem;
+}}
+.sidebar-field-label {{
+    display: flex;
+    align-items: center;
+    gap: 0.42rem;
+    margin: 0.05rem 0 0.3rem 0.15rem;
+    color: rgba(247, 247, 251, 0.92);
+    font-family: 'Montserrat', sans-serif;
+    font-size: 0.8rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+}}
+.sidebar-field-icon {{
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1rem;
+    font-size: 0.88rem;
+}}
 [data-testid="stSidebar"] .stExpander {{
     background: rgba(255, 255, 255, 0.08);
     border: 1px solid rgba(255, 255, 255, 0.12);
-    border-radius: 16px;
+    border-radius: 15px;
     overflow: hidden;
-    box-shadow: 0 18px 40px rgba(0, 0, 0, 0.14);
+    box-shadow: 0 14px 30px rgba(0, 0, 0, 0.14);
+    margin-bottom: 0.7rem;
 }}
 [data-testid="stSidebar"] .stExpander details summary {{
     background: rgba(255, 255, 255, 0.06);
-    padding: 0.35rem 0.65rem;
+    padding: 0.3rem 0.65rem;
+}}
+[data-testid="stSidebar"] .stExpander details summary p {{
+    font-family: 'Montserrat', sans-serif;
+    font-size: 0.98rem;
+    font-weight: 700;
 }}
 [data-testid="stSidebar"] [data-testid="stCheckbox"] {{
-    margin-bottom: 0.22rem;
+    margin-bottom: 0.14rem;
 }}
 [data-testid="stSidebar"] [data-testid="stCheckbox"] label {{
     width: 100%;
-    padding: 0.42rem 0.58rem;
-    border-radius: 18px;
+    padding: 0.34rem 0.52rem;
+    border-radius: 16px;
     border: 1px solid rgba(255, 255, 255, 0.12);
     background: linear-gradient(180deg, rgba(255,255,255,0.11), rgba(255,255,255,0.05));
-    box-shadow: 0 12px 24px rgba(0, 0, 0, 0.10);
+    box-shadow: 0 8px 18px rgba(0, 0, 0, 0.10);
     transition: background 0.2s ease, transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
 }}
 [data-testid="stSidebar"] [data-testid="stCheckbox"] label:hover {{
     background: linear-gradient(180deg, rgba(255,255,255,0.16), rgba(255,255,255,0.08));
     border-color: rgba(194, 223, 234, 0.36);
-    box-shadow: 0 14px 30px rgba(0, 0, 0, 0.14);
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.14);
     transform: translateX(2px);
 }}
 [data-testid="stSidebar"] [data-testid="stCheckbox"] p {{
-    font-size: 0.96rem;
+    font-size: 0.9rem;
     font-weight: 500;
     letter-spacing: 0.01em;
 }}
@@ -220,14 +268,14 @@ st.markdown(f"""
 }}
 [data-testid="stSidebar"] div.stButton > button {{
     width: 100%;
-    min-height: 3rem;
+    min-height: 2.8rem;
     border-radius: 999px;
     border: 1px solid rgba(255, 255, 255, 0.16);
     background: linear-gradient(180deg, rgba(126, 121, 190, 0.98) 0%, rgba(94, 90, 160, 0.98) 100%);
     color: var(--elite-white);
     font-family: 'Montserrat', sans-serif;
     font-weight: 700;
-    font-size: 0.98rem;
+    font-size: 0.92rem;
     letter-spacing: 0.01em;
     box-shadow: inset 0 1px 0 rgba(255,255,255,0.16), 0 18px 30px rgba(29, 24, 74, 0.28);
 }}
@@ -492,7 +540,11 @@ div[data-testid="stDataFrame"] {{
 [data-testid="stSidebar"] .stDateInput > div,
 [data-testid="stSidebar"] .stSelectbox > div[data-baseweb="select"] {{
     background: rgba(255, 255, 255, 0.08);
-    border-radius: 14px;
+    border-radius: 13px;
+}}
+[data-testid="stSidebar"] .stDateInput > label,
+[data-testid="stSidebar"] .stSelectbox > label {{
+    display: none;
 }}
 [data-testid="stSidebar"] .stSelectbox > div[data-baseweb="select"] span,
 [data-testid="stSidebar"] .stSelectbox > div[data-baseweb="select"] div,
@@ -500,6 +552,7 @@ div[data-testid="stDataFrame"] {{
     color: var(--elite-ink) !important;
     -webkit-text-fill-color: var(--elite-ink) !important;
     font-weight: 500;
+    font-size: 0.94rem;
 }}
 [data-testid="stSidebar"] .stDateInput input::placeholder {{
     color: rgba(56, 58, 53, 0.70) !important;
@@ -700,6 +753,18 @@ def _coerce_sidebar_date(value, fallback):
     if isinstance(value, date):
         return value
     return fallback
+
+
+def _sidebar_field_label(icon, text):
+    st.markdown(
+        (
+            f'<div class="sidebar-field-label">'
+            f'<span class="sidebar-field-icon">{icon}</span>'
+            f'<span>{html.escape(text)}</span>'
+            f'</div>'
+        ),
+        unsafe_allow_html=True
+    )
 
 
 def _selector_state_key(var_name):
@@ -1410,7 +1475,15 @@ _df_cortinas_all = cargar_cortinas(archivo_cortinas_bytes) if archivo_cortinas_b
 if 'graficar_correlacion' not in st.session_state:
     st.session_state.graficar_correlacion = False
 
-st.sidebar.header("Filtros")
+st.sidebar.markdown(
+    """
+    <div class="sidebar-title">
+        <span class="sidebar-title-icon">📅</span>
+        <span>Filtros</span>
+    </div>
+    """,
+    unsafe_allow_html=True
+)
 
 block_codes, variable_block_map, cortina_block_map = _get_block_options(_df_variables_all, _df_cortinas_all)
 bloque_variables = None
@@ -1422,7 +1495,7 @@ if selected_block_code_current in variable_block_map:
     bloque_variables = variable_block_map.get(selected_block_code_current)
     bloque_seleccionado = cortina_block_map.get(selected_block_code_current)
 
-with st.sidebar.expander("Fechas", expanded=True):
+with st.sidebar.expander("📅 Fechas", expanded=True):
     fecha_variables = None
     fecha_cortinas = None
 
@@ -1445,6 +1518,7 @@ with st.sidebar.expander("Fechas", expanded=True):
                     st.session_state.get("fecha_calendario_unica", max_fecha),
                     max_fecha
                 )
+                _sidebar_field_label("📅", "Seleccionar fecha")
                 fecha_unica = st.date_input(
                     "Seleccionar fecha:",
                     value=fecha_unica_default,
@@ -1466,6 +1540,7 @@ with st.sidebar.expander("Fechas", expanded=True):
                         st.session_state.get("fecha_calendario_un_dia", max_fecha),
                         max_fecha
                     )
+                    _sidebar_field_label("📅", "Seleccionar fecha")
                     fecha_unica = st.date_input(
                         "Seleccionar fecha:",
                         value=fecha_unica_default,
@@ -1475,11 +1550,13 @@ with st.sidebar.expander("Fechas", expanded=True):
                     fecha_variables = (fecha_unica, fecha_unica)
                     fecha_cortinas = (fecha_unica, fecha_unica)
                 else:
+                    _sidebar_field_label("📅", "Fecha inicio")
                     fecha_inicio = st.date_input(
                         "Fecha inicio:",
                         value=min_fecha,
                         key="fecha_inicio_compartida"
                     )
+                    _sidebar_field_label("📅", "Fecha fin")
                     fecha_fin = st.date_input(
                         "Fecha fin:",
                         value=max_fecha,
@@ -1490,16 +1567,17 @@ with st.sidebar.expander("Fechas", expanded=True):
                     fecha_variables = (fecha_inicio, fecha_fin)
                     fecha_cortinas = (fecha_inicio, fecha_fin)
 
-with st.sidebar.expander("Bloque", expanded=True):
+with st.sidebar.expander("📍 Bloque", expanded=True):
     if _df_variables_all.empty:
         st.write("No se encontraron datos de variables para habilitar los bloques.")
     elif not block_codes:
         st.warning("No se detectaron bloques válidos dentro del archivo de variables.")
     else:
+        _sidebar_field_label("🌸", "Seleccionar bloque")
         selected_block_code = st.selectbox(
             "Seleccionar bloque:",
             options=block_codes,
-            format_func=lambda code: f"Bloque {code}",
+            format_func=lambda code: f"🌸 Bloque {code}",
             key="bloque_compartido"
         )
         bloque_variables = variable_block_map.get(selected_block_code)
@@ -1530,7 +1608,7 @@ if fecha_cortinas is not None:
 available_correlacion_vars = _get_available_correlacion_vars(df_variables_corr, datos_cortinas_sel)
 
 selected_vars_sidebar = []
-with st.sidebar.expander("Variables visibles", expanded=True):
+with st.sidebar.expander("☰ Variables visibles", expanded=True):
     if bloque_variables is None or fecha_variables is None:
         st.write("Selecciona bloque y fechas para elegir qué series mostrar.")
     elif not available_correlacion_vars:
