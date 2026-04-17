@@ -1508,7 +1508,7 @@ def cargar_cortinas(ruta_bytes):
     except Exception as e:
         st.error(f"Error técnico en cortinas: {e}")
         return pd.DataFrame()
-
+ 
 
 def _render_variables_ambientales(df_variables, fecha_variables):
     sensor_vars = _get_available_sensor_vars(df_variables)
