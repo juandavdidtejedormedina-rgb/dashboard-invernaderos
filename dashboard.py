@@ -570,6 +570,176 @@ section[data-testid="stSidebar"] > div {{
     font-weight: 500;
     text-align: right;
 }}
+.info-panels-layout {{
+    margin: 0.4rem 0 1.15rem 0;
+}}
+.info-panel-stack {{
+    display: flex;
+    flex-direction: column;
+    gap: 0.95rem;
+}}
+.info-panel-card {{
+    position: relative;
+    overflow: hidden;
+    padding: 1.1rem 1.15rem 1.05rem 1.15rem;
+    border-radius: 24px;
+    border: 1px solid rgba(84, 83, 134, 0.12);
+    background: linear-gradient(180deg, rgba(255,255,255,0.97) 0%, rgba(250,248,243,0.93) 100%);
+    box-shadow: 0 18px 38px rgba(56, 58, 53, 0.08);
+}}
+.info-panel-card::before {{
+    content: '';
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: 4px;
+    background: linear-gradient(90deg, var(--info-accent), var(--info-accent-soft));
+}}
+.info-panel-card::after {{
+    content: '';
+    position: absolute;
+    right: -30px;
+    bottom: -45px;
+    width: 150px;
+    height: 150px;
+    background: radial-gradient(circle, var(--info-accent-soft) 0%, rgba(255,255,255,0) 70%);
+    pointer-events: none;
+}}
+.info-panel-card * {{
+    position: relative;
+    z-index: 1;
+}}
+.info-panel-header {{
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.85rem;
+    margin-bottom: 0.7rem;
+}}
+.info-panel-header-main {{
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    min-width: 0;
+}}
+.info-panel-icon {{
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.3rem;
+    height: 2.3rem;
+    border-radius: 15px;
+    background: var(--info-accent-soft);
+    color: var(--info-accent);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.62), 0 10px 22px rgba(56, 58, 53, 0.05);
+}}
+.info-panel-icon svg {{
+    width: 1.08rem;
+    height: 1.08rem;
+    stroke: currentColor;
+    fill: none;
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}}
+.info-panel-kicker {{
+    margin: 0 0 0.1rem 0;
+    color: #8a8d98;
+    font-size: 0.73rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+}}
+.info-panel-title {{
+    margin: 0;
+    color: var(--elite-graphite);
+    font-family: 'Montserrat', sans-serif;
+    font-size: 1.1rem;
+    font-weight: 700;
+    line-height: 1.2;
+}}
+.info-panel-tag {{
+    display: inline-flex;
+    align-items: center;
+    padding: 0.24rem 0.62rem;
+    border-radius: 999px;
+    background: var(--info-accent-soft);
+    color: var(--info-accent);
+    font-size: 0.74rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+}}
+.info-panel-body {{
+    color: #555963;
+    font-size: 0.95rem;
+    line-height: 1.6;
+}}
+.info-panel-body p {{
+    margin: 0;
+}}
+.info-panel-body p + p {{
+    margin-top: 0.5rem;
+}}
+.info-panel-empty {{
+    color: #7b7f8a;
+    font-style: italic;
+}}
+.info-panel-list {{
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}}
+.info-panel-list-item {{
+    display: flex;
+    align-items: flex-start;
+    gap: 0.7rem;
+    padding: 0.55rem 0;
+    border-bottom: 1px solid rgba(84, 83, 134, 0.08);
+}}
+.info-panel-list-item:last-child {{
+    border-bottom: none;
+    padding-bottom: 0;
+}}
+.info-panel-dot {{
+    width: 0.62rem;
+    height: 0.62rem;
+    border-radius: 999px;
+    margin-top: 0.42rem;
+    background: var(--info-accent);
+    box-shadow: 0 0 0 6px var(--info-accent-soft);
+    flex: 0 0 auto;
+}}
+.info-panel-list-text {{
+    color: #4f545f;
+    font-size: 0.95rem;
+    line-height: 1.45;
+}}
+.info-panel-state {{
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    margin-bottom: 0.65rem;
+}}
+.info-panel-state-badge {{
+    display: inline-flex;
+    align-items: center;
+    padding: 0.34rem 0.78rem;
+    border-radius: 999px;
+    font-size: 0.82rem;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+}}
+.info-panel-state-text {{
+    color: var(--elite-graphite);
+    font-family: 'Montserrat', sans-serif;
+    font-size: 1rem;
+    font-weight: 700;
+}}
+.info-panel-meta {{
+    color: #757985;
+    font-size: 0.86rem;
+    line-height: 1.5;
+}}
 .block-note {{
     margin: 0.5rem 0 1.1rem 0;
     padding: 1rem 1.05rem;
@@ -1114,6 +1284,148 @@ def _render_summary_cards(df_variables, fecha_variables):
     cards_html = _build_summary_cards_html(df_variables, fecha_variables)
     if cards_html:
         st.markdown(cards_html, unsafe_allow_html=True)
+
+
+def _info_panel_icon_svg(icon_name):
+    icons = {
+        'modificacion': (
+            '<svg viewBox="0 0 24 24" aria-hidden="true">'
+            '<path d="M4 7.5h16"></path>'
+            '<path d="M7 12h10"></path>'
+            '<path d="M10 16.5h4"></path>'
+            '</svg>'
+        ),
+        'observaciones': (
+            '<svg viewBox="0 0 24 24" aria-hidden="true">'
+            '<path d="M8 9h8"></path>'
+            '<path d="M8 13h5"></path>'
+            '<path d="M6 20V5.8A1.8 1.8 0 0 1 7.8 4h8.4A1.8 1.8 0 0 1 18 5.8V20l-6-3-6 3Z"></path>'
+            '</svg>'
+        ),
+        'culatas': (
+            '<svg viewBox="0 0 24 24" aria-hidden="true">'
+            '<path d="M12 3C9.2 7.1 6.5 9.8 6.5 13a5.5 5.5 0 0 0 11 0C17.5 9.8 14.8 7.1 12 3Z"></path>'
+            '<path d="M12 9.2v5.2"></path>'
+            '</svg>'
+        )
+    }
+    return icons.get(icon_name, '')
+
+
+def _render_info_panels(block_label, block_modification, culatas_observation, daily_annotations, rango_multiple):
+    period_label = 'del rango' if rango_multiple else 'del día'
+    observation_title = f'Observaciones {period_label}'
+    culatas_title = 'Información sobre culatas'
+    block_title = f'Modificación aplicada en {block_label}' if block_label else 'Modificación aplicada'
+
+    observations_html = ''
+    if daily_annotations:
+        observation_items = []
+        for item in daily_annotations:
+            observation_items.append(
+                (
+                    '<li class="info-panel-list-item">'
+                    '<span class="info-panel-dot"></span>'
+                    f'<span class="info-panel-list-text">{html.escape(item)}</span>'
+                    '</li>'
+                )
+            )
+        observations_html = f'<ul class="info-panel-list">{"".join(observation_items)}</ul>'
+    else:
+        observations_html = (
+            '<div class="info-panel-body">'
+            f'<p class="info-panel-empty">No hay anotaciones registradas {period_label}.</p>'
+            '</div>'
+        )
+
+    mod_text = block_modification or 'No hay una modificación registrada para este bloque.'
+    mod_html = (
+        '<div class="info-panel-body">'
+        f'<p>{html.escape(mod_text)}</p>'
+        '</div>'
+    )
+
+    culatas_state = culatas_observation or 'Sin información disponible'
+    culatas_state_lower = culatas_state.lower()
+    if 'abiertas' in culatas_state_lower:
+        culatas_badge_bg = 'rgba(112, 200, 140, 0.18)'
+        culatas_badge_color = '#3C8C57'
+        culatas_tag = 'Estado abierto'
+    elif 'cerradas' in culatas_state_lower:
+        culatas_badge_bg = 'rgba(84, 83, 134, 0.16)'
+        culatas_badge_color = BRAND_COLORS['hero']
+        culatas_tag = 'Estado cerrado'
+    else:
+        culatas_badge_bg = 'rgba(124, 129, 138, 0.16)'
+        culatas_badge_color = '#6D727D'
+        culatas_tag = 'Sin dato'
+
+    culatas_html = (
+        '<div class="info-panel-body">'
+        '<div class="info-panel-state">'
+        f'<span class="info-panel-state-badge" style="background:{culatas_badge_bg}; color:{culatas_badge_color};">{html.escape(culatas_tag)}</span>'
+        f'<span class="info-panel-state-text">{html.escape(culatas_state)}</span>'
+        '</div>'
+        f'<p class="info-panel-meta">Resumen operativo {period_label} para {html.escape(str(block_label)) if block_label else "el bloque seleccionado"}.</p>'
+        '</div>'
+    )
+
+    info_cards = {
+        'observaciones': (
+            f'<div class="info-panel-card" style="--info-accent: {BRAND_COLORS["rose"]}; --info-accent-soft: rgba(244, 199, 206, 0.18);">'
+            '<div class="info-panel-header">'
+            '<div class="info-panel-header-main">'
+            f'<span class="info-panel-icon">{_info_panel_icon_svg("observaciones")}</span>'
+            '<div>'
+            '<p class="info-panel-kicker">Seguimiento</p>'
+            f'<h3 class="info-panel-title">{html.escape(observation_title)}</h3>'
+            '</div>'
+            '</div>'
+            f'<span class="info-panel-tag">{html.escape(period_label.title())}</span>'
+            '</div>'
+            f'{observations_html}'
+            '</div>'
+        ),
+        'modificacion': (
+            f'<div class="info-panel-card" style="--info-accent: {BRAND_COLORS["hero"]}; --info-accent-soft: rgba(84, 83, 134, 0.14);">'
+            '<div class="info-panel-header">'
+            '<div class="info-panel-header-main">'
+            f'<span class="info-panel-icon">{_info_panel_icon_svg("modificacion")}</span>'
+            '<div>'
+            '<p class="info-panel-kicker">Bloque</p>'
+            f'<h3 class="info-panel-title">{html.escape(block_title)}</h3>'
+            '</div>'
+            '</div>'
+            f'<span class="info-panel-tag">{html.escape(str(block_label)) if block_label else "Sin bloque"}</span>'
+            '</div>'
+            f'{mod_html}'
+            '</div>'
+        ),
+        'culatas': (
+            f'<div class="info-panel-card" style="--info-accent: {BRAND_COLORS["sky"]}; --info-accent-soft: rgba(194, 223, 234, 0.24);">'
+            '<div class="info-panel-header">'
+            '<div class="info-panel-header-main">'
+            f'<span class="info-panel-icon">{_info_panel_icon_svg("culatas")}</span>'
+            '<div>'
+            '<p class="info-panel-kicker">Sistema</p>'
+            f'<h3 class="info-panel-title">{html.escape(culatas_title)}</h3>'
+            '</div>'
+            '</div>'
+            f'<span class="info-panel-tag">{html.escape(period_label.title())}</span>'
+            '</div>'
+            f'{culatas_html}'
+            '</div>'
+        )
+    }
+
+    col_observaciones, col_detalle = st.columns([1.05, 2.3], gap='small')
+    with col_observaciones:
+        st.markdown(info_cards['observaciones'], unsafe_allow_html=True)
+    with col_detalle:
+        st.markdown(
+            f'<div class="info-panel-stack">{info_cards["modificacion"]}{info_cards["culatas"]}</div>',
+            unsafe_allow_html=True
+        )
 
 
 def _selector_state_key(var_name):
@@ -2027,28 +2339,13 @@ with tab_correlacion:
         block_modification = _get_block_modification(block_label)
         culatas_observation = _get_culatas_daily_observation(datos_cortinas_sel)
         daily_annotations = _get_daily_annotations(datos_cortinas_sel)
-        if block_label and (block_modification or culatas_observation or daily_annotations):
-            observation_label = 'Observación del rango' if rango_multiple else 'Observación del día'
-            annotations_label = 'Anotaciones del rango' if rango_multiple else 'Anotaciones del día'
-            note_parts = [
-                f'<p class="block-note-title">Modificación aplicada en {html.escape(str(block_label))}</p>'
-            ]
-            if block_modification:
-                note_parts.append(f'<p class="block-note-text">{html.escape(block_modification)}</p>')
-            if culatas_observation:
-                note_parts.append(f'<p class="block-note-observation">{observation_label}: {html.escape(culatas_observation)}</p>')
-            if daily_annotations:
-                formatted_annotations = '<br>'.join(html.escape(text) for text in daily_annotations)
-                note_parts.append(
-                    f'<p class="block-note-text"><strong>{annotations_label}:</strong><br>{formatted_annotations}</p>'
-                )
-            st.markdown(
-                f"""
-                <div class="block-note">
-                    {''.join(note_parts)}
-                </div>
-                """,
-                unsafe_allow_html=True
+        if block_label or block_modification or culatas_observation or daily_annotations:
+            _render_info_panels(
+                block_label,
+                block_modification,
+                culatas_observation,
+                daily_annotations,
+                rango_multiple
             )
 
         tab_corr_graf, tab_corr_regs = st.tabs(["Correlación", "Registros"])
