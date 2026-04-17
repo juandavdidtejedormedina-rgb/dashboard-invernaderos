@@ -1157,10 +1157,10 @@ def _render_correlacion(df_variables, datos_cortinas_sel, fecha_variables, varia
             right_margin = 190
     else:
         if num_axes >= 4:
-            x_domain_end = 0.82
-            axis_start = 0.87
-            axis_end = 0.95
-            right_margin = 220
+            x_domain_end = 0.79
+            axis_start = 0.84
+            axis_end = 0.98
+            right_margin = 255
         elif num_axes == 3:
             x_domain_end = 0.86
             axis_start = 0.90
