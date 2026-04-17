@@ -7,6 +7,7 @@ import requests
 import re
 import html
 import base64
+import unicodedata
 from pathlib import Path
 from datetime import date, datetime, timedelta
 def _image_to_base64(image_path):
@@ -187,58 +188,6 @@ st.markdown(f"""
 [data-testid="stSidebar"] .stExpander details summary {{
     background: rgba(255, 255, 255, 0.06);
     padding: 0.35rem 0.65rem;
-}}
-[data-testid="stSidebar"] [data-testid="stCheckbox"] {{
-    margin-bottom: 0.15rem;
-}}
-[data-testid="stSidebar"] [data-testid="stCheckbox"] label {{
-    width: 100%;
-    padding: 0.38rem 0.48rem;
-    border-radius: 14px;
-    border: 1px solid rgba(255, 255, 255, 0.10);
-    background: rgba(255, 255, 255, 0.06);
-    transition: background 0.2s ease, transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
-}}
-[data-testid="stSidebar"] [data-testid="stCheckbox"] label:hover {{
-    background: rgba(255, 255, 255, 0.11);
-    border-color: rgba(194, 223, 234, 0.35);
-    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.12);
-    transform: translateX(2px);
-}}
-.sidebar-panel-card {{
-    padding: 0.9rem 0.95rem;
-    border-radius: 18px;
-    border: 1px solid rgba(255, 255, 255, 0.14);
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.06));
-    box-shadow: 0 14px 28px rgba(0, 0, 0, 0.10);
-    margin-bottom: 0.65rem;
-}}
-.sidebar-panel-title {{
-    margin: 0;
-    color: #ffffff;
-    font-family: 'Montserrat', sans-serif;
-    font-size: 0.96rem;
-    font-weight: 700;
-    letter-spacing: 0.04em;
-}}
-.sidebar-panel-help {{
-    margin: 0.28rem 0 0 0;
-    color: rgba(247, 247, 251, 0.78);
-    font-size: 0.82rem;
-    line-height: 1.45;
-}}
-.sidebar-source-pill {{
-    padding: 0.8rem 0.95rem;
-    border-radius: 16px;
-    border: 1px solid rgba(255, 255, 255, 0.14);
-    background: linear-gradient(135deg, rgba(255, 255, 255, 0.14), rgba(194, 223, 234, 0.12));
-    color: #f7f7fb;
-    font-size: 0.88rem;
-    line-height: 1.45;
-    margin-bottom: 0.4rem;
-}}
-[data-testid="stSidebar"] div.stButton > button {{
-    width: 100%;
 }}
 [data-testid="stSidebar"] .stFileUploader {{
     background: rgba(255, 255, 255, 0.06);
@@ -524,19 +473,23 @@ def descargar_desde_github(url):
         st.error(f"Error al conectar con GitHub: {e}")
         return None
 
-# 2. Fuentes de datos en la barra lateral
-st.sidebar.header("Fuente de datos")
-st.sidebar.markdown(
-    """
-    <div class="sidebar-source-pill">
-        Variables y cortinas se leen directamente desde la nube. Ya no es necesario cargar archivos de Excel manualmente.
-    </div>
-    """,
-    unsafe_allow_html=True
-)
+# 2. Selector de archivos en la barra lateral
+st.sidebar.header("Actualmente se estan leyendo datos de la nube, si desea leer otro archivo debe subirlo")
+st.sidebar.caption("Usa los archivos de la nube o sube unos nuevos.")
 
-archivo_variables_bytes = descargar_desde_github(URL_VARIABLES)
-archivo_cortinas_bytes = descargar_desde_github(URL_CORTINAS)
+archivo_variables = st.sidebar.file_uploader("Sube archivo variables (Opcional)", type=["xlsx"])
+archivo_cortinas = st.sidebar.file_uploader("Sube archivo cortinas (Opcional)", type=["xlsx"])
+
+# Lógica de asignación de datos
+if archivo_variables:
+    archivo_variables_bytes = archivo_variables.read()
+else:
+    archivo_variables_bytes = descargar_desde_github(URL_VARIABLES)
+
+if archivo_cortinas:
+    archivo_cortinas_bytes = archivo_cortinas.read()
+else:
+    archivo_cortinas_bytes = descargar_desde_github(URL_CORTINAS)
 
 # 3. Funciones de carga de datos con corrección de FECHAS
 
@@ -552,11 +505,71 @@ def _limpiar_columnas(df):
 
 def _leer_excel_desde_bytes(ruta_bytes, sheet_name, **kwargs):
     return pd.read_excel(
-    io.BytesIO(ruta_bytes),
-    sheet_name=sheet_name,
-    engine="openpyxl",
-    **kwargs
-)
+        io.BytesIO(ruta_bytes),
+        sheet_name=sheet_name,
+        engine="openpyxl",
+        **kwargs
+    )
+
+
+def _build_normalized_text_key(value):
+    normalized = unicodedata.normalize('NFKD', str(value))
+    normalized = ''.join(char for char in normalized if not unicodedata.combining(char))
+    normalized = normalized.replace('µ', 'u').replace('°', ' ')
+    normalized = normalized.lower()
+    normalized = re.sub(r'[^a-z0-9]+', ' ', normalized)
+    return re.sub(r'\s+', ' ', normalized).strip()
+
+
+def _normalize_variable_column_name(column_name):
+    text = re.sub(r'\s+', ' ', str(column_name).strip())
+    normalized_key = _build_normalized_text_key(text)
+
+    if normalized_key == 'datetime':
+        return 'DateTime'
+    if normalized_key == 'fecha':
+        return 'Fecha'
+    if normalized_key == 'hora':
+        return 'Hora'
+
+    normalized_key = re.sub(r'\bb\d+\b', ' ', normalized_key)
+    normalized_key = re.sub(r'\bumol\b.*$', ' ', normalized_key)
+    normalized_key = re.sub(r'\bg\b$', ' ', normalized_key)
+    normalized_key = re.sub(r'\bc\b$', ' ', normalized_key)
+    normalized_key = re.sub(r'\s+', ' ', normalized_key).strip()
+
+    if normalized_key.startswith('temperatura'):
+        return 'Temperatura'
+    if normalized_key.startswith('humedad relativa'):
+        return 'Humedad Relativa'
+    if normalized_key.startswith('radiacion par'):
+        return 'Radiación PAR'
+    if normalized_key.startswith('gramos de agua'):
+        return 'Gramos de agua'
+
+    return text
+
+
+def _combine_fecha_hora_columns(df):
+    if 'Fecha' not in df.columns or 'Hora' not in df.columns:
+        return df
+
+    df = df.copy()
+    fecha_series = pd.to_datetime(df['Fecha'], errors='coerce', dayfirst=True)
+    hora_series = df['Hora'].astype(str).str.strip().replace({'NaT': '', 'nan': '', 'None': ''})
+    df['DateTime'] = pd.to_datetime(
+        fecha_series.dt.strftime('%Y-%m-%d') + ' ' + hora_series,
+        errors='coerce'
+    )
+    return df
+
+
+def _prepare_variables_sheet(df_sheet):
+    df_sheet = df_sheet.copy()
+    df_sheet.columns = [_normalize_variable_column_name(col) for col in df_sheet.columns]
+    if 'DateTime' not in df_sheet.columns and {'Fecha', 'Hora'}.issubset(df_sheet.columns):
+        df_sheet = _combine_fecha_hora_columns(df_sheet)
+    return df_sheet
 
 
 @st.cache_data
@@ -569,12 +582,15 @@ def cargar_datos(ruta_bytes):
         registros = []
 
         for sheet in [s for s in xls.sheet_names if s.lower() != 'plantilla']:
-            df_sheet = _leer_excel_desde_bytes(ruta_bytes, sheet_name=sheet)
-            df_sheet = _limpiar_columnas(df_sheet)
+            df_sheet = pd.DataFrame()
 
-            if 'DateTime' not in df_sheet.columns and len(df_sheet):
-                df_sheet = _leer_excel_desde_bytes(ruta_bytes, sheet_name=sheet, skiprows=1)
-                df_sheet = _limpiar_columnas(df_sheet)
+            for read_kwargs in ({}, {'skiprows': 1}):
+                candidate = _leer_excel_desde_bytes(ruta_bytes, sheet_name=sheet, **read_kwargs)
+                candidate = _prepare_variables_sheet(candidate)
+                candidate = _limpiar_columnas(candidate)
+                if 'DateTime' in candidate.columns:
+                    df_sheet = candidate
+                    break
 
             if 'DateTime' not in df_sheet.columns:
                 continue
@@ -622,35 +638,8 @@ def _coerce_sidebar_date(value, fallback):
     return fallback
 
 
-def _selector_state_key(var_name):
-    safe_name = re.sub(r'[^a-z0-9]+', '_', str(var_name).lower()).strip('_')
-    return f'variables_correlacion_{safe_name}'
-
-
-def _reset_correlacion_selector(options):
-    st.session_state['variables_correlacion'] = options.copy()
-    known_options = list(dict.fromkeys((SENSOR_VARIABLES + MOTOR_VARIABLES) + list(options)))
-    for option in known_options:
-        st.session_state[_selector_state_key(option)] = option in options
-
-
-def _get_selected_correlacion_vars(options):
-    selected_vars = [option for option in options if st.session_state.get(_selector_state_key(option), True)]
-    st.session_state['variables_correlacion'] = selected_vars
-    return selected_vars
-
-
-def _get_missing_motor_dates(df_variables, datos_cortinas):
-    if df_variables.empty or 'Fecha_Filtro' not in df_variables.columns:
-        return []
-
-    fechas_variables = set(pd.Series(df_variables['Fecha_Filtro'].dropna().unique()).tolist())
-    fechas_cortinas = set()
-
-    if not datos_cortinas.empty and 'Fecha' in datos_cortinas.columns:
-        fechas_cortinas = set(pd.Series(datos_cortinas['Fecha'].dropna().unique()).tolist())
-
-    return sorted(fechas_variables - fechas_cortinas)
+def _sync_corr_bottom_to_top():
+    st.session_state['variables_correlacion'] = st.session_state.get('variables_correlacion_bottom', []).copy()
 
 
 def _get_block_modification(block_name):
@@ -719,6 +708,21 @@ def _normalize_percent_value(value):
     return max(0.0, min(100.0, float(value)))
 
 
+def _normalize_cortina_name(value):
+    if pd.isna(value):
+        return None
+
+    normalized_key = _build_normalized_text_key(value)
+    normalized_key = re.sub(r'\s+', ' ', normalized_key).strip()
+    cortina_name_map = {
+        'frente 1': 'FRENTE 1',
+        'frente 2': 'FRENTE 2',
+        'puerta 1': 'PUERTA 1',
+        'puerta 2': 'PUERTA 2'
+    }
+    return cortina_name_map.get(normalized_key, str(value).strip())
+
+
 def _build_cortina_apertura_profile(df_cortinas, elemento, config):
     elemento_col = config['element_col']
     apertura_col = config['open_time_col']
@@ -731,7 +735,9 @@ def _build_cortina_apertura_profile(df_cortinas, elemento, config):
     if elemento_col not in df_cortinas.columns:
         return pd.DataFrame()
 
-    datos_elem = df_cortinas[df_cortinas[elemento_col] == elemento].copy()
+    elemento_normalizado = _normalize_cortina_name(elemento)
+    elementos_normalizados = df_cortinas[elemento_col].apply(_normalize_cortina_name)
+    datos_elem = df_cortinas[elementos_normalizados == elemento_normalizado].copy()
     if datos_elem.empty or 'Fecha' not in datos_elem.columns:
         return pd.DataFrame()
 
@@ -837,7 +843,10 @@ def _get_available_cortina_vars(datos_cortinas):
     for config in SIDE_CONFIGS.values():
         element_col = config['element_col']
         if element_col in datos_cortinas.columns:
-            available.extend([str(v).strip() for v in datos_cortinas[element_col].dropna().unique() if str(v).strip()])
+            for value in datos_cortinas[element_col].dropna().unique():
+                normalized_name = _normalize_cortina_name(value)
+                if normalized_name:
+                    available.append(normalized_name)
     available_set = set(available)
     ordered_known = [motor for motor in MOTOR_VARIABLES if motor in available_set]
     extras = sorted(available_set - set(MOTOR_VARIABLES))
@@ -1019,6 +1028,7 @@ def _render_correlacion(df_variables, datos_cortinas_sel, fecha_variables, varia
     available_cortinas = _get_available_cortina_vars(datos_cortinas_sel)
     available_vars = list(dict.fromkeys(sensor_vars + available_cortinas))
     selected_vars = variables_seleccionadas or []
+
     if df_variables.empty or not sensor_vars:
         st.warning("No hay datos de variables disponibles para la combinación seleccionada.")
         return
@@ -1322,10 +1332,8 @@ _df_cortinas_all = cargar_cortinas(archivo_cortinas_bytes) if archivo_cortinas_b
 if 'graficar_correlacion' not in st.session_state:
     st.session_state.graficar_correlacion = False
 
-toggle_chart_label = "Graficar correlación" if not st.session_state.graficar_correlacion else "Ocultar correlación"
-if st.sidebar.button(toggle_chart_label, key="boton_toggle_graficos", use_container_width=True):
-    st.session_state.graficar_correlacion = not st.session_state.graficar_correlacion
-    st.rerun()
+if st.sidebar.button("Detener / limpiar gráficos", key="boton_detener_graficos"):
+    st.session_state.graficar_correlacion = False
 
 st.sidebar.header("Filtros")
 
@@ -1357,13 +1365,13 @@ with st.sidebar.expander("Filtros Fechas", expanded=True):
     elif bloque_variables is None:
         st.write("Selecciona primero el bloque.")
     else:
-        fechas_compartidas = _get_available_variable_dates(_df_variables_all, bloque_variables)
+        fechas_disponibles = _get_available_variable_dates(_df_variables_all, bloque_variables)
 
-        if not fechas_compartidas:
+        if not fechas_disponibles:
             st.warning("No hay fechas disponibles en variables para el bloque seleccionado.")
         else:
-            min_fecha = min(fechas_compartidas)
-            max_fecha = max(fechas_compartidas)
+            min_fecha = min(fechas_disponibles)
+            max_fecha = max(fechas_disponibles)
 
             if min_fecha == max_fecha:
                 st.caption("Solo hay una fecha con datos en variables para este bloque, pero puedes consultar cualquier día desde el calendario.")
@@ -1404,15 +1412,11 @@ with st.sidebar.expander("Filtros Fechas", expanded=True):
                     fecha_inicio = st.date_input(
                         "Fecha inicio:",
                         value=min_fecha,
-                        min_value=min_fecha,
-                        max_value=max_fecha,
                         key="fecha_inicio_compartida"
                     )
                     fecha_fin = st.date_input(
                         "Fecha fin:",
                         value=max_fecha,
-                        min_value=min_fecha,
-                        max_value=max_fecha,
                         key="fecha_fin_compartida"
                     )
                     if fecha_fin < fecha_inicio:
@@ -1463,27 +1467,34 @@ with st.sidebar.expander("Variables visibles", expanded=True):
     elif not available_correlacion_vars:
         st.write("No se encontraron variables con datos para el rango seleccionado.")
     else:
-        selector_context = (
+        current_context = (
             str(bloque_variables),
             str(fecha_variables[0]),
             str(fecha_variables[1]),
             tuple(available_correlacion_vars)
         )
         previous_context = st.session_state.get('variables_correlacion_context')
-        if previous_context != selector_context:
-            _reset_correlacion_selector(available_correlacion_vars)
-            st.session_state['variables_correlacion_context'] = selector_context
+        if previous_context != current_context:
+            st.session_state['variables_correlacion'] = available_correlacion_vars.copy()
+            st.session_state['variables_correlacion_bottom'] = available_correlacion_vars.copy()
+            st.session_state['variables_correlacion_context'] = current_context
 
-        for option in available_correlacion_vars:
-            state_key = _selector_state_key(option)
-            if state_key not in st.session_state:
-                st.session_state[state_key] = True
-            st.checkbox(
-                VARIABLE_SELECTOR_LABELS.get(option, option),
-                key=state_key
-            )
+        current_top = [v for v in st.session_state.get('variables_correlacion', available_correlacion_vars.copy()) if v in available_correlacion_vars]
+        current_bottom = [v for v in st.session_state.get('variables_correlacion_bottom', current_top) if v in available_correlacion_vars]
 
-        selected_vars_sidebar = _get_selected_correlacion_vars(available_correlacion_vars)
+        st.session_state['variables_correlacion'] = current_top
+        st.session_state['variables_correlacion_bottom'] = current_bottom
+
+        st.pills(
+            'Mostrar u ocultar variables:',
+            options=available_correlacion_vars,
+            default=st.session_state['variables_correlacion_bottom'],
+            selection_mode='multi',
+            format_func=lambda v: VARIABLE_SELECTOR_LABELS.get(v, VARIABLE_LABELS.get(v, v)),
+            key='variables_correlacion_bottom',
+            on_change=_sync_corr_bottom_to_top
+        )
+        selected_vars_sidebar = st.session_state['variables_correlacion_bottom']
 
 # Vista principal
 tab_correlacion = st.container()
@@ -1517,7 +1528,6 @@ with tab_correlacion:
             if variables_sensor else pd.DataFrame()
         )
 
-        dias_sin_motores = _get_missing_motor_dates(df_variables_corr, datos_cortinas_sel)
         block_label = bloque_seleccionado or bloque_variables
         block_modification = _get_block_modification(block_label)
         culatas_observation = _get_culatas_daily_observation(datos_cortinas_sel)
@@ -1549,8 +1559,12 @@ with tab_correlacion:
         tab_corr_graf, tab_corr_regs = st.tabs(["Correlación", "Registros"])
 
         with tab_corr_graf:
+            graficar_corr = st.button("Graficar correlación", key="boton_graficar_correlacion")
+            if graficar_corr:
+                st.session_state.graficar_correlacion = True
+
             if not st.session_state.graficar_correlacion:
-                st.info("Usa el botón de la barra lateral para graficar u ocultar la correlación.")
+                st.info("Presiona el botón Graficar para generar el análisis de correlación.")
             else:
                 selected_vars = selected_vars_sidebar or st.session_state.get('variables_correlacion', available_correlacion_vars.copy())
 
@@ -1559,13 +1573,6 @@ with tab_correlacion:
                     st.warning(f"No se encontraron datos de variables para el rango seleccionado: {fecha_label}.")
                 elif not available_correlacion_vars:
                     st.warning("No se encontraron variables con datos para graficar en el rango seleccionado.")
-                elif not datos_cortinas_sel.empty and dias_sin_motores:
-                    fechas_sin_motores = ', '.join(fecha.strftime('%Y-%m-%d') for fecha in dias_sin_motores[:5])
-                    sufijo_fechas = '...' if len(dias_sin_motores) > 5 else ''
-                    st.info(
-                        f"Hay {len(dias_sin_motores)} dia(s) del rango sin informacion de motores: "
-                        f"{fechas_sin_motores}{sufijo_fechas}. Los motores se grafican solo donde existen registros."
-                    )
                 elif datos_cortinas_sel.empty:
                     st.info("No hay informacion de motores para este rango. Se mostraran las variables ambientales disponibles.")
 
