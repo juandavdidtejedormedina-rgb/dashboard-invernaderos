@@ -590,7 +590,7 @@ section[data-testid="stSidebar"] > div {{
 }}
 .info-panels-grid {{
     display: grid;
-    grid-template-columns: minmax(290px, 0.96fr) minmax(0, 2fr);
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 1rem;
     align-items: stretch;
 }}
@@ -601,9 +601,11 @@ section[data-testid="stSidebar"] > div {{
 }}
 .info-panel-card {{
     position: relative;
+    display: flex;
+    flex-direction: column;
     overflow: hidden;
-    min-height: 178px;
-    padding: 1.18rem 1.22rem 1.12rem 1.22rem;
+    min-height: 232px;
+    padding: 1.15rem 1.18rem 1.12rem 1.18rem;
     border-radius: 26px;
     border: 1px solid rgba(84, 83, 134, 0.10);
     background:
@@ -630,7 +632,7 @@ section[data-testid="stSidebar"] > div {{
     pointer-events: none;
 }}
 .info-panel-card--compact {{
-    min-height: 162px;
+    min-height: 232px;
 }}
 .info-panel-card--observaciones {{
     height: 100%;
@@ -691,9 +693,9 @@ section[data-testid="stSidebar"] > div {{
     margin: 0;
     color: var(--elite-graphite);
     font-family: 'Montserrat', sans-serif;
-    font-size: 1.28rem;
+    font-size: 1.16rem;
     font-weight: 700;
-    line-height: 1.14;
+    line-height: 1.2;
     letter-spacing: -0.01em;
 }}
 .info-panel-tag {{
@@ -711,9 +713,14 @@ section[data-testid="stSidebar"] > div {{
     white-space: nowrap;
 }}
 .info-panel-body {{
+    flex: 1 1 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 0.78rem;
+    justify-content: flex-start;
     color: #555963;
-    font-size: 0.95rem;
-    line-height: 1.62;
+    font-size: 0.93rem;
+    line-height: 1.58;
 }}
 .info-panel-body p {{
     margin: 0;
@@ -721,20 +728,24 @@ section[data-testid="stSidebar"] > div {{
 .info-panel-body p + p {{
     margin-top: 0.5rem;
 }}
-.info-panel-insight {{
+.info-panel-copy {{
+    color: #4f545f;
+    font-size: 0.95rem;
+    line-height: 1.62;
+}}
+.info-panel-stat-row {{
     display: flex;
     align-items: flex-end;
     gap: 0.55rem;
-    margin-bottom: 0.95rem;
 }}
-.info-panel-insight-value {{
+.info-panel-stat-value {{
     color: var(--elite-graphite);
     font-family: 'Montserrat', sans-serif;
-    font-size: 2.3rem;
+    font-size: 2.15rem;
     font-weight: 800;
     line-height: 1;
 }}
-.info-panel-insight-label {{
+.info-panel-stat-caption {{
     margin-bottom: 0.22rem;
     color: #747884;
     font-size: 0.84rem;
@@ -744,7 +755,11 @@ section[data-testid="stSidebar"] > div {{
     display: flex;
     flex-direction: column;
     gap: 0.62rem;
-    padding-top: 0.15rem;
+    justify-content: center;
+    min-height: 100%;
+}}
+.info-panel-empty-state--centered {{
+    align-items: flex-start;
 }}
 .info-panel-empty-title {{
     color: var(--elite-graphite);
@@ -764,6 +779,11 @@ section[data-testid="stSidebar"] > div {{
     display: flex;
     flex-direction: column;
     gap: 0.18rem;
+}}
+.info-panel-list-wrap {{
+    max-height: 144px;
+    overflow: auto;
+    padding-right: 0.2rem;
 }}
 .info-panel-list-item {{
     display: flex;
@@ -817,6 +837,12 @@ section[data-testid="stSidebar"] > div {{
     color: #757985;
     font-size: 0.87rem;
     line-height: 1.55;
+}}
+.info-panel-footer-note {{
+    margin-top: auto;
+    color: #727783;
+    font-size: 0.84rem;
+    line-height: 1.5;
 }}
 .block-note {{
     margin: 0.5rem 0 1.1rem 0;
@@ -962,11 +988,22 @@ div[data-testid="stDataFrame"] {{
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }}
     .info-panels-grid {{
-        grid-template-columns: 1fr;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }}
+    .info-panel-card--observaciones {{
+        grid-column: 1 / -1;
     }}
     .info-panel-card,
     .info-panel-card--compact {{
         min-height: auto;
+    }}
+}}
+@media (max-width: 760px) {{
+    .info-panels-grid {{
+        grid-template-columns: 1fr;
+    }}
+    .info-panel-card--observaciones {{
+        grid-column: auto;
     }}
 }}
 @media (max-width: 680px) {{
@@ -1409,8 +1446,9 @@ def _render_info_panels(block_label, block_modification, culatas_observation, da
     period_tag = 'Del rango' if rango_multiple else 'Del día'
     observation_title = 'Observaciones'
     culatas_title = 'Estado de culatas'
-    block_title = 'Modificación aplicada'
-    block_tag = html.escape(str(block_label)) if block_label else 'Sin bloque'
+    block_title = 'Modificación del bloque'
+    block_tag_text = str(block_label) if block_label else 'Sin bloque'
+    block_tag = html.escape(block_tag_text)
 
     observations_html = ''
     if daily_annotations:
@@ -1428,17 +1466,18 @@ def _render_info_panels(block_label, block_modification, culatas_observation, da
             )
         observations_html = (
             '<div class="info-panel-body">'
-            '<div class="info-panel-insight">'
-            f'<span class="info-panel-insight-value">{annotation_count}</span>'
-            f'<span class="info-panel-insight-label">{html.escape(annotation_label)}</span>'
+            '<div class="info-panel-stat-row">'
+            f'<span class="info-panel-stat-value">{annotation_count}</span>'
+            f'<span class="info-panel-stat-caption">{html.escape(annotation_label)}</span>'
             '</div>'
-            f'<ul class="info-panel-list">{"".join(observation_items)}</ul>'
+            f'<div class="info-panel-list-wrap"><ul class="info-panel-list">{"".join(observation_items)}</ul></div>'
+            f'<p class="info-panel-footer-note">Seguimiento operativo {period_context}.</p>'
             '</div>'
         )
     else:
         observations_html = (
             '<div class="info-panel-body">'
-            '<div class="info-panel-empty-state">'
+            '<div class="info-panel-empty-state info-panel-empty-state--centered">'
             '<span class="info-panel-state-badge" style="background: rgba(244, 199, 206, 0.18); color: #B56576;">Sin novedades</span>'
             '<p class="info-panel-empty-title">Operación sin eventos reportados</p>'
             f'<p class="info-panel-empty">No hay anotaciones registradas {period_context}.</p>'
@@ -1449,8 +1488,8 @@ def _render_info_panels(block_label, block_modification, culatas_observation, da
     mod_text = block_modification or 'No hay una modificación registrada para este bloque.'
     mod_html = (
         '<div class="info-panel-body">'
-        f'<p>{html.escape(mod_text)}</p>'
-        f'<p class="info-panel-meta">Configuración vigente para {block_tag}.</p>'
+        f'<p class="info-panel-copy">{html.escape(mod_text)}</p>'
+        f'<p class="info-panel-footer-note">Configuración vigente para {block_tag}.</p>'
         '</div>'
     )
 
@@ -1475,7 +1514,7 @@ def _render_info_panels(block_label, block_modification, culatas_observation, da
         f'<span class="info-panel-state-badge" style="background:{culatas_badge_bg}; color:{culatas_badge_color};">{html.escape(culatas_tag)}</span>'
         f'<span class="info-panel-state-text">{html.escape(culatas_state)}</span>'
         '</div>'
-        f'<p class="info-panel-meta">Resumen operativo {period_context} para {block_tag.lower() if block_label else "el bloque seleccionado"}.</p>'
+        f'<p class="info-panel-copy">Resumen operativo {period_context} para {html.escape(block_tag_text.lower()) if block_label else "el bloque seleccionado"}.</p>'
         '</div>'
     )
 
@@ -1532,7 +1571,8 @@ def _render_info_panels(block_label, block_modification, culatas_observation, da
             '<div class="info-panels-layout">'
             '<div class="info-panels-grid">'
             f'{info_cards["observaciones"]}'
-            f'<div class="info-panel-stack">{info_cards["modificacion"]}{info_cards["culatas"]}</div>'
+            f'{info_cards["modificacion"]}'
+            f'{info_cards["culatas"]}'
             '</div>'
             '</div>'
         ),
