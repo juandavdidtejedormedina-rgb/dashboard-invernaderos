@@ -177,11 +177,21 @@ st.markdown(f"""
     padding-left: 1rem;
     padding-right: 1rem;
 }}
-section[data-testid="stSidebar"][aria-expanded="false"] ~ div[data-testid="stAppViewContainer"] > .main {{
+[data-testid="stAppViewContainer"] > section[data-testid="stSidebar"][aria-expanded="false"] {{
+    min-width: 0 !important;
+    max-width: 0 !important;
+    width: 0 !important;
+}}
+[data-testid="stAppViewContainer"] > section[data-testid="stSidebar"][aria-expanded="false"] > div {{
+    width: 0 !important;
+    padding: 0 !important;
+    overflow: hidden;
+}}
+[data-testid="stAppViewContainer"] > section[data-testid="stSidebar"][aria-expanded="false"] ~ .main {{
     padding-left: 0;
     padding-right: 0;
 }}
-section[data-testid="stSidebar"][aria-expanded="false"] ~ div[data-testid="stAppViewContainer"] > .main .block-container {{
+[data-testid="stAppViewContainer"] > section[data-testid="stSidebar"][aria-expanded="false"] ~ .main .block-container {{
     margin-left: auto;
     margin-right: auto;
 }}
