@@ -170,6 +170,21 @@ st.markdown(f"""
 [data-testid="stAppViewContainer"] > .main {{
     padding-top: 1.25rem;
 }}
+[data-testid="stAppViewContainer"] > .main .block-container {{
+    max-width: 1180px;
+    margin-left: auto;
+    margin-right: auto;
+    padding-left: 1rem;
+    padding-right: 1rem;
+}}
+section[data-testid="stSidebar"][aria-expanded="false"] ~ div[data-testid="stAppViewContainer"] > .main {{
+    padding-left: 0;
+    padding-right: 0;
+}}
+section[data-testid="stSidebar"][aria-expanded="false"] ~ div[data-testid="stAppViewContainer"] > .main .block-container {{
+    margin-left: auto;
+    margin-right: auto;
+}}
 section[data-testid="stSidebar"] {{
     min-width: 268px !important;
     max-width: 268px !important;
@@ -2306,21 +2321,6 @@ if st.sidebar.button(toggle_chart_label, key="boton_toggle_graficos", use_contai
 tab_correlacion = st.container()
 
 with tab_correlacion:
-    st.markdown(
-        """
-        <div class="section-intro">
-            <p class="section-kicker">Gráficos</p>
-            <h2 class="section-title">Visualización de variables y motores en invernaderos</h2>
-            <p class="section-text">
-                Aplicación para estudio del comportamiento de variables medidas, apertura de cortinas
-                y eventos operativos por bloque, para seguimiento diario
-                o análisis de varios días.
-            </p>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
-
     if _df_variables_all.empty:
         st.warning("No se encontraron datos de variables para visualizar este análisis.")
     elif fecha_variables is None or fecha_cortinas is None or bloque_variables is None:
