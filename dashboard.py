@@ -1060,7 +1060,7 @@ def _build_summary_cards_html(df_variables, fecha_variables):
 
     fecha_inicio, fecha_fin = fecha_variables
     single_day = fecha_inicio == fecha_fin
-    period_chip = 'Promedio del dia' if single_day else 'Promedio del rango'
+    period_chip = 'Promedio del día' if single_day else 'Promedio del rango'
     period_text = (
         fecha_inicio.strftime('%d/%m/%Y')
         if single_day else
@@ -1092,19 +1092,19 @@ def _build_summary_cards_html(df_variables, fecha_variables):
                 )
 
         cards_html.append(
-            f"""
-            <div class="summary-card" style="--summary-accent: {accent_color}; --summary-accent-soft: {accent_soft};">
-                <div class="summary-card-header">
-                    <span class="summary-card-icon">{config['icon_svg']}</span>
-                    <span class="summary-card-label">{html.escape(config['label'])}</span>
-                </div>
-                {value_markup}
-                <div class="summary-card-footer">
-                    <span class="summary-card-chip">{period_chip}</span>
-                    <span class="summary-card-period">{period_text}</span>
-                </div>
-            </div>
-            """
+            (
+                f'<div class="summary-card" style="--summary-accent: {accent_color}; --summary-accent-soft: {accent_soft};">'
+                '<div class="summary-card-header">'
+                f'<span class="summary-card-icon">{config["icon_svg"]}</span>'
+                f'<span class="summary-card-label">{html.escape(config["label"])}</span>'
+                '</div>'
+                f'{value_markup}'
+                '<div class="summary-card-footer">'
+                f'<span class="summary-card-chip">{html.escape(period_chip)}</span>'
+                f'<span class="summary-card-period">{html.escape(period_text)}</span>'
+                '</div>'
+                '</div>'
+            )
         )
 
     return f'<div class="summary-grid">{"".join(cards_html)}</div>'
