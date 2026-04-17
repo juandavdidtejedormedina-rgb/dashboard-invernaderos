@@ -645,20 +645,20 @@ section[data-testid="stSidebar"] > div {{
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
-    gap: 1rem;
-    margin-bottom: 0.95rem;
+    gap: 0.85rem;
+    margin-bottom: 0.8rem;
 }}
 .info-panel-header-main {{
     display: flex;
     align-items: flex-start;
-    gap: 0.82rem;
+    gap: 0.68rem;
     min-width: 0;
     flex: 1 1 auto;
 }}
 .info-panel-heading {{
     display: flex;
     flex-direction: column;
-    gap: 0.14rem;
+    gap: 0;
     min-width: 0;
 }}
 .info-panel-icon {{
@@ -693,21 +693,24 @@ section[data-testid="stSidebar"] > div {{
     margin: 0;
     color: var(--elite-graphite);
     font-family: 'Montserrat', sans-serif;
-    font-size: 1.16rem;
+    font-size: 1rem;
     font-weight: 700;
-    line-height: 1.2;
+    line-height: 1.16;
     letter-spacing: -0.01em;
+    word-break: keep-all;
+    overflow-wrap: normal;
+    hyphens: none;
 }}
 .info-panel-tag {{
     display: inline-flex;
     align-items: center;
-    padding: 0.32rem 0.74rem;
+    padding: 0.28rem 0.64rem;
     border-radius: 999px;
     background: var(--info-accent-soft);
     color: var(--info-accent);
     border: 1px solid rgba(84, 83, 134, 0.08);
     box-shadow: inset 0 1px 0 rgba(255,255,255,0.62);
-    font-size: 0.72rem;
+    font-size: 0.67rem;
     font-weight: 700;
     letter-spacing: 0.02em;
     white-space: nowrap;
@@ -730,8 +733,8 @@ section[data-testid="stSidebar"] > div {{
 }}
 .info-panel-copy {{
     color: #4f545f;
-    font-size: 0.95rem;
-    line-height: 1.62;
+    font-size: 0.91rem;
+    line-height: 1.56;
 }}
 .info-panel-stat-row {{
     display: flex;
@@ -829,7 +832,7 @@ section[data-testid="stSidebar"] > div {{
 .info-panel-state-text {{
     color: var(--elite-graphite);
     font-family: 'Montserrat', sans-serif;
-    font-size: 1.08rem;
+    font-size: 0.98rem;
     font-weight: 700;
     line-height: 1.3;
 }}
@@ -1446,7 +1449,7 @@ def _render_info_panels(block_label, block_modification, culatas_observation, da
     period_tag = 'Del rango' if rango_multiple else 'Del día'
     observation_title = 'Observaciones'
     culatas_title = 'Estado de culatas'
-    block_title = 'Modificación del bloque'
+    block_title = 'Modificación aplicada'
     block_tag_text = str(block_label) if block_label else 'Sin bloque'
     block_tag = html.escape(block_tag_text)
 
@@ -1471,7 +1474,7 @@ def _render_info_panels(block_label, block_modification, culatas_observation, da
             f'<span class="info-panel-stat-caption">{html.escape(annotation_label)}</span>'
             '</div>'
             f'<div class="info-panel-list-wrap"><ul class="info-panel-list">{"".join(observation_items)}</ul></div>'
-            f'<p class="info-panel-footer-note">Seguimiento operativo {period_context}.</p>'
+            f'<p class="info-panel-footer-note">Eventos registrados {period_context}.</p>'
             '</div>'
         )
     else:
@@ -1525,7 +1528,6 @@ def _render_info_panels(block_label, block_modification, culatas_observation, da
             '<div class="info-panel-header-main">'
             f'<span class="info-panel-icon">{_info_panel_icon_svg("observaciones")}</span>'
             '<div class="info-panel-heading">'
-            '<p class="info-panel-kicker">Seguimiento</p>'
             f'<h3 class="info-panel-title">{html.escape(observation_title)}</h3>'
             '</div>'
             '</div>'
@@ -1540,7 +1542,6 @@ def _render_info_panels(block_label, block_modification, culatas_observation, da
             '<div class="info-panel-header-main">'
             f'<span class="info-panel-icon">{_info_panel_icon_svg("modificacion")}</span>'
             '<div class="info-panel-heading">'
-            '<p class="info-panel-kicker">Bloque</p>'
             f'<h3 class="info-panel-title">{html.escape(block_title)}</h3>'
             '</div>'
             '</div>'
@@ -1555,7 +1556,6 @@ def _render_info_panels(block_label, block_modification, culatas_observation, da
             '<div class="info-panel-header-main">'
             f'<span class="info-panel-icon">{_info_panel_icon_svg("culatas")}</span>'
             '<div class="info-panel-heading">'
-            '<p class="info-panel-kicker">Sistema</p>'
             f'<h3 class="info-panel-title">{html.escape(culatas_title)}</h3>'
             '</div>'
             '</div>'
