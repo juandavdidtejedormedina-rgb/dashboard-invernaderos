@@ -52,6 +52,13 @@ VARIABLE_SELECTOR_LABELS = {
     'PUERTA 1': 'Puerta 1',
     'PUERTA 2': 'Puerta 2'
 }
+SUMMARY_CARD_LABELS = {
+    'Temperatura': 'Temperatura',
+    'Humedad Relativa': 'Humedad Relativa',
+    'RadiaciÃ³n PAR': 'RadiaciÃ³n PAR',
+    'Gramos de agua': 'Gramos de agua'
+}
+SUMMARY_CARD_LABELS[SENSOR_VARIABLES[2]] = 'Radiacion PAR'
 BRAND_COLORS = {
     'hero': '#545386',
     'sky': '#C2DFEA',
@@ -419,6 +426,80 @@ section[data-testid="stSidebar"] > div {{
     font-size: 1rem;
     line-height: 1.6;
 }}
+.summary-metrics-grid {{
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.95rem;
+    margin: 0 0 1.15rem 0;
+}}
+.summary-metric-card {{
+    position: relative;
+    min-height: 148px;
+    padding: 1rem 1rem 0.95rem 1rem;
+    border-radius: 22px;
+    border: 1px solid rgba(84, 83, 134, 0.10);
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(250, 248, 243, 0.93) 100%);
+    box-shadow: 0 18px 38px rgba(56, 58, 53, 0.08);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}}
+.summary-metric-card::before {{
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 5px;
+    background: linear-gradient(90deg, var(--metric-accent), rgba(255, 255, 255, 0));
+}}
+.summary-metric-top {{
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}}
+.summary-metric-dot {{
+    width: 0.72rem;
+    height: 0.72rem;
+    border-radius: 999px;
+    background: var(--metric-accent);
+    flex-shrink: 0;
+}}
+.summary-metric-label {{
+    margin: 0;
+    color: #666873;
+    font-family: 'Montserrat', sans-serif;
+    font-size: 0.86rem;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+}}
+.summary-metric-value {{
+    margin: 0.35rem 0 0 0;
+    color: var(--elite-graphite);
+    font-family: 'Montserrat', sans-serif;
+    font-size: 2rem;
+    font-weight: 800;
+    line-height: 1.05;
+}}
+.summary-metric-unit {{
+    margin-left: 0.2rem;
+    color: var(--elite-hero);
+    font-size: 0.95rem;
+    font-weight: 700;
+}}
+.summary-metric-caption {{
+    margin: 0.6rem 0 0 0;
+    color: #7a7c86;
+    font-size: 0.84rem;
+    line-height: 1.4;
+}}
+.summary-metric-empty {{
+    color: #8a8d97;
+    font-size: 1.05rem;
+    font-weight: 700;
+}}
 .section-intro {{
     margin: 0.4rem 0 0.85rem 0;
     padding: 1rem 1.05rem;
@@ -584,6 +665,14 @@ div[data-testid="stDataFrame"] {{
     }}
     .hero-copy h1 {{
         font-size: 1.7rem;
+    }}
+    .summary-metrics-grid {{
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }}
+}}
+@media (max-width: 620px) {{
+    .summary-metrics-grid {{
+        grid-template-columns: 1fr;
     }}
 }}
 </style>
@@ -1057,6 +1146,63 @@ def _get_available_sensor_vars(df_variables):
         var_name for var_name in SENSOR_VARIABLES
         if var_name in df_variables.columns and df_variables[var_name].notna().any()
     ]
+
+
+def _format_summary_metric_value(var_name, value):
+    if value is None or pd.isna(value):
+        return '<span class="summary-metric-empty">Sin datos</span>'
+
+    decimals_by_var = {
+        'Temperatura': 1,
+        'Humedad Relativa': 1,
+        'RadiaciÃ³n PAR': 0,
+        'Gramos de agua': 1
+    }
+    decimals_by_var[SENSOR_VARIABLES[2]] = 0
+    decimals = decimals_by_var.get(var_name, 1)
+    formatted_value = f"{float(value):.{decimals}f}"
+    if decimals > 0 and formatted_value.endswith('.0'):
+        formatted_value = formatted_value[:-2]
+
+    unit = VARIABLE_UNITS.get(var_name, '')
+    if not unit:
+        return formatted_value
+
+    return f'{formatted_value}<span class="summary-metric-unit">{html.escape(unit)}</span>'
+
+
+def _render_environmental_summary_cards(df_variables, fecha_variables):
+    if fecha_variables is None:
+        return
+
+    fecha_inicio, fecha_fin = fecha_variables
+    caption = 'Promedio del dia seleccionado' if fecha_inicio == fecha_fin else 'Promedio del rango seleccionado'
+    cards = []
+
+    for var_name in SENSOR_VARIABLES:
+        promedio = None
+        if not df_variables.empty and var_name in df_variables.columns:
+            serie = pd.to_numeric(df_variables[var_name], errors='coerce').dropna()
+            if not serie.empty:
+                promedio = float(serie.mean())
+
+        cards.append(
+            f"""
+            <div class="summary-metric-card" style="--metric-accent: {VARIABLE_COLORS.get(var_name, BRAND_COLORS['hero'])};">
+                <div class="summary-metric-top">
+                    <span class="summary-metric-dot"></span>
+                    <p class="summary-metric-label">{html.escape(SUMMARY_CARD_LABELS.get(var_name, var_name))}</p>
+                </div>
+                <div class="summary-metric-value">{_format_summary_metric_value(var_name, promedio)}</div>
+                <p class="summary-metric-caption">{html.escape(caption)}</p>
+            </div>
+            """
+        )
+
+    st.markdown(
+        f'<div class="summary-metrics-grid">{"".join(cards)}</div>',
+        unsafe_allow_html=True
+    )
 
 
 def _get_available_correlacion_vars(df_variables, datos_cortinas):
@@ -1698,6 +1844,9 @@ if st.sidebar.button(toggle_chart_label, key="boton_toggle_graficos", use_contai
 tab_correlacion = st.container()
 
 with tab_correlacion:
+    if not _df_variables_all.empty and fecha_variables is not None and fecha_cortinas is not None and bloque_variables is not None:
+        _render_environmental_summary_cards(df_variables_corr, fecha_variables)
+
     st.markdown(
         """
         <div class="section-intro">
