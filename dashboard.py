@@ -200,7 +200,12 @@ section[data-testid="stSidebar"] > div {{
     letter-spacing: 0.01em;
 }}
 .sidebar-title-icon {{
-    font-size: 1rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.05rem;
+    height: 1.05rem;
+    color: rgba(255, 255, 255, 0.92);
 }}
 .sidebar-field-label {{
     display: flex;
@@ -218,7 +223,18 @@ section[data-testid="stSidebar"] > div {{
     align-items: center;
     justify-content: center;
     width: 1rem;
-    font-size: 0.88rem;
+    height: 1rem;
+    color: rgba(247, 247, 251, 0.88);
+}}
+.sidebar-title-icon svg,
+.sidebar-field-icon svg {{
+    width: 100%;
+    height: 100%;
+    stroke: currentColor;
+    fill: none;
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
 }}
 [data-testid="stSidebar"] .stExpander {{
     background: rgba(255, 255, 255, 0.08);
@@ -755,11 +771,48 @@ def _coerce_sidebar_date(value, fallback):
     return fallback
 
 
-def _sidebar_field_label(icon, text):
+def _sidebar_icon_svg(icon_name):
+    icons = {
+        'filter': (
+            '<svg viewBox="0 0 24 24" aria-hidden="true">'
+            '<path d="M4 7h16"></path>'
+            '<path d="M7 12h10"></path>'
+            '<path d="M10 17h4"></path>'
+            '</svg>'
+        ),
+        'calendar': (
+            '<svg viewBox="0 0 24 24" aria-hidden="true">'
+            '<rect x="3" y="5" width="18" height="16" rx="2"></rect>'
+            '<path d="M16 3v4"></path>'
+            '<path d="M8 3v4"></path>'
+            '<path d="M3 10h18"></path>'
+            '</svg>'
+        ),
+        'location': (
+            '<svg viewBox="0 0 24 24" aria-hidden="true">'
+            '<path d="M12 21s6-5.2 6-11a6 6 0 1 0-12 0c0 5.8 6 11 6 11Z"></path>'
+            '<circle cx="12" cy="10" r="2.4"></circle>'
+            '</svg>'
+        ),
+        'list': (
+            '<svg viewBox="0 0 24 24" aria-hidden="true">'
+            '<path d="M9 6h10"></path>'
+            '<path d="M9 12h10"></path>'
+            '<path d="M9 18h10"></path>'
+            '<circle cx="5" cy="6" r="1"></circle>'
+            '<circle cx="5" cy="12" r="1"></circle>'
+            '<circle cx="5" cy="18" r="1"></circle>'
+            '</svg>'
+        )
+    }
+    return icons.get(icon_name, '')
+
+
+def _sidebar_field_label(icon_name, text):
     st.markdown(
         (
             f'<div class="sidebar-field-label">'
-            f'<span class="sidebar-field-icon">{icon}</span>'
+            f'<span class="sidebar-field-icon">{_sidebar_icon_svg(icon_name)}</span>'
             f'<span>{html.escape(text)}</span>'
             f'</div>'
         ),
@@ -1476,9 +1529,9 @@ if 'graficar_correlacion' not in st.session_state:
     st.session_state.graficar_correlacion = False
 
 st.sidebar.markdown(
-    """
+    f"""
     <div class="sidebar-title">
-        <span class="sidebar-title-icon">📅</span>
+        <span class="sidebar-title-icon">{_sidebar_icon_svg('filter')}</span>
         <span>Filtros</span>
     </div>
     """,
@@ -1495,7 +1548,7 @@ if selected_block_code_current in variable_block_map:
     bloque_variables = variable_block_map.get(selected_block_code_current)
     bloque_seleccionado = cortina_block_map.get(selected_block_code_current)
 
-with st.sidebar.expander("📅 Fechas", expanded=True):
+with st.sidebar.expander("Fechas", expanded=True):
     fecha_variables = None
     fecha_cortinas = None
 
@@ -1518,7 +1571,7 @@ with st.sidebar.expander("📅 Fechas", expanded=True):
                     st.session_state.get("fecha_calendario_unica", max_fecha),
                     max_fecha
                 )
-                _sidebar_field_label("📅", "Seleccionar fecha")
+                _sidebar_field_label("calendar", "Seleccionar fecha")
                 fecha_unica = st.date_input(
                     "Seleccionar fecha:",
                     value=fecha_unica_default,
@@ -1540,7 +1593,7 @@ with st.sidebar.expander("📅 Fechas", expanded=True):
                         st.session_state.get("fecha_calendario_un_dia", max_fecha),
                         max_fecha
                     )
-                    _sidebar_field_label("📅", "Seleccionar fecha")
+                    _sidebar_field_label("calendar", "Seleccionar fecha")
                     fecha_unica = st.date_input(
                         "Seleccionar fecha:",
                         value=fecha_unica_default,
@@ -1550,13 +1603,13 @@ with st.sidebar.expander("📅 Fechas", expanded=True):
                     fecha_variables = (fecha_unica, fecha_unica)
                     fecha_cortinas = (fecha_unica, fecha_unica)
                 else:
-                    _sidebar_field_label("📅", "Fecha inicio")
+                    _sidebar_field_label("calendar", "Fecha inicio")
                     fecha_inicio = st.date_input(
                         "Fecha inicio:",
                         value=min_fecha,
                         key="fecha_inicio_compartida"
                     )
-                    _sidebar_field_label("📅", "Fecha fin")
+                    _sidebar_field_label("calendar", "Fecha fin")
                     fecha_fin = st.date_input(
                         "Fecha fin:",
                         value=max_fecha,
@@ -1567,17 +1620,17 @@ with st.sidebar.expander("📅 Fechas", expanded=True):
                     fecha_variables = (fecha_inicio, fecha_fin)
                     fecha_cortinas = (fecha_inicio, fecha_fin)
 
-with st.sidebar.expander("📍 Bloque", expanded=True):
+with st.sidebar.expander("Bloque", expanded=True):
     if _df_variables_all.empty:
         st.write("No se encontraron datos de variables para habilitar los bloques.")
     elif not block_codes:
         st.warning("No se detectaron bloques válidos dentro del archivo de variables.")
     else:
-        _sidebar_field_label("🌸", "Seleccionar bloque")
+        _sidebar_field_label("location", "Seleccionar bloque")
         selected_block_code = st.selectbox(
             "Seleccionar bloque:",
             options=block_codes,
-            format_func=lambda code: f"🌸 Bloque {code}",
+            format_func=lambda code: f"Bloque {code}",
             key="bloque_compartido"
         )
         bloque_variables = variable_block_map.get(selected_block_code)
@@ -1608,7 +1661,7 @@ if fecha_cortinas is not None:
 available_correlacion_vars = _get_available_correlacion_vars(df_variables_corr, datos_cortinas_sel)
 
 selected_vars_sidebar = []
-with st.sidebar.expander("☰ Variables visibles", expanded=True):
+with st.sidebar.expander("Variables visibles", expanded=True):
     if bloque_variables is None or fecha_variables is None:
         st.write("Selecciona bloque y fechas para elegir qué series mostrar.")
     elif not available_correlacion_vars:
