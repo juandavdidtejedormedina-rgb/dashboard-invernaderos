@@ -189,6 +189,85 @@ st.markdown(f"""
     background: rgba(255, 255, 255, 0.06);
     padding: 0.35rem 0.65rem;
 }}
+[data-testid="stSidebar"] [data-testid="stCheckbox"] {{
+    margin-bottom: 0.22rem;
+}}
+[data-testid="stSidebar"] [data-testid="stCheckbox"] label {{
+    width: 100%;
+    padding: 0.42rem 0.58rem;
+    border-radius: 18px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: linear-gradient(180deg, rgba(255,255,255,0.11), rgba(255,255,255,0.05));
+    box-shadow: 0 12px 24px rgba(0, 0, 0, 0.10);
+    transition: background 0.2s ease, transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}}
+[data-testid="stSidebar"] [data-testid="stCheckbox"] label:hover {{
+    background: linear-gradient(180deg, rgba(255,255,255,0.16), rgba(255,255,255,0.08));
+    border-color: rgba(194, 223, 234, 0.36);
+    box-shadow: 0 14px 30px rgba(0, 0, 0, 0.14);
+    transform: translateX(2px);
+}}
+[data-testid="stSidebar"] [data-testid="stCheckbox"] p {{
+    font-size: 0.96rem;
+    font-weight: 500;
+    letter-spacing: 0.01em;
+}}
+[data-testid="stSidebar"] [data-testid="stCheckbox"] svg {{
+    fill: var(--elite-white);
+}}
+[data-testid="stSidebar"] .stCheckbox [role="checkbox"] {{
+    border-radius: 12px;
+}}
+[data-testid="stSidebar"] div.stButton > button {{
+    width: 100%;
+    min-height: 3rem;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    background: linear-gradient(180deg, rgba(126, 121, 190, 0.98) 0%, rgba(94, 90, 160, 0.98) 100%);
+    color: var(--elite-white);
+    font-family: 'Montserrat', sans-serif;
+    font-weight: 700;
+    font-size: 0.98rem;
+    letter-spacing: 0.01em;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.16), 0 18px 30px rgba(29, 24, 74, 0.28);
+}}
+[data-testid="stSidebar"] div.stButton > button:hover {{
+    border-color: rgba(255, 255, 255, 0.24);
+    background: linear-gradient(180deg, rgba(139, 133, 206, 0.98) 0%, rgba(103, 99, 171, 0.98) 100%);
+    color: var(--elite-white);
+}}
+.sidebar-source-pill {{
+    padding: 0.85rem 0.95rem;
+    border-radius: 18px;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.14), rgba(194, 223, 234, 0.08));
+    color: #f7f7fb;
+    font-size: 0.88rem;
+    line-height: 1.5;
+    margin-bottom: 0.55rem;
+}}
+.sidebar-panel-card {{
+    padding: 0.9rem 0.95rem;
+    border-radius: 18px;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.06));
+    box-shadow: 0 14px 28px rgba(0, 0, 0, 0.10);
+    margin-bottom: 0.7rem;
+}}
+.sidebar-panel-title {{
+    margin: 0;
+    color: #ffffff;
+    font-family: 'Montserrat', sans-serif;
+    font-size: 0.96rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+}}
+.sidebar-panel-help {{
+    margin: 0.32rem 0 0 0;
+    color: rgba(247, 247, 251, 0.82);
+    font-size: 0.82rem;
+    line-height: 1.48;
+}}
 [data-testid="stSidebar"] .stFileUploader {{
     background: rgba(255, 255, 255, 0.06);
     border-radius: 16px;
@@ -473,23 +552,19 @@ def descargar_desde_github(url):
         st.error(f"Error al conectar con GitHub: {e}")
         return None
 
-# 2. Selector de archivos en la barra lateral
-st.sidebar.header("Actualmente se estan leyendo datos de la nube, si desea leer otro archivo debe subirlo")
-st.sidebar.caption("Usa los archivos de la nube o sube unos nuevos.")
+# 2. Fuente de datos en la barra lateral
+st.sidebar.header("Fuente de datos")
+st.sidebar.markdown(
+    """
+    <div class="sidebar-source-pill">
+        Variables y cortinas se leen directamente desde la nube. La carga manual de archivos quedó desactivada para trabajar siempre con la misma fuente.
+    </div>
+    """,
+    unsafe_allow_html=True
+)
 
-archivo_variables = st.sidebar.file_uploader("Sube archivo variables (Opcional)", type=["xlsx"])
-archivo_cortinas = st.sidebar.file_uploader("Sube archivo cortinas (Opcional)", type=["xlsx"])
-
-# Lógica de asignación de datos
-if archivo_variables:
-    archivo_variables_bytes = archivo_variables.read()
-else:
-    archivo_variables_bytes = descargar_desde_github(URL_VARIABLES)
-
-if archivo_cortinas:
-    archivo_cortinas_bytes = archivo_cortinas.read()
-else:
-    archivo_cortinas_bytes = descargar_desde_github(URL_CORTINAS)
+archivo_variables_bytes = descargar_desde_github(URL_VARIABLES)
+archivo_cortinas_bytes = descargar_desde_github(URL_CORTINAS)
 
 # 3. Funciones de carga de datos con corrección de FECHAS
 
@@ -638,8 +713,22 @@ def _coerce_sidebar_date(value, fallback):
     return fallback
 
 
-def _sync_corr_bottom_to_top():
-    st.session_state['variables_correlacion'] = st.session_state.get('variables_correlacion_bottom', []).copy()
+def _selector_state_key(var_name):
+    safe_name = re.sub(r'[^a-z0-9]+', '_', str(var_name).lower()).strip('_')
+    return f'variables_correlacion_{safe_name}'
+
+
+def _reset_correlacion_selector(options):
+    st.session_state['variables_correlacion'] = options.copy()
+    known_options = list(dict.fromkeys((SENSOR_VARIABLES + MOTOR_VARIABLES) + list(options)))
+    for option in known_options:
+        st.session_state[_selector_state_key(option)] = option in options
+
+
+def _get_selected_correlacion_vars(options):
+    selected_vars = [option for option in options if st.session_state.get(_selector_state_key(option), True)]
+    st.session_state['variables_correlacion'] = selected_vars
+    return selected_vars
 
 
 def _get_block_modification(block_name):
@@ -1332,8 +1421,10 @@ _df_cortinas_all = cargar_cortinas(archivo_cortinas_bytes) if archivo_cortinas_b
 if 'graficar_correlacion' not in st.session_state:
     st.session_state.graficar_correlacion = False
 
-if st.sidebar.button("Detener / limpiar gráficos", key="boton_detener_graficos"):
-    st.session_state.graficar_correlacion = False
+toggle_chart_label = "Graficar correlación" if not st.session_state.graficar_correlacion else "Parar gráfico"
+if st.sidebar.button(toggle_chart_label, key="boton_toggle_graficos", use_container_width=True):
+    st.session_state.graficar_correlacion = not st.session_state.graficar_correlacion
+    st.rerun()
 
 st.sidebar.header("Filtros")
 
@@ -1475,26 +1566,19 @@ with st.sidebar.expander("Variables visibles", expanded=True):
         )
         previous_context = st.session_state.get('variables_correlacion_context')
         if previous_context != current_context:
-            st.session_state['variables_correlacion'] = available_correlacion_vars.copy()
-            st.session_state['variables_correlacion_bottom'] = available_correlacion_vars.copy()
+            _reset_correlacion_selector(available_correlacion_vars)
             st.session_state['variables_correlacion_context'] = current_context
 
-        current_top = [v for v in st.session_state.get('variables_correlacion', available_correlacion_vars.copy()) if v in available_correlacion_vars]
-        current_bottom = [v for v in st.session_state.get('variables_correlacion_bottom', current_top) if v in available_correlacion_vars]
+        for option in available_correlacion_vars:
+            state_key = _selector_state_key(option)
+            if state_key not in st.session_state:
+                st.session_state[state_key] = option in available_correlacion_vars
+            st.checkbox(
+                VARIABLE_SELECTOR_LABELS.get(option, VARIABLE_LABELS.get(option, option)),
+                key=state_key
+            )
 
-        st.session_state['variables_correlacion'] = current_top
-        st.session_state['variables_correlacion_bottom'] = current_bottom
-
-        st.pills(
-            'Mostrar u ocultar variables:',
-            options=available_correlacion_vars,
-            default=st.session_state['variables_correlacion_bottom'],
-            selection_mode='multi',
-            format_func=lambda v: VARIABLE_SELECTOR_LABELS.get(v, VARIABLE_LABELS.get(v, v)),
-            key='variables_correlacion_bottom',
-            on_change=_sync_corr_bottom_to_top
-        )
-        selected_vars_sidebar = st.session_state['variables_correlacion_bottom']
+        selected_vars_sidebar = _get_selected_correlacion_vars(available_correlacion_vars)
 
 # Vista principal
 tab_correlacion = st.container()
@@ -1559,12 +1643,8 @@ with tab_correlacion:
         tab_corr_graf, tab_corr_regs = st.tabs(["Correlación", "Registros"])
 
         with tab_corr_graf:
-            graficar_corr = st.button("Graficar correlación", key="boton_graficar_correlacion")
-            if graficar_corr:
-                st.session_state.graficar_correlacion = True
-
             if not st.session_state.graficar_correlacion:
-                st.info("Presiona el botón Graficar para generar el análisis de correlación.")
+                st.info("Usa el botón de la barra lateral para graficar o parar el análisis de correlación.")
             else:
                 selected_vars = selected_vars_sidebar or st.session_state.get('variables_correlacion', available_correlacion_vars.copy())
 
