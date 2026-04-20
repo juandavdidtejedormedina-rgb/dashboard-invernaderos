@@ -1,3 +1,4 @@
+Codigo funcionando
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
@@ -42,12 +43,6 @@ CORTINA_COLORS = {
     'PUERTA 2': '#D8B7C0'
 }
 MOTOR_VARIABLES = list(CORTINA_COLORS.keys())
-MOTOR_AREA_REFERENCE = {
-    'FRENTE 1': {'row_key': 'ventilacion frontal', 'divisor': 1},
-    'FRENTE 2': {'row_key': 'ventilacion frontal', 'divisor': 1},
-    'PUERTA 1': {'row_key': 'ventilacion lateral', 'divisor': 1},
-    'PUERTA 2': {'row_key': 'ventilacion lateral', 'divisor': 1}
-}
 VARIABLE_SELECTOR_LABELS = {
     'Temperatura': 'Temperatura (°C)',
     'Humedad Relativa': 'Humedad Relativa (%)',
@@ -100,28 +95,6 @@ BLOCK_MODIFICATIONS = {
     '35': 'Sistema de extractores y ventiladores, incluyendo cortinas móviles en culatas.',
     '27': 'Sin modificación alguna.',
     '38': 'Sistema de apertura y cierre de cortinas bidireccionales manuales, incluyendo cortinas móviles en culatas.'
-}
-BLOCK_VENTILATION_DATA = {
-    '34': [
-        {'label': 'Ventilacion lateral', 'ideal': 523.6, 'real': 482.8},
-        {'label': 'Ventilacion frontal', 'ideal': 938.0, 'real': 884.4},
-        {'label': 'Ventilacion culatas', 'ideal': 201.6, 'real': 196.0}
-    ],
-    '27': [
-        {'label': 'Ventilacion lateral', 'ideal': 503.2, 'real': 435.2},
-        {'label': 'Ventilacion frontal', 'ideal': 1072.0, 'real': 956.76},
-        {'label': 'Ventilacion culatas', 'ideal': None, 'real': None}
-    ],
-    '38': [
-        {'label': 'Ventilacion lateral', 'ideal': 489.6, 'real': 435.2},
-        {'label': 'Ventilacion frontal', 'ideal': 1018.4, 'real': 938.0},
-        {'label': 'Ventilacion culatas', 'ideal': 201.6, 'real': 196.0}
-    ],
-    '35': [
-        {'label': 'Ventilacion lateral', 'ideal': 530.4, 'real': 462.4},
-        {'label': 'Ventilacion frontal', 'ideal': 951.4, 'real': 737.0},
-        {'label': 'Ventilacion culatas', 'ideal': 201.6, 'real': 98.0}
-    ]
 }
 WEEKDAY_ES = {
     0: 'Lunes',
@@ -1034,148 +1007,6 @@ section[data-testid="stSidebar"] > div {{
     font-size: 0.84rem;
     line-height: 1.5;
 }}
-.ventilation-layout {{
-    margin: 0.2rem 0 1.15rem 0;
-}}
-.ventilation-panel {{
-    position: relative;
-    overflow: hidden;
-    padding: 1.18rem 1.22rem 1.16rem 1.22rem;
-    border-radius: 28px;
-    border: 1px solid rgba(76, 70, 120, 0.08);
-    background: linear-gradient(180deg, rgba(255,255,255,0.95) 0%, rgba(247,244,238,0.98) 100%);
-    box-shadow:
-        0 20px 42px rgba(45, 48, 64, 0.08),
-        inset 0 1px 0 rgba(255,255,255,0.72);
-    backdrop-filter: blur(12px);
-}}
-.ventilation-panel::before {{
-    content: '';
-    position: absolute;
-    inset: 0 0 auto 0;
-    height: 4px;
-    background: linear-gradient(90deg, var(--elite-hero), var(--elite-sky));
-}}
-.ventilation-panel::after {{
-    content: '';
-    position: absolute;
-    right: -34px;
-    top: -34px;
-    width: 190px;
-    height: 190px;
-    background: radial-gradient(circle, rgba(214, 229, 236, 0.26) 0%, rgba(255,255,255,0) 72%);
-    pointer-events: none;
-}}
-.ventilation-panel * {{
-    position: relative;
-    z-index: 1;
-}}
-.ventilation-grid {{
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 0.9rem;
-}}
-.ventilation-item {{
-    display: flex;
-    flex-direction: column;
-    gap: 0.8rem;
-    min-height: 228px;
-    padding: 0.98rem 1rem;
-    border-radius: 22px;
-    border: 1px solid rgba(76, 70, 120, 0.07);
-    background: linear-gradient(180deg, rgba(255,255,255,0.92), rgba(246,242,235,0.88));
-    box-shadow: inset 0 1px 0 rgba(255,255,255,0.72), 0 12px 26px rgba(45, 48, 64, 0.05);
-}}
-.ventilation-item-top {{
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 0.8rem;
-}}
-.ventilation-item-heading {{
-    display: flex;
-    flex-direction: column;
-    gap: 0.1rem;
-    min-width: 0;
-}}
-.ventilation-item-kicker {{
-    margin: 0;
-    color: #7a7f8d;
-    font-size: 0.71rem;
-    font-weight: 700;
-    letter-spacing: 0.16em;
-    text-transform: uppercase;
-}}
-.ventilation-item-title {{
-    margin: 0;
-    color: var(--elite-graphite);
-    font-family: var(--font-display);
-    font-size: 1.02rem;
-    font-weight: 800;
-    line-height: 1.2;
-    letter-spacing: -0.03em;
-}}
-.ventilation-item-badge {{
-    display: inline-flex;
-    align-items: center;
-    padding: 0.32rem 0.78rem;
-    border-radius: 999px;
-    font-size: 0.82rem;
-    font-weight: 800;
-    white-space: nowrap;
-}}
-.ventilation-metrics {{
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 0.55rem;
-}}
-.ventilation-metric {{
-    padding: 0.66rem 0.7rem;
-    border-radius: 16px;
-    border: 1px solid rgba(76, 70, 120, 0.06);
-    background: rgba(255, 255, 255, 0.74);
-}}
-.ventilation-metric-label {{
-    display: block;
-    margin-bottom: 0.22rem;
-    color: #7b808d;
-    font-size: 0.7rem;
-    font-weight: 700;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-}}
-.ventilation-metric-value {{
-    color: var(--elite-graphite);
-    font-family: var(--font-display);
-    font-size: 1rem;
-    font-weight: 800;
-    line-height: 1.25;
-}}
-.ventilation-metric-value small {{
-    color: #666c79;
-    font-size: 0.74rem;
-    font-weight: 600;
-}}
-.ventilation-progress-track {{
-    height: 0.68rem;
-    border-radius: 999px;
-    background: rgba(76, 70, 120, 0.08);
-    overflow: hidden;
-}}
-.ventilation-progress-fill {{
-    display: block;
-    height: 100%;
-    border-radius: inherit;
-}}
-.ventilation-note {{
-    margin: 0;
-    color: #626776;
-    font-size: 0.84rem;
-    line-height: 1.5;
-}}
-.ventilation-panel .info-panel-footer-note {{
-    margin-top: 0.9rem;
-}}
 .block-note {{
     margin: 0.5rem 0 1.1rem 0;
     padding: 1rem 1.05rem;
@@ -1326,26 +1157,16 @@ div[data-testid="stDataFrame"] {{
     .info-panels-grid {{
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }}
-    .ventilation-grid {{
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-    }}
     .info-panel-card--observaciones {{
         grid-column: 1 / -1;
     }}
     .info-panel-card,
-    .info-panel-card--compact,
-    .ventilation-item {{
+    .info-panel-card--compact {{
         min-height: auto;
     }}
 }}
 @media (max-width: 760px) {{
     .info-panels-grid {{
-        grid-template-columns: 1fr;
-    }}
-    .ventilation-grid {{
-        grid-template-columns: 1fr;
-    }}
-    .ventilation-metrics {{
         grid-template-columns: 1fr;
     }}
     .info-panel-card--observaciones {{
@@ -1923,14 +1744,6 @@ def _info_panel_icon_svg(icon_name):
             '<path d="M12 3C9.2 7.1 6.5 9.8 6.5 13a5.5 5.5 0 0 0 11 0C17.5 9.8 14.8 7.1 12 3Z"></path>'
             '<path d="M12 9.2v5.2"></path>'
             '</svg>'
-        ),
-        'ventilacion': (
-            '<svg viewBox="0 0 24 24" aria-hidden="true">'
-            '<path d="M12 12m-1.8 0a1.8 1.8 0 1 0 3.6 0a1.8 1.8 0 1 0 -3.6 0"></path>'
-            '<path d="M12.4 4.2c2.8 0 4.4 2.1 3.2 4.5l-1.2 2.3"></path>'
-            '<path d="M18.8 11.7c1.4 2.4 0 4.9 -2.6 4.9h-2.6"></path>'
-            '<path d="M10 18.9c-1.5 2.4 -4.3 2.5 -5.8 0.3l-1.3 -2.2"></path>'
-            '</svg>'
         )
     }
     return icons.get(icon_name, '')
@@ -2168,283 +1981,6 @@ def _get_block_modification(block_name):
     return BLOCK_MODIFICATIONS.get(match.group(1))
 
 
-def _get_block_ventilation_rows(block_name):
-    block_code = _extract_block_code(block_name)
-    if not block_code:
-        return []
-    return BLOCK_VENTILATION_DATA.get(block_code, [])
-
-
-def _get_motor_area_reference(block_name, motor_name):
-    motor_key = _normalize_cortina_name(motor_name)
-    reference_config = MOTOR_AREA_REFERENCE.get(motor_key)
-    if not reference_config:
-        return None
-
-    for row in _get_block_ventilation_rows(block_name):
-        row_key = _build_normalized_text_key(row.get('label', ''))
-        if row_key != reference_config['row_key']:
-            continue
-
-        real_value = row.get('real')
-        ideal_value = row.get('ideal')
-        if real_value is None or pd.isna(real_value):
-            return None
-
-        return {
-            'real_max_area': float(real_value) / float(reference_config['divisor']),
-            'ideal_max_area': (
-                float(ideal_value) / float(reference_config['divisor'])
-                if ideal_value is not None and not pd.isna(ideal_value)
-                else None
-            ),
-            'source_label': row.get('label', '')
-        }
-
-    return None
-
-
-def _get_culatas_area_reference(block_name):
-    for row in _get_block_ventilation_rows(block_name):
-        row_key = _build_normalized_text_key(row.get('label', ''))
-        if row_key != 'ventilacion culatas':
-            continue
-
-        real_value = row.get('real')
-        if real_value is None or pd.isna(real_value):
-            return None
-
-        return float(real_value)
-
-    return None
-
-
-def _build_culatas_state_text(open_percent, block_name=None):
-    percent_value = _normalize_percent_value(open_percent)
-    if percent_value is None:
-        return 'Sin información disponible'
-
-    if percent_value <= 0:
-        return 'Culatas cerradas'
-
-    max_area = _get_culatas_area_reference(block_name)
-    if max_area is None:
-        return 'Culatas abiertas'
-
-    open_area = max_area * percent_value / 100.0
-    area_text = _format_area_value(open_area)
-    percent_text = _format_summary_number(percent_value, 0)
-    return f'Culatas abiertas - {area_text} m2 abiertos ({percent_text}%)'
-
-
-def _convert_cortina_profile_to_area(df_state, real_max_area, ideal_max_area=None):
-    if df_state.empty:
-        return df_state
-
-    df_area = df_state.copy()
-    apertura_pct = pd.to_numeric(df_area['Apertura'], errors='coerce')
-    df_area['Apertura_m2'] = apertura_pct * float(real_max_area) / 100.0
-    if ideal_max_area is not None:
-        df_area['Apertura_ideal_m2'] = apertura_pct * float(ideal_max_area) / 100.0
-    else:
-        df_area['Apertura_ideal_m2'] = pd.NA
-
-    detail_values = []
-    for detail in df_area['Detalle'].fillna(''):
-        detail_text = str(detail).strip()
-        if detail_text:
-            detail_values.append(detail_text.replace(' | ', ' • '))
-        else:
-            detail_values.append('')
-
-    df_area['DetalleGrafico'] = detail_values
-    apertura_ideal_series = pd.to_numeric(df_area['Apertura_ideal_m2'], errors='coerce')
-    brecha_ideal_series = pd.to_numeric(df_area['Apertura_m2'], errors='coerce') - apertura_ideal_series
-    df_area['ResumenIdealTexto'] = [
-        (
-            f'Ideal: {_format_area_value(ideal_value)} m2 • Brecha: {_format_area_value(gap_value)} m2'
-            if not pd.isna(ideal_value) and not pd.isna(gap_value) else
-            'Ideal: Sin dato'
-        )
-        for ideal_value, gap_value in zip(apertura_ideal_series, brecha_ideal_series)
-    ]
-    return df_area
-
-
-def _format_area_value(value):
-    if value is None or pd.isna(value):
-        return 'No aplica'
-
-    numeric_value = round(float(value), 2)
-    if abs(numeric_value - round(numeric_value)) < 1e-6:
-        decimals = 0
-    elif abs(numeric_value - round(numeric_value, 1)) < 1e-6:
-        decimals = 1
-    else:
-        decimals = 2
-
-    return _format_summary_number(numeric_value, decimals)
-
-
-def _get_ventilation_percentage(ideal_value, real_value):
-    if (
-        ideal_value is None or
-        real_value is None or
-        pd.isna(ideal_value) or
-        pd.isna(real_value) or
-        float(ideal_value) <= 0
-    ):
-        return None
-
-    return max(0.0, (float(real_value) / float(ideal_value)) * 100.0)
-
-
-def _get_ventilation_status_style(percent_value):
-    if percent_value is None:
-        return {
-            'badge_text': 'No aplica',
-            'badge_bg': 'rgba(124, 129, 138, 0.16)',
-            'badge_color': '#6D727D',
-            'fill_color': 'rgba(124, 129, 138, 0.30)',
-            'fill_width': 100
-        }
-
-    if percent_value >= 95:
-        return {
-            'badge_text': f'{round(percent_value):.0f}%',
-            'badge_bg': 'rgba(214, 229, 236, 0.42)',
-            'badge_color': '#4E7483',
-            'fill_color': '#98BECF',
-            'fill_width': min(percent_value, 100.0)
-        }
-
-    if percent_value >= 85:
-        return {
-            'badge_text': f'{round(percent_value):.0f}%',
-            'badge_bg': 'rgba(76, 70, 120, 0.14)',
-            'badge_color': BRAND_COLORS['hero'],
-            'fill_color': BRAND_COLORS['hero'],
-            'fill_width': min(percent_value, 100.0)
-        }
-
-    return {
-        'badge_text': f'{round(percent_value):.0f}%',
-        'badge_bg': 'rgba(231, 210, 218, 0.34)',
-        'badge_color': '#A45F70',
-        'fill_color': '#D39AA8',
-        'fill_width': min(percent_value, 100.0)
-    }
-
-
-def _build_ventilation_note(label, gap_value):
-    label_text = str(label).lower()
-
-    if gap_value is None:
-        if 'culatas' in label_text:
-            return 'Este bloque no contiene culatas para este frente de ventilacion.'
-        return 'No hay referencia tecnica disponible para este componente.'
-
-    absolute_gap = _format_area_value(abs(gap_value))
-    if gap_value > 0:
-        return f'Faltan {absolute_gap} m&sup2; para alcanzar la apertura ideal.'
-    if gap_value < 0:
-        return f'Supera la apertura ideal por {absolute_gap} m&sup2;.'
-    return 'La apertura real coincide con la apertura ideal del bloque.'
-
-
-def _render_block_ventilation_panel(block_label):
-    ventilation_rows = _get_block_ventilation_rows(block_label)
-    if not ventilation_rows:
-        return
-
-    block_code = _extract_block_code(block_label)
-    block_tag = f'Bloque {block_code}' if block_code else 'Bloque'
-    items_html = []
-
-    for row in ventilation_rows:
-        label = row.get('label', 'Ventilacion')
-        ideal_value = row.get('ideal')
-        real_value = row.get('real')
-        gap_value = (
-            float(ideal_value) - float(real_value)
-            if ideal_value is not None and real_value is not None
-            else None
-        )
-        percent_value = _get_ventilation_percentage(ideal_value, real_value)
-        status_style = _get_ventilation_status_style(percent_value)
-
-        ideal_html = (
-            f'{_format_area_value(ideal_value)} <small>m&sup2;</small>'
-            if ideal_value is not None and not pd.isna(ideal_value)
-            else 'No aplica'
-        )
-        real_html = (
-            f'{_format_area_value(real_value)} <small>m&sup2;</small>'
-            if real_value is not None and not pd.isna(real_value)
-            else 'No aplica'
-        )
-        difference_html = (
-            f'{_format_area_value(abs(gap_value))} <small>m&sup2;</small>'
-            if gap_value is not None
-            else 'No aplica'
-        )
-        note_html = _build_ventilation_note(label, gap_value)
-
-        items_html.append(
-            (
-                '<div class="ventilation-item">'
-                '<div class="ventilation-item-top">'
-                '<div class="ventilation-item-heading">'
-                '<p class="ventilation-item-kicker">Tipo de ventilacion</p>'
-                f'<h4 class="ventilation-item-title">{html.escape(label)}</h4>'
-                '</div>'
-                f'<span class="ventilation-item-badge" style="background:{status_style["badge_bg"]}; color:{status_style["badge_color"]};">{html.escape(status_style["badge_text"])}</span>'
-                '</div>'
-                '<div class="ventilation-metrics">'
-                '<div class="ventilation-metric">'
-                '<span class="ventilation-metric-label">Ideal</span>'
-                f'<span class="ventilation-metric-value">{ideal_html}</span>'
-                '</div>'
-                '<div class="ventilation-metric">'
-                '<span class="ventilation-metric-label">Real</span>'
-                f'<span class="ventilation-metric-value">{real_html}</span>'
-                '</div>'
-                '<div class="ventilation-metric">'
-                '<span class="ventilation-metric-label">Brecha</span>'
-                f'<span class="ventilation-metric-value">{difference_html}</span>'
-                '</div>'
-                '</div>'
-                '<div class="ventilation-progress-track">'
-                f'<span class="ventilation-progress-fill" style="width:{status_style["fill_width"]}%; background:{status_style["fill_color"]};"></span>'
-                '</div>'
-                f'<p class="ventilation-note">{note_html}</p>'
-                '</div>'
-            )
-        )
-
-    st.markdown(
-        (
-            '<div class="ventilation-layout">'
-            '<div class="ventilation-panel">'
-            '<div class="info-panel-header">'
-            '<div class="info-panel-header-main">'
-            f'<span class="info-panel-icon">{_info_panel_icon_svg("ventilacion")}</span>'
-            '<div class="info-panel-heading">'
-            '<p class="info-panel-kicker">Ficha tecnica</p>'
-            '<h3 class="info-panel-title">Capacidad de ventilacion del bloque</h3>'
-            '</div>'
-            '</div>'
-            f'<span class="info-panel-tag">{html.escape(block_tag)}</span>'
-            '</div>'
-            f'<div class="ventilation-grid">{"".join(items_html)}</div>'
-            '<p class="info-panel-footer-note">Comparativo estatico entre apertura ideal y apertura real para la infraestructura del bloque seleccionado.</p>'
-            '</div>'
-            '</div>'
-        ),
-        unsafe_allow_html=True
-    )
-
-
 def _extract_block_code(block_name):
     if not block_name:
         return None
@@ -2615,7 +2151,7 @@ def _build_cortina_apertura_profile(df_cortinas, elemento, config):
     return pd.DataFrame(profile).sort_values('Hora').reset_index(drop=True)
 
 
-def _get_culatas_daily_observation(datos_cortinas, block_label=None):
+def _get_culatas_daily_observation(datos_cortinas):
     if datos_cortinas.empty or 'Culatas %' not in datos_cortinas.columns:
         return None
 
@@ -2626,10 +2162,10 @@ def _get_culatas_daily_observation(datos_cortinas, block_label=None):
     ultimo_valor = _normalize_percent_value(valores_culatas.iloc[-1])
     if ultimo_valor is None:
         return None
-    return _build_culatas_state_text(ultimo_valor, block_label)
+    return 'Culatas abiertas' if ultimo_valor > 0 else 'Culatas cerradas'
 
 
-def _get_culatas_observation_by_day(datos_cortinas, block_label=None):
+def _get_culatas_observation_by_day(datos_cortinas):
     if (
         datos_cortinas.empty or
         'Fecha' not in datos_cortinas.columns or
@@ -2649,7 +2185,7 @@ def _get_culatas_observation_by_day(datos_cortinas, block_label=None):
             if ultimo_valor is None:
                 state = 'Sin información disponible'
             else:
-                state = _build_culatas_state_text(ultimo_valor, block_label)
+                state = 'Culatas abiertas' if ultimo_valor > 0 else 'Culatas cerradas'
 
         observations.append({
             'fecha': fecha,
@@ -2911,14 +2447,7 @@ def cargar_cortinas(ruta_bytes):
         return pd.DataFrame()
 
 
-def _render_correlacion(
-    df_variables,
-    datos_cortinas_sel,
-    fecha_variables,
-    variables_seleccionadas=None,
-    block_label=None,
-    show_ideal_aperturas=False
-):
+def _render_correlacion(df_variables, datos_cortinas_sel, fecha_variables, variables_seleccionadas=None):
     fecha_inicio, fecha_fin = fecha_variables
     multi_day_view = fecha_inicio != fecha_fin
     hover_time_format = '%d/%m %H:%M' if multi_day_view else '%H:%M'
@@ -2940,14 +2469,6 @@ def _render_correlacion(
 
     selected_sensors = [v for v in selected_vars if v in sensor_vars]
     selected_cortinas = [v for v in selected_vars if v in available_cortinas]
-    cortina_reference_map = {
-        var_name: _get_motor_area_reference(block_label, var_name)
-        for var_name in selected_cortinas
-    }
-    use_cortina_area = bool(selected_cortinas) and all(
-        cortina_reference_map.get(var_name) for var_name in selected_cortinas
-    )
-    show_ideal_lines = bool(show_ideal_aperturas and use_cortina_area)
 
     if not selected_sensors and not selected_cortinas:
         if available_vars:
@@ -2974,7 +2495,6 @@ def _render_correlacion(
     }
     sensor_traces = []
     cortina_traces = []
-    cortina_axis_max = 100.0 if not use_cortina_area else 0.0
 
     for order, var_name in enumerate(selected_vars):
         if var_name in selected_sensors:
@@ -3017,70 +2537,18 @@ def _render_correlacion(
                 df_state = _build_cortina_apertura_profile(datos_cortinas_sel, var_name, config)
                 if df_state.empty:
                     continue
-
-                y_col = 'Apertura'
-                detail_col = 'Detalle'
-                trace_name = str(var_name)
-                hover_value_line = 'Apertura: %{y:.0f}%'
-                customdata_columns = ['Evento', detail_col]
-
-                if use_cortina_area:
-                    motor_reference = cortina_reference_map.get(var_name)
-                    df_state = _convert_cortina_profile_to_area(
-                        df_state,
-                        motor_reference['real_max_area'],
-                        motor_reference.get('ideal_max_area')
-                    )
-                    y_col = 'Apertura_m2'
-                    detail_col = 'DetalleGrafico'
-                    trace_name = f'{var_name} (m2)'
-                    hover_value_line = 'Real: %{y:.1f} m2'
-                    customdata_columns = (
-                        ['Evento', detail_col, 'ResumenIdealTexto']
-                        if show_ideal_lines else
-                        ['Evento', detail_col]
-                    )
-                    serie_area = pd.to_numeric(df_state[y_col], errors='coerce').dropna()
-                    if not serie_area.empty:
-                        cortina_axis_max = max(cortina_axis_max, float(serie_area.max()))
-
                 color = CORTINA_COLORS.get(str(var_name).upper(), palette[order % len(palette)])
                 trace = dict(
                     x=df_state['Hora'],
-                    y=df_state[y_col],
-                    name=trace_name,
+                    y=df_state['Apertura'],
+                    name=str(var_name),
                     mode='lines+markers',
                     line=dict(color=color, width=3.2, shape='hv'),
                     marker=dict(size=5, color=color),
-                    hovertemplate=(
-                        f'<b>%{{x|{hover_time_format}}}</b><br>%{{customdata[0]}}<br>{hover_value_line}'
-                        + ('<br>%{customdata[2]}' if show_ideal_lines else '')
-                        + '<br>%{customdata[1]}<extra></extra>'
-                    ),
-                    customdata=df_state[customdata_columns],
-                    legendgroup=str(var_name),
-                    legendrank=order * 10 + 1
+                    hovertemplate=f'<b>%{{x|{hover_time_format}}}</b><br>%{{customdata[0]}}<br>Apertura: %{{y:.0f}}%<br>%{{customdata[1]}}<extra></extra>',
+                    customdata=df_state[['Evento', 'Detalle']]
                 )
                 cortina_traces.append((var_name, trace, color))
-
-                if show_ideal_lines and motor_reference.get('ideal_max_area') is not None:
-                    serie_area_ideal = pd.to_numeric(df_state['Apertura_ideal_m2'], errors='coerce').dropna()
-                    if not serie_area_ideal.empty:
-                        cortina_axis_max = max(cortina_axis_max, float(serie_area_ideal.max()))
-
-                    trace_ideal = dict(
-                        x=df_state['Hora'],
-                        y=df_state['Apertura_ideal_m2'],
-                        name=f'{var_name} ideal',
-                        mode='lines',
-                        line=dict(color=color, width=2.2, shape='hv', dash='dot'),
-                        opacity=0.68,
-                        hoverinfo='skip',
-                        legendgroup=str(var_name),
-                        legendrank=order * 10 + 2,
-                        showlegend=False
-                    )
-                    cortina_traces.append((f'{var_name}_ideal', trace_ideal, color))
                 break
 
     if not selected_sensors and selected_cortinas and not cortina_traces:
@@ -3208,55 +2676,30 @@ def _render_correlacion(
             fig_corr.add_trace(go.Scatter(**trace))
 
         cortina_color = BRAND_COLORS['hero']
-        if use_cortina_area:
-            axis_range_max = max(10.0, cortina_axis_max * 1.08 if cortina_axis_max > 0 else 10.0)
-            axis_configs['y2'] = dict(
-                title=dict(
-                    text='Frentes / Puertas (m2)',
-                    font=dict(color=cortina_color, size=11, family='Manrope, sans-serif')
-                ),
-                tickfont=dict(color=cortina_color, size=10, family='Manrope, sans-serif'),
-                tickcolor=cortina_color,
-                range=[0, axis_range_max],
-                autorange=False,
-                side='right',
-                overlaying='y',
-                anchor='free',
-                position=cortina_axis_position,
-                showgrid=False,
-                showline=True,
-                linewidth=1,
-                ticks='',
-                zeroline=False,
-                tickmode='auto',
-                automargin=True,
-                title_standoff=18
-            )
-        else:
-            axis_configs['y2'] = dict(
-                title=dict(
-                    text=CORR_AXIS_TITLES['% Apertura Cortinas'],
-                    font=dict(color=cortina_color, size=11, family='Manrope, sans-serif')
-                ),
-                tickfont=dict(color=cortina_color, size=10, family='Manrope, sans-serif'),
-                tickcolor=cortina_color,
-                range=[-4, 100],
-                autorange=False,
-                side='right',
-                overlaying='y',
-                anchor='free',
-                position=cortina_axis_position,
-                showgrid=False,
-                showline=True,
-                linewidth=1,
-                ticks='',
-                zeroline=False,
-                tickmode='array',
-                tickvals=[0, 25, 50, 75, 100],
-                ticksuffix='%',
-                automargin=True,
-                title_standoff=18
-            )
+        axis_configs['y2'] = dict(
+            title=dict(
+                text=CORR_AXIS_TITLES['% Apertura Cortinas'],
+                font=dict(color=cortina_color, size=11, family='Manrope, sans-serif')
+            ),
+            tickfont=dict(color=cortina_color, size=10, family='Manrope, sans-serif'),
+            tickcolor=cortina_color,
+            range=[-4, 100],
+            autorange=False,
+            side='right',
+            overlaying='y',
+            anchor='free',
+            position=cortina_axis_position,
+            showgrid=False,
+            showline=True,
+            linewidth=1,
+            ticks='',
+            zeroline=False,
+            tickmode='array',
+            tickvals=[0, 25, 50, 75, 100],
+            ticksuffix='%',
+            automargin=True,
+            title_standoff=18
+        )
 
     fig_corr.update_layout(
         title=dict(
@@ -3318,8 +2761,6 @@ _df_cortinas_all = cargar_cortinas(archivo_cortinas_bytes) if archivo_cortinas_b
 
 if 'graficar_correlacion' not in st.session_state:
     st.session_state.graficar_correlacion = False
-if 'mostrar_aperturas_ideales' not in st.session_state:
-    st.session_state.mostrar_aperturas_ideales = False
 
 st.sidebar.markdown(
     f"""
@@ -3481,10 +2922,6 @@ with st.sidebar.expander("Series visibles", expanded=True):
             )
 
         selected_vars_sidebar = _get_selected_correlacion_vars(available_correlacion_vars)
-        st.checkbox(
-            "Aperturas ideales",
-            key="mostrar_aperturas_ideales"
-        )
 
 toggle_chart_label = "Mostrar correlación" if not st.session_state.graficar_correlacion else "Ocultar correlación"
 if st.sidebar.button(toggle_chart_label, key="boton_toggle_graficos", use_container_width=True):
@@ -3511,8 +2948,8 @@ with tab_correlacion:
 
         block_label = bloque_seleccionado or bloque_variables
         block_modification = _get_block_modification(block_label)
-        culatas_observation = _get_culatas_daily_observation(datos_cortinas_sel, block_label)
-        culatas_by_day = _get_culatas_observation_by_day(datos_cortinas_sel, block_label)
+        culatas_observation = _get_culatas_daily_observation(datos_cortinas_sel)
+        culatas_by_day = _get_culatas_observation_by_day(datos_cortinas_sel)
         daily_annotations = _get_daily_annotations(datos_cortinas_sel)
         annotations_by_day = _get_annotations_by_day(datos_cortinas_sel)
         if (
@@ -3558,9 +2995,7 @@ with tab_correlacion:
                         df_variables_corr,
                         datos_cortinas_sel,
                         fecha_variables,
-                        selected_vars,
-                        block_label=block_label,
-                        show_ideal_aperturas=st.session_state.get('mostrar_aperturas_ideales', False)
+                        selected_vars
                     )
 
         with tab_corr_regs:
