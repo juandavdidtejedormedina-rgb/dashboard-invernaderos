@@ -2187,11 +2187,17 @@ def _get_motor_area_reference(block_name, motor_name):
             continue
 
         real_value = row.get('real')
+        ideal_value = row.get('ideal')
         if real_value is None or pd.isna(real_value):
             return None
 
         return {
-            'max_area': float(real_value) / float(reference_config['divisor']),
+            'real_max_area': float(real_value) / float(reference_config['divisor']),
+            'ideal_max_area': (
+                float(ideal_value) / float(reference_config['divisor'])
+                if ideal_value is not None and not pd.isna(ideal_value)
+                else None
+            ),
             'source_label': row.get('label', '')
         }
 
@@ -2231,24 +2237,50 @@ def _build_culatas_state_text(open_percent, block_name=None):
     return f'Culatas abiertas - {area_text} m2 abiertos ({percent_text}%)'
 
 
-def _convert_cortina_profile_to_area(df_state, max_area):
+def _convert_cortina_profile_to_area(df_state, real_max_area, ideal_max_area=None):
     if df_state.empty:
         return df_state
 
     df_area = df_state.copy()
     apertura_pct = pd.to_numeric(df_area['Apertura'], errors='coerce')
-    df_area['Apertura_m2'] = apertura_pct * float(max_area) / 100.0
-    area_ref_text = _format_area_value(max_area)
+    df_area['Apertura_m2'] = apertura_pct * float(real_max_area) / 100.0
+    area_ref_text = _format_area_value(real_max_area)
+
+    ideal_ref_text = None
+    if ideal_max_area is not None:
+        df_area['Apertura_ideal_m2'] = apertura_pct * float(ideal_max_area) / 100.0
+        ideal_ref_text = _format_area_value(ideal_max_area)
+    else:
+        df_area['Apertura_ideal_m2'] = pd.NA
 
     detail_values = []
     for detail in df_area['Detalle'].fillna(''):
         detail_text = str(detail).strip()
+        ref_parts = [f'Ref. real max: {area_ref_text} m2']
+        if ideal_ref_text is not None:
+            ref_parts.append(f'Ref. ideal max: {ideal_ref_text} m2')
+
         if detail_text:
-            detail_values.append(f'{detail_text} | Ref. max: {area_ref_text} m2')
+            detail_values.append(f'{detail_text} | {" | ".join(ref_parts)}')
         else:
-            detail_values.append(f'Ref. max: {area_ref_text} m2')
+            detail_values.append(' | '.join(ref_parts))
 
     df_area['DetalleGrafico'] = detail_values
+    df_area['AperturaRealTexto'] = pd.to_numeric(df_area['Apertura_m2'], errors='coerce').apply(
+        lambda value: f'Apertura real: {_format_area_value(value)} m2'
+        if not pd.isna(value) else 'Apertura real: Sin dato'
+    )
+    df_area['AperturaIdealTexto'] = pd.to_numeric(df_area['Apertura_ideal_m2'], errors='coerce').apply(
+        lambda value: f'Apertura ideal: {_format_area_value(value)} m2'
+        if not pd.isna(value) else 'Apertura ideal: Sin dato'
+    )
+    df_area['BrechaIdealTexto'] = (
+        pd.to_numeric(df_area['Apertura_m2'], errors='coerce') -
+        pd.to_numeric(df_area['Apertura_ideal_m2'], errors='coerce')
+    ).apply(
+        lambda value: f'Diferencia real - ideal: {_format_area_value(value)} m2'
+        if not pd.isna(value) else 'Diferencia real - ideal: Sin dato'
+    )
     return df_area
 
 
@@ -2995,14 +3027,20 @@ def _render_correlacion(df_variables, datos_cortinas_sel, fecha_variables, varia
                 detail_col = 'Detalle'
                 trace_name = str(var_name)
                 hover_value_line = 'Apertura: %{y:.0f}%'
+                customdata_columns = ['Evento', detail_col]
 
                 if use_cortina_area:
                     motor_reference = cortina_reference_map.get(var_name)
-                    df_state = _convert_cortina_profile_to_area(df_state, motor_reference['max_area'])
+                    df_state = _convert_cortina_profile_to_area(
+                        df_state,
+                        motor_reference['real_max_area'],
+                        motor_reference.get('ideal_max_area')
+                    )
                     y_col = 'Apertura_m2'
                     detail_col = 'DetalleGrafico'
-                    trace_name = f'{var_name} (m2)'
-                    hover_value_line = 'Apertura: %{y:.1f} m2'
+                    trace_name = f'{var_name} real'
+                    hover_value_line = 'Apertura real: %{y:.1f} m2'
+                    customdata_columns = ['Evento', detail_col, 'AperturaIdealTexto', 'BrechaIdealTexto']
                     serie_area = pd.to_numeric(df_state[y_col], errors='coerce').dropna()
                     if not serie_area.empty:
                         cortina_axis_max = max(cortina_axis_max, float(serie_area.max()))
@@ -3015,10 +3053,38 @@ def _render_correlacion(df_variables, datos_cortinas_sel, fecha_variables, varia
                     mode='lines+markers',
                     line=dict(color=color, width=3.2, shape='hv'),
                     marker=dict(size=5, color=color),
-                    hovertemplate=f'<b>%{{x|{hover_time_format}}}</b><br>%{{customdata[0]}}<br>{hover_value_line}<br>%{{customdata[1]}}<extra></extra>',
-                    customdata=df_state[['Evento', detail_col]]
+                    hovertemplate=(
+                        f'<b>%{{x|{hover_time_format}}}</b><br>%{{customdata[0]}}<br>{hover_value_line}'
+                        + ('<br>%{customdata[2]}<br>%{customdata[3]}' if use_cortina_area else '')
+                        + '<br>%{customdata[1]}<extra></extra>'
+                    ),
+                    customdata=df_state[customdata_columns],
+                    legendgroup=str(var_name),
+                    legendrank=order * 10 + 1
                 )
                 cortina_traces.append((var_name, trace, color))
+
+                if use_cortina_area and motor_reference.get('ideal_max_area') is not None:
+                    serie_area_ideal = pd.to_numeric(df_state['Apertura_ideal_m2'], errors='coerce').dropna()
+                    if not serie_area_ideal.empty:
+                        cortina_axis_max = max(cortina_axis_max, float(serie_area_ideal.max()))
+
+                    trace_ideal = dict(
+                        x=df_state['Hora'],
+                        y=df_state['Apertura_ideal_m2'],
+                        name=f'{var_name} ideal',
+                        mode='lines',
+                        line=dict(color=color, width=2.2, shape='hv', dash='dot'),
+                        opacity=0.68,
+                        hovertemplate=(
+                            f'<b>%{{x|{hover_time_format}}}</b><br>%{{customdata[0]}}<br>Apertura ideal: %{y:.1f} m2'
+                            '<br>%{customdata[2]}<br>%{customdata[3]}<br>%{customdata[1]}<extra></extra>'
+                        ),
+                        customdata=df_state[['Evento', 'DetalleGrafico', 'AperturaRealTexto', 'BrechaIdealTexto']],
+                        legendgroup=str(var_name),
+                        legendrank=order * 10 + 2
+                    )
+                    cortina_traces.append((f'{var_name}_ideal', trace_ideal, color))
                 break
 
     if not selected_sensors and selected_cortinas and not cortina_traces:
