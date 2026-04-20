@@ -42,6 +42,12 @@ CORTINA_COLORS = {
     'PUERTA 2': '#D8B7C0'
 }
 MOTOR_VARIABLES = list(CORTINA_COLORS.keys())
+MOTOR_AREA_REFERENCE = {
+    'FRENTE 1': {'row_key': 'ventilacion frontal', 'divisor': 2},
+    'FRENTE 2': {'row_key': 'ventilacion frontal', 'divisor': 2},
+    'PUERTA 1': {'row_key': 'ventilacion lateral', 'divisor': 2},
+    'PUERTA 2': {'row_key': 'ventilacion lateral', 'divisor': 2}
+}
 VARIABLE_SELECTOR_LABELS = {
     'Temperatura': 'Temperatura (°C)',
     'Humedad Relativa': 'Humedad Relativa (%)',
@@ -2169,6 +2175,50 @@ def _get_block_ventilation_rows(block_name):
     return BLOCK_VENTILATION_DATA.get(block_code, [])
 
 
+def _get_motor_area_reference(block_name, motor_name):
+    motor_key = _normalize_cortina_name(motor_name)
+    reference_config = MOTOR_AREA_REFERENCE.get(motor_key)
+    if not reference_config:
+        return None
+
+    for row in _get_block_ventilation_rows(block_name):
+        row_key = _build_normalized_text_key(row.get('label', ''))
+        if row_key != reference_config['row_key']:
+            continue
+
+        real_value = row.get('real')
+        if real_value is None or pd.isna(real_value):
+            return None
+
+        return {
+            'max_area': float(real_value) / float(reference_config['divisor']),
+            'source_label': row.get('label', '')
+        }
+
+    return None
+
+
+def _convert_cortina_profile_to_area(df_state, max_area):
+    if df_state.empty:
+        return df_state
+
+    df_area = df_state.copy()
+    apertura_pct = pd.to_numeric(df_area['Apertura'], errors='coerce')
+    df_area['Apertura_m2'] = apertura_pct * float(max_area) / 100.0
+    area_ref_text = _format_area_value(max_area)
+
+    detail_values = []
+    for detail in df_area['Detalle'].fillna(''):
+        detail_text = str(detail).strip()
+        if detail_text:
+            detail_values.append(f'{detail_text} | Ref. max: {area_ref_text} m2')
+        else:
+            detail_values.append(f'Ref. max: {area_ref_text} m2')
+
+    df_area['DetalleGrafico'] = detail_values
+    return df_area
+
+
 def _format_area_value(value):
     if value is None or pd.isna(value):
         return 'No aplica'
@@ -2809,7 +2859,7 @@ def cargar_cortinas(ruta_bytes):
         return pd.DataFrame()
 
 
-def _render_correlacion(df_variables, datos_cortinas_sel, fecha_variables, variables_seleccionadas=None):
+def _render_correlacion(df_variables, datos_cortinas_sel, fecha_variables, variables_seleccionadas=None, block_label=None):
     fecha_inicio, fecha_fin = fecha_variables
     multi_day_view = fecha_inicio != fecha_fin
     hover_time_format = '%d/%m %H:%M' if multi_day_view else '%H:%M'
@@ -2831,6 +2881,13 @@ def _render_correlacion(df_variables, datos_cortinas_sel, fecha_variables, varia
 
     selected_sensors = [v for v in selected_vars if v in sensor_vars]
     selected_cortinas = [v for v in selected_vars if v in available_cortinas]
+    cortina_reference_map = {
+        var_name: _get_motor_area_reference(block_label, var_name)
+        for var_name in selected_cortinas
+    }
+    use_cortina_area = bool(selected_cortinas) and all(
+        cortina_reference_map.get(var_name) for var_name in selected_cortinas
+    )
 
     if not selected_sensors and not selected_cortinas:
         if available_vars:
@@ -2857,6 +2914,7 @@ def _render_correlacion(df_variables, datos_cortinas_sel, fecha_variables, varia
     }
     sensor_traces = []
     cortina_traces = []
+    cortina_axis_max = 100.0 if not use_cortina_area else 0.0
 
     for order, var_name in enumerate(selected_vars):
         if var_name in selected_sensors:
@@ -2899,16 +2957,33 @@ def _render_correlacion(df_variables, datos_cortinas_sel, fecha_variables, varia
                 df_state = _build_cortina_apertura_profile(datos_cortinas_sel, var_name, config)
                 if df_state.empty:
                     continue
+
+                y_col = 'Apertura'
+                detail_col = 'Detalle'
+                trace_name = str(var_name)
+                hover_value_line = 'Apertura: %{y:.0f}%'
+
+                if use_cortina_area:
+                    motor_reference = cortina_reference_map.get(var_name)
+                    df_state = _convert_cortina_profile_to_area(df_state, motor_reference['max_area'])
+                    y_col = 'Apertura_m2'
+                    detail_col = 'DetalleGrafico'
+                    trace_name = f'{var_name} (m2)'
+                    hover_value_line = 'Apertura: %{y:.1f} m2'
+                    serie_area = pd.to_numeric(df_state[y_col], errors='coerce').dropna()
+                    if not serie_area.empty:
+                        cortina_axis_max = max(cortina_axis_max, float(serie_area.max()))
+
                 color = CORTINA_COLORS.get(str(var_name).upper(), palette[order % len(palette)])
                 trace = dict(
                     x=df_state['Hora'],
-                    y=df_state['Apertura'],
-                    name=str(var_name),
+                    y=df_state[y_col],
+                    name=trace_name,
                     mode='lines+markers',
                     line=dict(color=color, width=3.2, shape='hv'),
                     marker=dict(size=5, color=color),
-                    hovertemplate=f'<b>%{{x|{hover_time_format}}}</b><br>%{{customdata[0]}}<br>Apertura: %{{y:.0f}}%<br>%{{customdata[1]}}<extra></extra>',
-                    customdata=df_state[['Evento', 'Detalle']]
+                    hovertemplate=f'<b>%{{x|{hover_time_format}}}</b><br>%{{customdata[0]}}<br>{hover_value_line}<br>%{{customdata[1]}}<extra></extra>',
+                    customdata=df_state[['Evento', detail_col]]
                 )
                 cortina_traces.append((var_name, trace, color))
                 break
@@ -3038,30 +3113,55 @@ def _render_correlacion(df_variables, datos_cortinas_sel, fecha_variables, varia
             fig_corr.add_trace(go.Scatter(**trace))
 
         cortina_color = BRAND_COLORS['hero']
-        axis_configs['y2'] = dict(
-            title=dict(
-                text=CORR_AXIS_TITLES['% Apertura Cortinas'],
-                font=dict(color=cortina_color, size=11, family='Manrope, sans-serif')
-            ),
-            tickfont=dict(color=cortina_color, size=10, family='Manrope, sans-serif'),
-            tickcolor=cortina_color,
-            range=[-4, 100],
-            autorange=False,
-            side='right',
-            overlaying='y',
-            anchor='free',
-            position=cortina_axis_position,
-            showgrid=False,
-            showline=True,
-            linewidth=1,
-            ticks='',
-            zeroline=False,
-            tickmode='array',
-            tickvals=[0, 25, 50, 75, 100],
-            ticksuffix='%',
-            automargin=True,
-            title_standoff=18
-        )
+        if use_cortina_area:
+            axis_range_max = max(10.0, cortina_axis_max * 1.08 if cortina_axis_max > 0 else 10.0)
+            axis_configs['y2'] = dict(
+                title=dict(
+                    text='Frentes / Puertas (m2)',
+                    font=dict(color=cortina_color, size=11, family='Manrope, sans-serif')
+                ),
+                tickfont=dict(color=cortina_color, size=10, family='Manrope, sans-serif'),
+                tickcolor=cortina_color,
+                range=[0, axis_range_max],
+                autorange=False,
+                side='right',
+                overlaying='y',
+                anchor='free',
+                position=cortina_axis_position,
+                showgrid=False,
+                showline=True,
+                linewidth=1,
+                ticks='',
+                zeroline=False,
+                tickmode='auto',
+                automargin=True,
+                title_standoff=18
+            )
+        else:
+            axis_configs['y2'] = dict(
+                title=dict(
+                    text=CORR_AXIS_TITLES['% Apertura Cortinas'],
+                    font=dict(color=cortina_color, size=11, family='Manrope, sans-serif')
+                ),
+                tickfont=dict(color=cortina_color, size=10, family='Manrope, sans-serif'),
+                tickcolor=cortina_color,
+                range=[-4, 100],
+                autorange=False,
+                side='right',
+                overlaying='y',
+                anchor='free',
+                position=cortina_axis_position,
+                showgrid=False,
+                showline=True,
+                linewidth=1,
+                ticks='',
+                zeroline=False,
+                tickmode='array',
+                tickvals=[0, 25, 50, 75, 100],
+                ticksuffix='%',
+                automargin=True,
+                title_standoff=18
+            )
 
     fig_corr.update_layout(
         title=dict(
@@ -3331,7 +3431,6 @@ with tab_correlacion:
                 annotations_by_day=annotations_by_day,
                 culatas_by_day=culatas_by_day
             )
-        _render_block_ventilation_panel(block_label)
 
         tab_corr_graf, tab_corr_regs = st.tabs(["Correlación", "Registros"])
 
@@ -3358,7 +3457,8 @@ with tab_correlacion:
                         df_variables_corr,
                         datos_cortinas_sel,
                         fecha_variables,
-                        selected_vars
+                        selected_vars,
+                        block_label=block_label
                     )
 
         with tab_corr_regs:
