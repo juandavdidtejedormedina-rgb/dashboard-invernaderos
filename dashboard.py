@@ -2198,6 +2198,39 @@ def _get_motor_area_reference(block_name, motor_name):
     return None
 
 
+def _get_culatas_area_reference(block_name):
+    for row in _get_block_ventilation_rows(block_name):
+        row_key = _build_normalized_text_key(row.get('label', ''))
+        if row_key != 'ventilacion culatas':
+            continue
+
+        real_value = row.get('real')
+        if real_value is None or pd.isna(real_value):
+            return None
+
+        return float(real_value)
+
+    return None
+
+
+def _build_culatas_state_text(open_percent, block_name=None):
+    percent_value = _normalize_percent_value(open_percent)
+    if percent_value is None:
+        return 'Sin información disponible'
+
+    if percent_value <= 0:
+        return 'Culatas cerradas'
+
+    max_area = _get_culatas_area_reference(block_name)
+    if max_area is None:
+        return 'Culatas abiertas'
+
+    open_area = max_area * percent_value / 100.0
+    area_text = _format_area_value(open_area)
+    percent_text = _format_summary_number(percent_value, 0)
+    return f'Culatas abiertas - {area_text} m2 abiertos ({percent_text}%)'
+
+
 def _convert_cortina_profile_to_area(df_state, max_area):
     if df_state.empty:
         return df_state
@@ -2563,7 +2596,7 @@ def _build_cortina_apertura_profile(df_cortinas, elemento, config):
     return pd.DataFrame(profile).sort_values('Hora').reset_index(drop=True)
 
 
-def _get_culatas_daily_observation(datos_cortinas):
+def _get_culatas_daily_observation(datos_cortinas, block_label=None):
     if datos_cortinas.empty or 'Culatas %' not in datos_cortinas.columns:
         return None
 
@@ -2574,10 +2607,10 @@ def _get_culatas_daily_observation(datos_cortinas):
     ultimo_valor = _normalize_percent_value(valores_culatas.iloc[-1])
     if ultimo_valor is None:
         return None
-    return 'Culatas abiertas' if ultimo_valor > 0 else 'Culatas cerradas'
+    return _build_culatas_state_text(ultimo_valor, block_label)
 
 
-def _get_culatas_observation_by_day(datos_cortinas):
+def _get_culatas_observation_by_day(datos_cortinas, block_label=None):
     if (
         datos_cortinas.empty or
         'Fecha' not in datos_cortinas.columns or
@@ -2597,7 +2630,7 @@ def _get_culatas_observation_by_day(datos_cortinas):
             if ultimo_valor is None:
                 state = 'Sin información disponible'
             else:
-                state = 'Culatas abiertas' if ultimo_valor > 0 else 'Culatas cerradas'
+                state = _build_culatas_state_text(ultimo_valor, block_label)
 
         observations.append({
             'fecha': fecha,
@@ -3410,8 +3443,8 @@ with tab_correlacion:
 
         block_label = bloque_seleccionado or bloque_variables
         block_modification = _get_block_modification(block_label)
-        culatas_observation = _get_culatas_daily_observation(datos_cortinas_sel)
-        culatas_by_day = _get_culatas_observation_by_day(datos_cortinas_sel)
+        culatas_observation = _get_culatas_daily_observation(datos_cortinas_sel, block_label)
+        culatas_by_day = _get_culatas_observation_by_day(datos_cortinas_sel, block_label)
         daily_annotations = _get_daily_annotations(datos_cortinas_sel)
         annotations_by_day = _get_annotations_by_day(datos_cortinas_sel)
         if (
