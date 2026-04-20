@@ -1459,13 +1459,51 @@ def _get_summary_metric_config(var_name):
     }
 
 
-def _build_summary_cards_html(df_variables, fecha_variables):
+def _get_summary_mode_config(summary_mode, single_day):
+    mode_key = str(summary_mode).strip().lower()
+    mode_map = {
+        'promedio': {
+            'label': 'Promedio',
+            'calculator': lambda serie: float(serie.mean())
+        },
+        'máximo': {
+            'label': 'Máximo',
+            'calculator': lambda serie: float(serie.max())
+        },
+        'maximo': {
+            'label': 'Máximo',
+            'calculator': lambda serie: float(serie.max())
+        },
+        'mínimo': {
+            'label': 'Mínimo',
+            'calculator': lambda serie: float(serie.min())
+        },
+        'minimo': {
+            'label': 'Mínimo',
+            'calculator': lambda serie: float(serie.min())
+        }
+    }
+    selected_mode = mode_map.get(mode_key, mode_map['promedio'])
+    chip_text = (
+        f"{selected_mode['label']} diario"
+        if single_day else
+        f"{selected_mode['label']} del periodo"
+    )
+    return {
+        'label': selected_mode['label'],
+        'calculator': selected_mode['calculator'],
+        'chip_text': chip_text
+    }
+
+
+def _build_summary_cards_html(df_variables, fecha_variables, summary_mode='Promedio'):
     if fecha_variables is None:
         return ''
 
     fecha_inicio, fecha_fin = fecha_variables
     single_day = fecha_inicio == fecha_fin
-    period_chip = 'Promedio diario' if single_day else 'Promedio del periodo'
+    summary_mode_config = _get_summary_mode_config(summary_mode, single_day)
+    period_chip = summary_mode_config['chip_text']
     period_text = (
         fecha_inicio.strftime('%d/%m/%Y')
         if single_day else
@@ -1487,8 +1525,8 @@ def _build_summary_cards_html(df_variables, fecha_variables):
         if not df_variables.empty and var_name in df_variables.columns:
             serie = pd.to_numeric(df_variables[var_name], errors='coerce').dropna()
             if not serie.empty:
-                average_value = float(serie.mean())
-                number_text = _format_summary_number(average_value, config['decimals'])
+                summary_value = summary_mode_config['calculator'](serie)
+                number_text = _format_summary_number(summary_value, config['decimals'])
                 value_markup = (
                     '<div class="summary-card-value">'
                     f'<span class="summary-card-number">{number_text}</span>'
@@ -1515,10 +1553,23 @@ def _build_summary_cards_html(df_variables, fecha_variables):
     return f'<div class="summary-grid">{"".join(cards_html)}</div>'
 
 
-def _render_summary_cards(df_variables, fecha_variables):
-    cards_html = _build_summary_cards_html(df_variables, fecha_variables)
+def _render_summary_cards(df_variables, fecha_variables, summary_mode='Promedio'):
+    cards_html = _build_summary_cards_html(df_variables, fecha_variables, summary_mode=summary_mode)
     if cards_html:
         st.markdown(cards_html, unsafe_allow_html=True)
+
+
+def _render_summary_cards_selector(df_variables, fecha_variables):
+    tab_promedio, tab_maximo, tab_minimo = st.tabs(["Promedio", "Máximo", "Mínimo"])
+
+    with tab_promedio:
+        _render_summary_cards(df_variables, fecha_variables, summary_mode='Promedio')
+
+    with tab_maximo:
+        _render_summary_cards(df_variables, fecha_variables, summary_mode='Máximo')
+
+    with tab_minimo:
+        _render_summary_cards(df_variables, fecha_variables, summary_mode='Mínimo')
 
 
 def _info_panel_icon_svg(icon_name):
@@ -2742,7 +2793,7 @@ with tab_correlacion:
             df_variables_corr[['DateTime'] + variables_sensor].dropna(how='all', subset=variables_sensor)
             if variables_sensor else pd.DataFrame()
         )
-        _render_summary_cards(df_variables_corr, fecha_variables)
+        _render_summary_cards_selector(df_variables_corr, fecha_variables)
 
         block_label = bloque_seleccionado or bloque_variables
         block_modification = _get_block_modification(block_label)
