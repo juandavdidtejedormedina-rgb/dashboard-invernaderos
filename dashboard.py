@@ -3077,7 +3077,7 @@ def _render_correlacion(df_variables, datos_cortinas_sel, fecha_variables, varia
                         line=dict(color=color, width=2.2, shape='hv', dash='dot'),
                         opacity=0.68,
                         hovertemplate=(
-                            f'<b>%{{x|{hover_time_format}}}</b><br>%{{customdata[0]}}<br>Apertura ideal: %{y:.1f} m2'
+                            f'<b>%{{x|{hover_time_format}}}</b><br>%{{customdata[0]}}<br>Apertura ideal: %{{y:.1f}} m2'
                             '<br>%{customdata[2]}<br>%{customdata[3]}<br>%{customdata[1]}<extra></extra>'
                         ),
                         customdata=df_state[['Evento', 'DetalleGrafico', 'AperturaRealTexto', 'BrechaIdealTexto']],
