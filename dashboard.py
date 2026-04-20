@@ -2924,7 +2924,14 @@ def cargar_cortinas(ruta_bytes):
         return pd.DataFrame()
 
 
-def _render_correlacion(df_variables, datos_cortinas_sel, fecha_variables, variables_seleccionadas=None, block_label=None):
+def _render_correlacion(
+    df_variables,
+    datos_cortinas_sel,
+    fecha_variables,
+    variables_seleccionadas=None,
+    block_label=None,
+    show_ideal_aperturas=False
+):
     fecha_inicio, fecha_fin = fecha_variables
     multi_day_view = fecha_inicio != fecha_fin
     hover_time_format = '%d/%m %H:%M' if multi_day_view else '%H:%M'
@@ -2953,6 +2960,7 @@ def _render_correlacion(df_variables, datos_cortinas_sel, fecha_variables, varia
     use_cortina_area = bool(selected_cortinas) and all(
         cortina_reference_map.get(var_name) for var_name in selected_cortinas
     )
+    show_ideal_lines = bool(show_ideal_aperturas and use_cortina_area)
 
     if not selected_sensors and not selected_cortinas:
         if available_vars:
@@ -3038,9 +3046,13 @@ def _render_correlacion(df_variables, datos_cortinas_sel, fecha_variables, varia
                     )
                     y_col = 'Apertura_m2'
                     detail_col = 'DetalleGrafico'
-                    trace_name = f'{var_name} real'
+                    trace_name = f'{var_name} (m2)'
                     hover_value_line = 'Apertura real: %{y:.1f} m2'
-                    customdata_columns = ['Evento', detail_col, 'AperturaIdealTexto', 'BrechaIdealTexto']
+                    customdata_columns = (
+                        ['Evento', detail_col, 'AperturaIdealTexto', 'BrechaIdealTexto']
+                        if show_ideal_lines else
+                        ['Evento', detail_col]
+                    )
                     serie_area = pd.to_numeric(df_state[y_col], errors='coerce').dropna()
                     if not serie_area.empty:
                         cortina_axis_max = max(cortina_axis_max, float(serie_area.max()))
@@ -3055,7 +3067,7 @@ def _render_correlacion(df_variables, datos_cortinas_sel, fecha_variables, varia
                     marker=dict(size=5, color=color),
                     hovertemplate=(
                         f'<b>%{{x|{hover_time_format}}}</b><br>%{{customdata[0]}}<br>{hover_value_line}'
-                        + ('<br>%{customdata[2]}<br>%{customdata[3]}' if use_cortina_area else '')
+                        + ('<br>%{customdata[2]}<br>%{customdata[3]}' if show_ideal_lines else '')
                         + '<br>%{customdata[1]}<extra></extra>'
                     ),
                     customdata=df_state[customdata_columns],
@@ -3064,7 +3076,7 @@ def _render_correlacion(df_variables, datos_cortinas_sel, fecha_variables, varia
                 )
                 cortina_traces.append((var_name, trace, color))
 
-                if use_cortina_area and motor_reference.get('ideal_max_area') is not None:
+                if show_ideal_lines and motor_reference.get('ideal_max_area') is not None:
                     serie_area_ideal = pd.to_numeric(df_state['Apertura_ideal_m2'], errors='coerce').dropna()
                     if not serie_area_ideal.empty:
                         cortina_axis_max = max(cortina_axis_max, float(serie_area_ideal.max()))
@@ -3082,7 +3094,8 @@ def _render_correlacion(df_variables, datos_cortinas_sel, fecha_variables, varia
                         ),
                         customdata=df_state[['Evento', 'DetalleGrafico', 'AperturaRealTexto', 'BrechaIdealTexto']],
                         legendgroup=str(var_name),
-                        legendrank=order * 10 + 2
+                        legendrank=order * 10 + 2,
+                        showlegend=False
                     )
                     cortina_traces.append((f'{var_name}_ideal', trace_ideal, color))
                 break
@@ -3322,6 +3335,8 @@ _df_cortinas_all = cargar_cortinas(archivo_cortinas_bytes) if archivo_cortinas_b
 
 if 'graficar_correlacion' not in st.session_state:
     st.session_state.graficar_correlacion = False
+if 'mostrar_aperturas_ideales' not in st.session_state:
+    st.session_state.mostrar_aperturas_ideales = False
 
 st.sidebar.markdown(
     f"""
@@ -3483,6 +3498,11 @@ with st.sidebar.expander("Series visibles", expanded=True):
             )
 
         selected_vars_sidebar = _get_selected_correlacion_vars(available_correlacion_vars)
+        st.checkbox(
+            "Aperturas ideales",
+            key="mostrar_aperturas_ideales",
+            help="Activa las referencias ideales solo para los frentes y puertas que esten visibles."
+        )
 
 toggle_chart_label = "Mostrar correlación" if not st.session_state.graficar_correlacion else "Ocultar correlación"
 if st.sidebar.button(toggle_chart_label, key="boton_toggle_graficos", use_container_width=True):
@@ -3557,7 +3577,8 @@ with tab_correlacion:
                         datos_cortinas_sel,
                         fecha_variables,
                         selected_vars,
-                        block_label=block_label
+                        block_label=block_label,
+                        show_ideal_aperturas=st.session_state.get('mostrar_aperturas_ideales', False)
                     )
 
         with tab_corr_regs:
