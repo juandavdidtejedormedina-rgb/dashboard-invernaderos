@@ -43,10 +43,10 @@ CORTINA_COLORS = {
 }
 MOTOR_VARIABLES = list(CORTINA_COLORS.keys())
 MOTOR_AREA_REFERENCE = {
-    'FRENTE 1': {'row_key': 'ventilacion frontal', 'divisor': 2},
-    'FRENTE 2': {'row_key': 'ventilacion frontal', 'divisor': 2},
-    'PUERTA 1': {'row_key': 'ventilacion lateral', 'divisor': 2},
-    'PUERTA 2': {'row_key': 'ventilacion lateral', 'divisor': 2}
+    'FRENTE 1': {'row_key': 'ventilacion frontal', 'divisor': 1},
+    'FRENTE 2': {'row_key': 'ventilacion frontal', 'divisor': 1},
+    'PUERTA 1': {'row_key': 'ventilacion lateral', 'divisor': 1},
+    'PUERTA 2': {'row_key': 'ventilacion lateral', 'divisor': 1}
 }
 VARIABLE_SELECTOR_LABELS = {
     'Temperatura': 'Temperatura (°C)',
