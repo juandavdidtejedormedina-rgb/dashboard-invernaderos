@@ -30,16 +30,16 @@ VARIABLE_UNITS = {
     'Gramos de agua': 'g'
 }
 VARIABLE_COLORS = {
-    'Temperatura': '#6E97F2',
-    'Humedad Relativa': '#5B6275',
-    'Radiación PAR': '#8CBD63',
-    'Gramos de agua': '#D39A58'
+    'Temperatura': '#9FC9DD',
+    'Humedad Relativa': '#383A35',
+    'Radiación PAR': '#BF8A97',
+    'Gramos de agua': '#B7A184'
 }
 CORTINA_COLORS = {
-    'FRENTE 1': '#524B82',
-    'FRENTE 2': '#8077AE',
-    'PUERTA 1': '#9E6F7F',
-    'PUERTA 2': '#D8B7C0'
+    'FRENTE 1': '#545386',
+    'FRENTE 2': '#8A88B3',
+    'PUERTA 1': '#D89AA8',
+    'PUERTA 2': '#F4C7CE'
 }
 MOTOR_VARIABLES = list(CORTINA_COLORS.keys())
 VARIABLE_SELECTOR_LABELS = {
@@ -53,13 +53,13 @@ VARIABLE_SELECTOR_LABELS = {
     'PUERTA 2': 'Puerta 2'
 }
 BRAND_COLORS = {
-    'hero': '#4C4678',
-    'sky': '#D6E5EC',
-    'rose': '#E7D2DA',
-    'beige': '#D9CDBA',
-    'graphite': '#2D3040',
-    'ink': '#1F2430',
-    'paper': '#F7F4EE',
+    'hero': '#545386',
+    'sky': '#C2DFEA',
+    'rose': '#F4C7CE',
+    'beige': '#D8D2C4',
+    'graphite': '#383A35',
+    'ink': '#2E312C',
+    'paper': '#FAF8F3',
     'white': '#FFFFFF'
 }
 APP_DIR = Path(__file__).resolve().parent
@@ -165,9 +165,9 @@ st.markdown(f"""
 
 .stApp {{
     background:
-        radial-gradient(circle at 12% 18%, rgba(217, 205, 186, 0.22), transparent 22%),
-        radial-gradient(circle at 88% 10%, rgba(214, 229, 236, 0.34), transparent 28%),
-        linear-gradient(180deg, #fcfaf6 0%, var(--elite-paper) 58%, #f2eee6 100%);
+        radial-gradient(circle at 12% 16%, rgba(244, 199, 206, 0.18), transparent 22%),
+        radial-gradient(circle at 88% 10%, rgba(194, 223, 234, 0.28), transparent 26%),
+        linear-gradient(180deg, #fffdfa 0%, var(--elite-paper) 62%, #f4efe6 100%);
     color: var(--elite-ink);
     font-family: var(--font-body);
 }}
@@ -211,10 +211,10 @@ section[data-testid="stSidebar"] > div {{
 }}
 [data-testid="stSidebar"] {{
     background:
-        radial-gradient(circle at top left, rgba(231, 210, 218, 0.18), transparent 24%),
-        linear-gradient(180deg, rgba(76, 70, 120, 0.98) 0%, rgba(31, 36, 48, 0.99) 100%);
+        radial-gradient(circle at top left, rgba(244, 199, 206, 0.16), transparent 24%),
+        linear-gradient(180deg, rgba(84, 83, 134, 0.98) 0%, rgba(56, 58, 53, 0.99) 100%);
     border-right: 1px solid rgba(255, 255, 255, 0.08);
-    box-shadow: 18px 0 42px rgba(31, 36, 48, 0.18);
+    box-shadow: 18px 0 42px rgba(56, 58, 53, 0.18);
 }}
 [data-testid="stSidebar"] * {{
     color: #f7f7fb;
@@ -319,17 +319,17 @@ section[data-testid="stSidebar"] > div {{
     min-height: 2.95rem;
     border-radius: 999px;
     border: 1px solid rgba(255, 255, 255, 0.14);
-    background: linear-gradient(135deg, #6a639c 0%, #4c4678 100%);
+    background: linear-gradient(135deg, #6a67a6 0%, #545386 100%);
     color: var(--elite-white);
     font-family: var(--font-display);
     font-weight: 800;
     font-size: 0.92rem;
     letter-spacing: 0.02em;
-    box-shadow: inset 0 1px 0 rgba(255,255,255,0.16), 0 18px 32px rgba(27, 23, 53, 0.32);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.16), 0 18px 32px rgba(38, 34, 77, 0.30);
 }}
 [data-testid="stSidebar"] div.stButton > button:hover {{
     border-color: rgba(255, 255, 255, 0.22);
-    background: linear-gradient(135deg, #776fb0 0%, #575184 100%);
+    background: linear-gradient(135deg, #7772b5 0%, #5d5a92 100%);
     color: var(--elite-white);
     transform: translateY(-1px);
 }}
@@ -391,24 +391,24 @@ section[data-testid="stSidebar"] > div {{
 .hero-card {{
     position: relative;
     display: grid;
-    grid-template-columns: 200px minmax(0, 1fr);
-    gap: 1.15rem;
-    align-items: stretch;
-    padding: 1.45rem 1.5rem;
-    margin: 0 0 1.35rem 0;
+    grid-template-columns: 130px minmax(0, 1fr);
+    gap: 1rem;
+    align-items: center;
+    padding: 0.88rem 1.15rem;
+    margin: 0 0 1.15rem 0;
     border: 1px solid rgba(255, 255, 255, 0.12);
-    border-radius: 30px;
+    border-radius: 24px;
     background:
-        radial-gradient(circle at 18% 18%, rgba(255,255,255,0.16), transparent 18%),
-        linear-gradient(135deg, #5f598f 0%, #4c4678 38%, #2d3040 100%);
-    box-shadow: 0 28px 68px rgba(35, 30, 58, 0.22);
+        radial-gradient(circle at 18% 18%, rgba(255,255,255,0.14), transparent 18%),
+        linear-gradient(135deg, rgba(111, 105, 168, 0.98) 0%, rgba(84, 83, 134, 0.98) 42%, rgba(56, 58, 53, 0.98) 100%);
+    box-shadow: 0 24px 60px rgba(56, 58, 53, 0.18);
     overflow: hidden;
 }}
 .hero-card::before {{
     content: '';
     position: absolute;
     inset: 1px;
-    border-radius: 29px;
+    border-radius: 23px;
     border: 1px solid rgba(255, 255, 255, 0.08);
     pointer-events: none;
 }}
@@ -416,16 +416,16 @@ section[data-testid="stSidebar"] > div {{
     display: flex;
     align-items: center;
     justify-content: center;
-    border-radius: 24px;
+    border-radius: 18px;
     border: 1px solid rgba(255, 255, 255, 0.18);
     background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(247, 244, 238, 0.95));
-    min-height: 150px;
-    padding: 1.1rem;
-    box-shadow: inset 0 1px 0 rgba(255,255,255,0.70), 0 20px 34px rgba(36, 31, 61, 0.18);
+    min-height: 94px;
+    padding: 0.7rem;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.70), 0 14px 26px rgba(36, 31, 61, 0.16);
 }}
 .hero-logo-image {{
     width: 100%;
-    max-width: 165px;
+    max-width: 100px;
     height: auto;
     object-fit: contain;
 }}
@@ -441,31 +441,32 @@ section[data-testid="stSidebar"] > div {{
     display: flex;
     flex-direction: column;
     justify-content: center;
+    min-width: 0;
 }}
 .hero-kicker {{
-    margin: 0 0 0.45rem 0;
-    color: rgba(255, 244, 238, 0.84);
-    font-family: var(--font-brand);
-    font-size: 1rem;
-    letter-spacing: 0.16em;
+    margin: 0 0 0.18rem 0;
+    color: rgba(255, 248, 244, 0.90);
+    font-family: var(--font-display);
+    font-size: 0.82rem;
+    letter-spacing: 0.18em;
     text-transform: uppercase;
-    font-weight: 700;
+    font-weight: 800;
 }}
 .hero-copy h1 {{
     margin: 0;
     color: var(--elite-white);
     font-family: var(--font-display);
     font-weight: 800;
-    font-size: 2.35rem;
-    line-height: 1.02;
-    letter-spacing: -0.04em;
+    font-size: 1.78rem;
+    line-height: 1.05;
+    letter-spacing: -0.03em;
 }}
 .hero-subtitle {{
-    margin: 0.85rem 0 0.1rem 0;
-    max-width: 44rem;
-    color: rgba(255, 255, 255, 0.82);
-    font-size: 1.03rem;
-    line-height: 1.7;
+    margin: 0.32rem 0 0 0;
+    max-width: 42rem;
+    color: rgba(255, 255, 255, 0.80);
+    font-size: 0.95rem;
+    line-height: 1.55;
 }}
 .section-intro {{
     margin: 0.4rem 0 0.85rem 0;
@@ -506,9 +507,9 @@ section[data-testid="stSidebar"] > div {{
     position: relative;
     padding: 1.08rem 1.08rem 1rem 1.08rem;
     border-radius: 24px;
-    border: 1px solid rgba(76, 70, 120, 0.10);
+    border: 1px solid rgba(84, 83, 134, 0.10);
     background: linear-gradient(180deg, rgba(255,255,255,0.92) 0%, rgba(247,244,238,0.96) 100%);
-    box-shadow: 0 18px 40px rgba(45, 48, 64, 0.09);
+    box-shadow: 0 18px 40px rgba(56, 58, 53, 0.08);
     overflow: hidden;
     backdrop-filter: blur(12px);
 }}
@@ -643,11 +644,11 @@ section[data-testid="stSidebar"] > div {{
     min-height: 232px;
     padding: 1.18rem 1.22rem 1.14rem 1.22rem;
     border-radius: 26px;
-    border: 1px solid rgba(76, 70, 120, 0.08);
+    border: 1px solid rgba(84, 83, 134, 0.08);
     background:
         linear-gradient(180deg, rgba(255,255,255,0.94) 0%, rgba(247,244,238,0.96) 100%);
     box-shadow:
-        0 20px 42px rgba(45, 48, 64, 0.08),
+        0 20px 42px rgba(56, 58, 53, 0.07),
         inset 0 1px 0 rgba(255,255,255,0.70);
     backdrop-filter: blur(12px);
 }}
@@ -745,7 +746,7 @@ section[data-testid="stSidebar"] > div {{
     border-radius: 999px;
     background: var(--info-accent-soft);
     color: var(--info-accent);
-    border: 1px solid rgba(76, 70, 120, 0.08);
+    border: 1px solid rgba(84, 83, 134, 0.08);
     box-shadow: inset 0 1px 0 rgba(255,255,255,0.62);
     font-size: 0.68rem;
     font-weight: 800;
@@ -840,7 +841,7 @@ section[data-testid="stSidebar"] > div {{
 .info-panel-day-card {{
     padding: 0.72rem 0.78rem;
     border-radius: 16px;
-    border: 1px solid rgba(76, 70, 120, 0.07);
+    border: 1px solid rgba(84, 83, 134, 0.07);
     background: linear-gradient(180deg, rgba(255,255,255,0.86), rgba(246,242,235,0.84));
 }}
 .info-panel-day-header {{
@@ -862,7 +863,7 @@ section[data-testid="stSidebar"] > div {{
     align-items: center;
     padding: 0.22rem 0.56rem;
     border-radius: 999px;
-    background: rgba(76, 70, 120, 0.08);
+    background: rgba(84, 83, 134, 0.08);
     color: var(--elite-hero);
     font-size: 0.68rem;
     font-weight: 700;
@@ -978,19 +979,19 @@ section[data-testid="stSidebar"] > div {{
 }}
 div.stButton > button {{
     border-radius: 999px;
-    border: 1px solid rgba(76, 70, 120, 0.18);
-    background: linear-gradient(135deg, #5e578f 0%, #433d6b 100%);
+    border: 1px solid rgba(84, 83, 134, 0.18);
+    background: linear-gradient(135deg, #6b67a9 0%, #545386 100%);
     color: var(--elite-white);
     font-family: var(--font-display);
     font-weight: 800;
     padding: 0.56rem 1.1rem;
     letter-spacing: 0.01em;
-    box-shadow: 0 14px 30px rgba(46, 39, 79, 0.24);
+    box-shadow: 0 14px 30px rgba(46, 39, 79, 0.22);
 }}
 div.stButton > button:hover {{
-    border-color: rgba(76, 70, 120, 0.30);
+    border-color: rgba(84, 83, 134, 0.30);
     color: var(--elite-white);
-    background: linear-gradient(135deg, #6a639c 0%, #4c4678 100%);
+    background: linear-gradient(135deg, #7873b9 0%, #5e5a95 100%);
     transform: translateY(-1px);
 }}
 div[data-testid="stPills"] {{
@@ -998,23 +999,23 @@ div[data-testid="stPills"] {{
 }}
 div[data-testid="stPills"] button {{
     border-radius: 999px;
-    border: 1px solid rgba(76, 70, 120, 0.14);
+    border: 1px solid rgba(84, 83, 134, 0.14);
     background: rgba(255, 255, 255, 0.88);
     color: var(--elite-graphite);
     font-family: var(--font-body);
     font-weight: 600;
     padding: 0.38rem 0.9rem;
     transition: all 0.2s ease;
-    box-shadow: 0 10px 22px rgba(45, 48, 64, 0.06);
+    box-shadow: 0 10px 22px rgba(56, 58, 53, 0.05);
 }}
 div[data-testid="stPills"] button:hover {{
-    border-color: rgba(76, 70, 120, 0.26);
-    background: rgba(214, 229, 236, 0.24);
+    border-color: rgba(84, 83, 134, 0.26);
+    background: rgba(194, 223, 234, 0.24);
     color: var(--elite-hero);
 }}
 div[data-testid="stPills"] button[aria-pressed="true"] {{
-    border-color: rgba(76, 70, 120, 0.24);
-    background: linear-gradient(135deg, rgba(76, 70, 120, 0.12), rgba(231, 210, 218, 0.26));
+    border-color: rgba(84, 83, 134, 0.24);
+    background: linear-gradient(135deg, rgba(84, 83, 134, 0.12), rgba(244, 199, 206, 0.24));
     color: var(--elite-hero);
     font-weight: 800;
 }}
@@ -1028,17 +1029,17 @@ button[data-baseweb="tab"][aria-selected="true"] {{
 div[data-testid="stPlotlyChart"],
 div[data-testid="stDataFrame"] {{
     border-radius: 24px;
-    border: 1px solid rgba(76, 70, 120, 0.08);
+    border: 1px solid rgba(84, 83, 134, 0.08);
     background: linear-gradient(180deg, rgba(255, 255, 255, 0.86), rgba(247, 244, 238, 0.82));
-    box-shadow: 0 20px 46px rgba(45, 48, 64, 0.07);
+    box-shadow: 0 20px 46px rgba(56, 58, 53, 0.07);
     padding: 0.45rem 0.45rem 0.2rem 0.45rem;
     backdrop-filter: blur(12px);
 }}
 [data-testid="stMetric"] {{
     background: rgba(255, 255, 255, 0.82);
     border-radius: 18px;
-    border: 1px solid rgba(76, 70, 120, 0.08);
-    box-shadow: 0 12px 28px rgba(45, 48, 64, 0.06);
+    border: 1px solid rgba(84, 83, 134, 0.08);
+    box-shadow: 0 12px 28px rgba(56, 58, 53, 0.06);
     padding: 0.35rem 0.6rem;
 }}
 [data-testid="stInfo"],
@@ -1084,9 +1085,16 @@ div[data-testid="stDataFrame"] {{
 @media (max-width: 980px) {{
     .hero-card {{
         grid-template-columns: 1fr;
+        padding: 1rem;
+    }}
+    .hero-logo-shell {{
+        min-height: 84px;
     }}
     .hero-copy h1 {{
-        font-size: 1.7rem;
+        font-size: 1.55rem;
+    }}
+    .hero-subtitle {{
+        font-size: 0.92rem;
     }}
 }}
 @media (max-width: 1180px) {{
@@ -1140,10 +1148,10 @@ st.markdown(
             {logo_html}
         </div>
         <div class="hero-copy">
-            <p class="hero-kicker">The Elite Flower • Dashboard Ejecutivo</p>
-            <h1>Monitoreo de Variables y Automatización</h1>
+            <p class="hero-kicker">THE ELITE FLOWER</p>
+            <h1>Monitor de Invernadero y Automatización</h1>
             <p class="hero-subtitle">
-                Vista ejecutiva para el seguimiento de variables ambientales, cortinas y operación por bloques.
+                Seguimiento ejecutivo de variables ambientales, cortinas y operación por bloques.
             </p>
         </div>
     </div>
@@ -1695,7 +1703,7 @@ def _render_info_panels(
 
     info_cards = {
         'observaciones': (
-            f'<div class="info-panel-card info-panel-card--observaciones" style="--info-accent: {BRAND_COLORS["rose"]}; --info-accent-soft: rgba(231, 210, 218, 0.22);">'
+            f'<div class="info-panel-card info-panel-card--observaciones" style="--info-accent: {BRAND_COLORS["rose"]}; --info-accent-soft: rgba(244, 199, 206, 0.22);">'
             '<div class="info-panel-header">'
             '<div class="info-panel-header-main">'
             f'<span class="info-panel-icon">{_info_panel_icon_svg("observaciones")}</span>'
@@ -1709,7 +1717,7 @@ def _render_info_panels(
             '</div>'
         ),
         'modificacion': (
-            f'<div class="info-panel-card info-panel-card--compact" style="--info-accent: {BRAND_COLORS["hero"]}; --info-accent-soft: rgba(76, 70, 120, 0.15);">'
+            f'<div class="info-panel-card info-panel-card--compact" style="--info-accent: {BRAND_COLORS["hero"]}; --info-accent-soft: rgba(84, 83, 134, 0.15);">'
             '<div class="info-panel-header">'
             '<div class="info-panel-header-main">'
             f'<span class="info-panel-icon">{_info_panel_icon_svg("modificacion")}</span>'
@@ -1723,7 +1731,7 @@ def _render_info_panels(
             '</div>'
         ),
         'culatas': (
-            f'<div class="info-panel-card info-panel-card--compact" style="--info-accent: {BRAND_COLORS["sky"]}; --info-accent-soft: rgba(214, 229, 236, 0.28);">'
+            f'<div class="info-panel-card info-panel-card--compact" style="--info-accent: {BRAND_COLORS["sky"]}; --info-accent-soft: rgba(194, 223, 234, 0.28);">'
             '<div class="info-panel-header">'
             '<div class="info-panel-header-main">'
             f'<span class="info-panel-icon">{_info_panel_icon_svg("culatas")}</span>'
@@ -2518,7 +2526,7 @@ def _render_correlacion(df_variables, datos_cortinas_sel, fecha_variables, varia
             tickfont=dict(size=11, family='Manrope, sans-serif', color=BRAND_COLORS['graphite']),
             domain=[0, x_domain_end],
             showgrid=True,
-            gridcolor='rgba(76, 70, 120, 0.07)',
+            gridcolor='rgba(84, 83, 134, 0.07)',
             zeroline=False
         ),
         hovermode='x unified',
@@ -2528,7 +2536,7 @@ def _render_correlacion(df_variables, datos_cortinas_sel, fecha_variables, varia
         plot_bgcolor='rgba(250,248,243,0.65)',
         hoverlabel=dict(
             bgcolor='rgba(249, 246, 240, 0.98)',
-            bordercolor='rgba(76, 70, 120, 0.16)',
+            bordercolor='rgba(84, 83, 134, 0.16)',
             font=dict(family='Manrope, sans-serif', color=BRAND_COLORS['graphite'], size=12)
         ),
         height=620,
@@ -2541,7 +2549,7 @@ def _render_correlacion(df_variables, datos_cortinas_sel, fecha_variables, varia
             traceorder='normal',
             font=dict(size=11, family='Manrope, sans-serif', color=BRAND_COLORS['graphite']),
             bgcolor='rgba(255,255,255,0.76)',
-            bordercolor='rgba(76, 70, 120, 0.08)',
+            bordercolor='rgba(84, 83, 134, 0.08)',
             borderwidth=1
         ),
         margin=dict(l=50, r=right_margin, t=142, b=55),
