@@ -2975,6 +2975,8 @@ def _render_correlacion(
     sensor_traces = []
     cortina_traces = []
     cortina_axis_max = 100.0 if not use_cortina_area else 0.0
+    sensor_legend_title_added = False
+    cortina_legend_title_added = False
 
     for order, var_name in enumerate(selected_vars):
         if var_name in selected_sensors:
@@ -3002,8 +3004,12 @@ def _render_correlacion(
                     var_name + ': %{y:.2f} ' +
                     VARIABLE_UNITS.get(var_name, '') +
                     '<extra></extra>'
-                )
+                ),
+                legendgroup=f'sensor_{var_name}'
             )
+            if not sensor_legend_title_added:
+                trace['legendgrouptitle_text'] = 'Sensores'
+                sensor_legend_title_added = True
             sensor_traces.append((
                 var_name,
                 trace,
@@ -3061,6 +3067,9 @@ def _render_correlacion(
                     legendgroup=str(var_name),
                     legendrank=order * 10 + 1
                 )
+                if not cortina_legend_title_added:
+                    trace['legendgrouptitle_text'] = 'Frentes y puertas'
+                    cortina_legend_title_added = True
                 cortina_traces.append((var_name, trace, color))
 
                 if show_ideal_lines and motor_reference.get('ideal_max_area') is not None:
@@ -3299,6 +3308,7 @@ def _render_correlacion(
             x=0,
             traceorder='normal',
             font=dict(size=11, family='Manrope, sans-serif', color=BRAND_COLORS['graphite']),
+            grouptitlefont=dict(size=11, family='Manrope, sans-serif', color=BRAND_COLORS['hero']),
             bgcolor='rgba(255,255,255,0.76)',
             bordercolor='rgba(76, 70, 120, 0.08)',
             borderwidth=1
