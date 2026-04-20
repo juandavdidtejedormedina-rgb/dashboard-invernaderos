@@ -2244,43 +2244,30 @@ def _convert_cortina_profile_to_area(df_state, real_max_area, ideal_max_area=Non
     df_area = df_state.copy()
     apertura_pct = pd.to_numeric(df_area['Apertura'], errors='coerce')
     df_area['Apertura_m2'] = apertura_pct * float(real_max_area) / 100.0
-    area_ref_text = _format_area_value(real_max_area)
-
-    ideal_ref_text = None
     if ideal_max_area is not None:
         df_area['Apertura_ideal_m2'] = apertura_pct * float(ideal_max_area) / 100.0
-        ideal_ref_text = _format_area_value(ideal_max_area)
     else:
         df_area['Apertura_ideal_m2'] = pd.NA
 
     detail_values = []
     for detail in df_area['Detalle'].fillna(''):
         detail_text = str(detail).strip()
-        ref_parts = [f'Ref. real max: {area_ref_text} m2']
-        if ideal_ref_text is not None:
-            ref_parts.append(f'Ref. ideal max: {ideal_ref_text} m2')
-
         if detail_text:
-            detail_values.append(f'{detail_text} | {" | ".join(ref_parts)}')
+            detail_values.append(detail_text.replace(' | ', ' • '))
         else:
-            detail_values.append(' | '.join(ref_parts))
+            detail_values.append('')
 
     df_area['DetalleGrafico'] = detail_values
-    df_area['AperturaRealTexto'] = pd.to_numeric(df_area['Apertura_m2'], errors='coerce').apply(
-        lambda value: f'Apertura real: {_format_area_value(value)} m2'
-        if not pd.isna(value) else 'Apertura real: Sin dato'
-    )
-    df_area['AperturaIdealTexto'] = pd.to_numeric(df_area['Apertura_ideal_m2'], errors='coerce').apply(
-        lambda value: f'Apertura ideal: {_format_area_value(value)} m2'
-        if not pd.isna(value) else 'Apertura ideal: Sin dato'
-    )
-    df_area['BrechaIdealTexto'] = (
-        pd.to_numeric(df_area['Apertura_m2'], errors='coerce') -
-        pd.to_numeric(df_area['Apertura_ideal_m2'], errors='coerce')
-    ).apply(
-        lambda value: f'Diferencia real - ideal: {_format_area_value(value)} m2'
-        if not pd.isna(value) else 'Diferencia real - ideal: Sin dato'
-    )
+    apertura_ideal_series = pd.to_numeric(df_area['Apertura_ideal_m2'], errors='coerce')
+    brecha_ideal_series = pd.to_numeric(df_area['Apertura_m2'], errors='coerce') - apertura_ideal_series
+    df_area['ResumenIdealTexto'] = [
+        (
+            f'Ideal: {_format_area_value(ideal_value)} m2 • Brecha: {_format_area_value(gap_value)} m2'
+            if not pd.isna(ideal_value) and not pd.isna(gap_value) else
+            'Ideal: Sin dato'
+        )
+        for ideal_value, gap_value in zip(apertura_ideal_series, brecha_ideal_series)
+    ]
     return df_area
 
 
@@ -3047,9 +3034,9 @@ def _render_correlacion(
                     y_col = 'Apertura_m2'
                     detail_col = 'DetalleGrafico'
                     trace_name = f'{var_name} (m2)'
-                    hover_value_line = 'Apertura real: %{y:.1f} m2'
+                    hover_value_line = 'Real: %{y:.1f} m2'
                     customdata_columns = (
-                        ['Evento', detail_col, 'AperturaIdealTexto', 'BrechaIdealTexto']
+                        ['Evento', detail_col, 'ResumenIdealTexto']
                         if show_ideal_lines else
                         ['Evento', detail_col]
                     )
@@ -3067,7 +3054,7 @@ def _render_correlacion(
                     marker=dict(size=5, color=color),
                     hovertemplate=(
                         f'<b>%{{x|{hover_time_format}}}</b><br>%{{customdata[0]}}<br>{hover_value_line}'
-                        + ('<br>%{customdata[2]}<br>%{customdata[3]}' if show_ideal_lines else '')
+                        + ('<br>%{customdata[2]}' if show_ideal_lines else '')
                         + '<br>%{customdata[1]}<extra></extra>'
                     ),
                     customdata=df_state[customdata_columns],
@@ -3088,11 +3075,7 @@ def _render_correlacion(
                         mode='lines',
                         line=dict(color=color, width=2.2, shape='hv', dash='dot'),
                         opacity=0.68,
-                        hovertemplate=(
-                            f'<b>%{{x|{hover_time_format}}}</b><br>%{{customdata[0]}}<br>Apertura ideal: %{{y:.1f}} m2'
-                            '<br>%{customdata[2]}<br>%{customdata[3]}<br>%{customdata[1]}<extra></extra>'
-                        ),
-                        customdata=df_state[['Evento', 'DetalleGrafico', 'AperturaRealTexto', 'BrechaIdealTexto']],
+                        hoverinfo='skip',
                         legendgroup=str(var_name),
                         legendrank=order * 10 + 2,
                         showlegend=False
