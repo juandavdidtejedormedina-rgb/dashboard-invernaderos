@@ -3500,8 +3500,7 @@ with st.sidebar.expander("Series visibles", expanded=True):
         selected_vars_sidebar = _get_selected_correlacion_vars(available_correlacion_vars)
         st.checkbox(
             "Aperturas ideales",
-            key="mostrar_aperturas_ideales",
-            help="Activa las referencias ideales solo para los frentes y puertas que esten visibles."
+            key="mostrar_aperturas_ideales"
         )
 
 toggle_chart_label = "Mostrar correlación" if not st.session_state.graficar_correlacion else "Ocultar correlación"
