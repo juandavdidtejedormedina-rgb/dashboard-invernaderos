@@ -361,61 +361,6 @@ section[data-testid="stSidebar"] > div {{
     color: var(--elite-white);
     transform: translateY(-1px);
 }}
-.sidebar-source-pill {{
-    padding: 0.85rem 0.95rem;
-    border-radius: 18px;
-    border: 1px solid rgba(255, 255, 255, 0.14);
-    background: linear-gradient(135deg, rgba(255, 255, 255, 0.14), rgba(194, 223, 234, 0.08));
-    color: #f7f7fb;
-    font-size: 0.88rem;
-    line-height: 1.5;
-    margin-bottom: 0.55rem;
-}}
-.sidebar-panel-card {{
-    padding: 0.9rem 0.95rem;
-    border-radius: 18px;
-    border: 1px solid rgba(255, 255, 255, 0.14);
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.06));
-    box-shadow: 0 14px 28px rgba(0, 0, 0, 0.10);
-    margin-bottom: 0.7rem;
-}}
-.sidebar-panel-title {{
-    margin: 0;
-    color: #ffffff;
-    font-family: var(--font-display);
-    font-size: 0.96rem;
-    font-weight: 700;
-    letter-spacing: 0.03em;
-}}
-.sidebar-panel-help {{
-    margin: 0.32rem 0 0 0;
-    color: rgba(247, 247, 251, 0.82);
-    font-size: 0.82rem;
-    line-height: 1.48;
-}}
-[data-testid="stSidebar"] .stFileUploader {{
-    background: rgba(255, 255, 255, 0.06);
-    border-radius: 16px;
-    border: 1px dashed rgba(255, 255, 255, 0.18);
-    padding: 0.55rem 0.55rem 0.2rem 0.55rem;
-}}
-[data-testid="stSidebar"] .stFileUploader section,
-[data-testid="stSidebar"] [data-testid="stFileUploaderDropzone"] {{
-    background: rgba(255, 255, 255, 0.96);
-    border-radius: 14px;
-    border: 1px solid rgba(84, 83, 134, 0.14);
-}}
-[data-testid="stSidebar"] .stFileUploader section *,
-[data-testid="stSidebar"] [data-testid="stFileUploaderDropzone"] * {{
-    color: var(--elite-ink) !important;
-}}
-[data-testid="stSidebar"] [data-testid="stFileUploaderDropzone"] svg {{
-    fill: var(--elite-hero);
-}}
-[data-testid="stSidebar"] [data-testid="stFileUploaderFileName"],
-[data-testid="stSidebar"] [data-testid="stFileUploaderDropzoneInstructions"] small {{
-    color: var(--elite-ink) !important;
-}}
 .hero-card {{
     position: relative;
     display: grid;
@@ -494,35 +439,6 @@ section[data-testid="stSidebar"] > div {{
     color: rgba(255, 255, 255, 0.82);
     font-size: 1.03rem;
     line-height: 1.7;
-}}
-.section-intro {{
-    margin: 0.4rem 0 0.85rem 0;
-    padding: 1rem 1.05rem;
-    border-radius: 20px;
-    border: 1px solid rgba(84, 83, 134, 0.12);
-    background: linear-gradient(135deg, rgba(255,255,255,0.94), rgba(216,210,196,0.35));
-}}
-.section-kicker {{
-    margin: 0 0 0.35rem 0;
-    color: var(--elite-hero);
-    font-size: 0.78rem;
-    letter-spacing: 0.18em;
-    text-transform: uppercase;
-    font-weight: 700;
-}}
-.section-title {{
-    margin: 0;
-    color: var(--elite-graphite);
-    font-family: var(--font-display);
-    font-size: 1.45rem;
-    font-weight: 800;
-    letter-spacing: -0.03em;
-}}
-.section-text {{
-    margin: 0.45rem 0 0 0;
-    color: #55575f;
-    font-size: 0.97rem;
-    line-height: 1.55;
 }}
 .summary-grid {{
     display: grid;
@@ -718,11 +634,6 @@ section[data-testid="stSidebar"] > div {{
     gap: 1rem;
     align-items: stretch;
 }}
-.info-panel-stack {{
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-}}
 .info-panel-card {{
     position: relative;
     display: flex;
@@ -805,14 +716,6 @@ section[data-testid="stSidebar"] > div {{
     stroke-width: 1.8;
     stroke-linecap: round;
     stroke-linejoin: round;
-}}
-.info-panel-kicker {{
-    margin: 0 0 0.1rem 0;
-    color: #7c8190;
-    font-size: 0.72rem;
-    font-weight: 700;
-    letter-spacing: 0.16em;
-    text-transform: uppercase;
 }}
 .info-panel-title {{
     margin: 0;
@@ -1023,188 +926,11 @@ section[data-testid="stSidebar"] > div {{
     font-weight: 800;
     line-height: 1.3;
 }}
-.info-panel-meta {{
-    color: #757985;
-    font-size: 0.87rem;
-    line-height: 1.55;
-}}
 .info-panel-footer-note {{
     margin-top: auto;
     color: #727783;
     font-size: 0.84rem;
     line-height: 1.5;
-}}
-.ventilation-layout {{
-    margin: 0.2rem 0 1.15rem 0;
-}}
-.ventilation-panel {{
-    position: relative;
-    overflow: hidden;
-    padding: 1.18rem 1.22rem 1.16rem 1.22rem;
-    border-radius: 28px;
-    border: 1px solid rgba(76, 70, 120, 0.08);
-    background: linear-gradient(180deg, rgba(255,255,255,0.95) 0%, rgba(247,244,238,0.98) 100%);
-    box-shadow:
-        0 20px 42px rgba(45, 48, 64, 0.08),
-        inset 0 1px 0 rgba(255,255,255,0.72);
-    backdrop-filter: blur(12px);
-}}
-.ventilation-panel::before {{
-    content: '';
-    position: absolute;
-    inset: 0 0 auto 0;
-    height: 4px;
-    background: linear-gradient(90deg, var(--elite-hero), var(--elite-sky));
-}}
-.ventilation-panel::after {{
-    content: '';
-    position: absolute;
-    right: -34px;
-    top: -34px;
-    width: 190px;
-    height: 190px;
-    background: radial-gradient(circle, rgba(214, 229, 236, 0.26) 0%, rgba(255,255,255,0) 72%);
-    pointer-events: none;
-}}
-.ventilation-panel * {{
-    position: relative;
-    z-index: 1;
-}}
-.ventilation-grid {{
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 0.9rem;
-}}
-.ventilation-item {{
-    display: flex;
-    flex-direction: column;
-    gap: 0.8rem;
-    min-height: 228px;
-    padding: 0.98rem 1rem;
-    border-radius: 22px;
-    border: 1px solid rgba(76, 70, 120, 0.07);
-    background: linear-gradient(180deg, rgba(255,255,255,0.92), rgba(246,242,235,0.88));
-    box-shadow: inset 0 1px 0 rgba(255,255,255,0.72), 0 12px 26px rgba(45, 48, 64, 0.05);
-}}
-.ventilation-item-top {{
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 0.8rem;
-}}
-.ventilation-item-heading {{
-    display: flex;
-    flex-direction: column;
-    gap: 0.1rem;
-    min-width: 0;
-}}
-.ventilation-item-kicker {{
-    margin: 0;
-    color: #7a7f8d;
-    font-size: 0.71rem;
-    font-weight: 700;
-    letter-spacing: 0.16em;
-    text-transform: uppercase;
-}}
-.ventilation-item-title {{
-    margin: 0;
-    color: var(--elite-graphite);
-    font-family: var(--font-display);
-    font-size: 1.02rem;
-    font-weight: 800;
-    line-height: 1.2;
-    letter-spacing: -0.03em;
-}}
-.ventilation-item-badge {{
-    display: inline-flex;
-    align-items: center;
-    padding: 0.32rem 0.78rem;
-    border-radius: 999px;
-    font-size: 0.82rem;
-    font-weight: 800;
-    white-space: nowrap;
-}}
-.ventilation-metrics {{
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 0.55rem;
-}}
-.ventilation-metric {{
-    padding: 0.66rem 0.7rem;
-    border-radius: 16px;
-    border: 1px solid rgba(76, 70, 120, 0.06);
-    background: rgba(255, 255, 255, 0.74);
-}}
-.ventilation-metric-label {{
-    display: block;
-    margin-bottom: 0.22rem;
-    color: #7b808d;
-    font-size: 0.7rem;
-    font-weight: 700;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-}}
-.ventilation-metric-value {{
-    color: var(--elite-graphite);
-    font-family: var(--font-display);
-    font-size: 1rem;
-    font-weight: 800;
-    line-height: 1.25;
-}}
-.ventilation-metric-value small {{
-    color: #666c79;
-    font-size: 0.74rem;
-    font-weight: 600;
-}}
-.ventilation-progress-track {{
-    height: 0.68rem;
-    border-radius: 999px;
-    background: rgba(76, 70, 120, 0.08);
-    overflow: hidden;
-}}
-.ventilation-progress-fill {{
-    display: block;
-    height: 100%;
-    border-radius: inherit;
-}}
-.ventilation-note {{
-    margin: 0;
-    color: #626776;
-    font-size: 0.84rem;
-    line-height: 1.5;
-}}
-.ventilation-panel .info-panel-footer-note {{
-    margin-top: 0.9rem;
-}}
-.block-note {{
-    margin: 0.5rem 0 1.1rem 0;
-    padding: 1rem 1.05rem;
-    border: 1px solid rgba(84, 83, 134, 0.16);
-    border-left: 5px solid var(--elite-hero);
-    border-radius: 18px;
-    background: linear-gradient(135deg, rgba(255,255,255,0.96) 0%, rgba(244,199,206,0.25) 100%);
-    box-shadow: 0 12px 30px rgba(84, 83, 134, 0.08);
-}}
-.block-note-title {{
-    margin: 0 0 0.25rem 0;
-    color: var(--elite-hero);
-    font-size: 0.92rem;
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    font-family: var(--font-display);
-}}
-.block-note-text {{
-    margin: 0;
-    color: #575962;
-    font-size: 0.96rem;
-    line-height: 1.45;
-}}
-.block-note-observation {{
-    margin: 0.55rem 0 0 0;
-    color: var(--elite-graphite);
-    font-size: 0.92rem;
-    font-weight: 700;
 }}
 div.stButton > button {{
     border-radius: 999px;
@@ -1222,31 +948,6 @@ div.stButton > button:hover {{
     color: var(--elite-white);
     background: linear-gradient(135deg, #6a639c 0%, #4c4678 100%);
     transform: translateY(-1px);
-}}
-div[data-testid="stPills"] {{
-    margin: 0.5rem 0 1rem 0;
-}}
-div[data-testid="stPills"] button {{
-    border-radius: 999px;
-    border: 1px solid rgba(76, 70, 120, 0.14);
-    background: rgba(255, 255, 255, 0.88);
-    color: var(--elite-graphite);
-    font-family: var(--font-body);
-    font-weight: 600;
-    padding: 0.38rem 0.9rem;
-    transition: all 0.2s ease;
-    box-shadow: 0 10px 22px rgba(45, 48, 64, 0.06);
-}}
-div[data-testid="stPills"] button:hover {{
-    border-color: rgba(76, 70, 120, 0.26);
-    background: rgba(214, 229, 236, 0.24);
-    color: var(--elite-hero);
-}}
-div[data-testid="stPills"] button[aria-pressed="true"] {{
-    border-color: rgba(76, 70, 120, 0.24);
-    background: linear-gradient(135deg, rgba(76, 70, 120, 0.12), rgba(231, 210, 218, 0.26));
-    color: var(--elite-hero);
-    font-weight: 800;
 }}
 button[data-baseweb="tab"] {{
     font-family: var(--font-display);
@@ -1280,8 +981,7 @@ div[data-testid="stDataFrame"] {{
 }}
 [data-testid="stRadio"] label,
 [data-testid="stSelectbox"] label,
-[data-testid="stDateInput"] label,
-[data-testid="stFileUploader"] label {{
+[data-testid="stDateInput"] label {{
     font-family: var(--font-body);
     font-weight: 500;
 }}
@@ -1326,26 +1026,16 @@ div[data-testid="stDataFrame"] {{
     .info-panels-grid {{
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }}
-    .ventilation-grid {{
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-    }}
     .info-panel-card--observaciones {{
         grid-column: 1 / -1;
     }}
     .info-panel-card,
-    .info-panel-card--compact,
-    .ventilation-item {{
+    .info-panel-card--compact {{
         min-height: auto;
     }}
 }}
 @media (max-width: 760px) {{
     .info-panels-grid {{
-        grid-template-columns: 1fr;
-    }}
-    .ventilation-grid {{
-        grid-template-columns: 1fr;
-    }}
-    .ventilation-metrics {{
         grid-template-columns: 1fr;
     }}
     .info-panel-card--observaciones {{
@@ -1577,16 +1267,6 @@ def _sidebar_icon_svg(icon_name):
             '<svg viewBox="0 0 24 24" aria-hidden="true">'
             '<path d="M12 21s6-5.2 6-11a6 6 0 1 0-12 0c0 5.8 6 11 6 11Z"></path>'
             '<circle cx="12" cy="10" r="2.4"></circle>'
-            '</svg>'
-        ),
-        'list': (
-            '<svg viewBox="0 0 24 24" aria-hidden="true">'
-            '<path d="M9 6h10"></path>'
-            '<path d="M9 12h10"></path>'
-            '<path d="M9 18h10"></path>'
-            '<circle cx="5" cy="6" r="1"></circle>'
-            '<circle cx="5" cy="12" r="1"></circle>'
-            '<circle cx="5" cy="18" r="1"></circle>'
             '</svg>'
         )
     }
@@ -1923,14 +1603,6 @@ def _info_panel_icon_svg(icon_name):
             '<path d="M12 3C9.2 7.1 6.5 9.8 6.5 13a5.5 5.5 0 0 0 11 0C17.5 9.8 14.8 7.1 12 3Z"></path>'
             '<path d="M12 9.2v5.2"></path>'
             '</svg>'
-        ),
-        'ventilacion': (
-            '<svg viewBox="0 0 24 24" aria-hidden="true">'
-            '<path d="M12 12m-1.8 0a1.8 1.8 0 1 0 3.6 0a1.8 1.8 0 1 0 -3.6 0"></path>'
-            '<path d="M12.4 4.2c2.8 0 4.4 2.1 3.2 4.5l-1.2 2.3"></path>'
-            '<path d="M18.8 11.7c1.4 2.4 0 4.9 -2.6 4.9h-2.6"></path>'
-            '<path d="M10 18.9c-1.5 2.4 -4.3 2.5 -5.8 0.3l-1.3 -2.2"></path>'
-            '</svg>'
         )
     }
     return icons.get(icon_name, '')
@@ -2160,12 +1832,8 @@ def _get_selected_correlacion_vars(options):
 
 
 def _get_block_modification(block_name):
-    if not block_name:
-        return None
-    match = re.search(r'(\d+)', str(block_name))
-    if not match:
-        return None
-    return BLOCK_MODIFICATIONS.get(match.group(1))
+    block_code = _extract_block_code(block_name)
+    return BLOCK_MODIFICATIONS.get(block_code) if block_code else None
 
 
 def _get_block_ventilation_rows(block_name):
@@ -2175,48 +1843,49 @@ def _get_block_ventilation_rows(block_name):
     return BLOCK_VENTILATION_DATA.get(block_code, [])
 
 
+def _get_block_ventilation_row(block_name, expected_row_key):
+    for row in _get_block_ventilation_rows(block_name):
+        row_key = _build_normalized_text_key(row.get('label', ''))
+        if row_key == expected_row_key:
+            return row
+    return None
+
+
 def _get_motor_area_reference(block_name, motor_name):
     motor_key = _normalize_cortina_name(motor_name)
     reference_config = MOTOR_AREA_REFERENCE.get(motor_key)
     if not reference_config:
         return None
 
-    for row in _get_block_ventilation_rows(block_name):
-        row_key = _build_normalized_text_key(row.get('label', ''))
-        if row_key != reference_config['row_key']:
-            continue
+    row = _get_block_ventilation_row(block_name, reference_config['row_key'])
+    if not row:
+        return None
 
-        real_value = row.get('real')
-        ideal_value = row.get('ideal')
-        if real_value is None or pd.isna(real_value):
-            return None
+    real_value = row.get('real')
+    ideal_value = row.get('ideal')
+    if real_value is None or pd.isna(real_value):
+        return None
 
-        return {
-            'real_max_area': float(real_value) / float(reference_config['divisor']),
-            'ideal_max_area': (
-                float(ideal_value) / float(reference_config['divisor'])
-                if ideal_value is not None and not pd.isna(ideal_value)
-                else None
-            ),
-            'source_label': row.get('label', '')
-        }
-
-    return None
+    return {
+        'real_max_area': float(real_value) / float(reference_config['divisor']),
+        'ideal_max_area': (
+            float(ideal_value) / float(reference_config['divisor'])
+            if ideal_value is not None and not pd.isna(ideal_value)
+            else None
+        )
+    }
 
 
 def _get_culatas_area_reference(block_name):
-    for row in _get_block_ventilation_rows(block_name):
-        row_key = _build_normalized_text_key(row.get('label', ''))
-        if row_key != 'ventilacion culatas':
-            continue
+    row = _get_block_ventilation_row(block_name, 'ventilacion culatas')
+    if not row:
+        return None
 
-        real_value = row.get('real')
-        if real_value is None or pd.isna(real_value):
-            return None
+    real_value = row.get('real')
+    if real_value is None or pd.isna(real_value):
+        return None
 
-        return float(real_value)
-
-    return None
+    return float(real_value)
 
 
 def _build_culatas_state_text(open_percent, block_name=None):
@@ -2253,7 +1922,7 @@ def _convert_cortina_profile_to_area(df_state, real_max_area, ideal_max_area=Non
     for detail in df_area['Detalle'].fillna(''):
         detail_text = str(detail).strip()
         if detail_text:
-            detail_values.append(detail_text.replace(' | ', ' • '))
+            detail_values.append(detail_text.replace(' | ', ' - '))
         else:
             detail_values.append('')
 
@@ -2262,7 +1931,7 @@ def _convert_cortina_profile_to_area(df_state, real_max_area, ideal_max_area=Non
     brecha_ideal_series = pd.to_numeric(df_area['Apertura_m2'], errors='coerce') - apertura_ideal_series
     df_area['ResumenIdealTexto'] = [
         (
-            f'Ideal: {_format_area_value(ideal_value)} m2 • Brecha: {_format_area_value(gap_value)} m2'
+            f'Ideal: {_format_area_value(ideal_value)} m2 | Brecha: {_format_area_value(gap_value)} m2'
             if not pd.isna(ideal_value) and not pd.isna(gap_value) else
             'Ideal: Sin dato'
         )
@@ -2284,165 +1953,6 @@ def _format_area_value(value):
         decimals = 2
 
     return _format_summary_number(numeric_value, decimals)
-
-
-def _get_ventilation_percentage(ideal_value, real_value):
-    if (
-        ideal_value is None or
-        real_value is None or
-        pd.isna(ideal_value) or
-        pd.isna(real_value) or
-        float(ideal_value) <= 0
-    ):
-        return None
-
-    return max(0.0, (float(real_value) / float(ideal_value)) * 100.0)
-
-
-def _get_ventilation_status_style(percent_value):
-    if percent_value is None:
-        return {
-            'badge_text': 'No aplica',
-            'badge_bg': 'rgba(124, 129, 138, 0.16)',
-            'badge_color': '#6D727D',
-            'fill_color': 'rgba(124, 129, 138, 0.30)',
-            'fill_width': 100
-        }
-
-    if percent_value >= 95:
-        return {
-            'badge_text': f'{round(percent_value):.0f}%',
-            'badge_bg': 'rgba(214, 229, 236, 0.42)',
-            'badge_color': '#4E7483',
-            'fill_color': '#98BECF',
-            'fill_width': min(percent_value, 100.0)
-        }
-
-    if percent_value >= 85:
-        return {
-            'badge_text': f'{round(percent_value):.0f}%',
-            'badge_bg': 'rgba(76, 70, 120, 0.14)',
-            'badge_color': BRAND_COLORS['hero'],
-            'fill_color': BRAND_COLORS['hero'],
-            'fill_width': min(percent_value, 100.0)
-        }
-
-    return {
-        'badge_text': f'{round(percent_value):.0f}%',
-        'badge_bg': 'rgba(231, 210, 218, 0.34)',
-        'badge_color': '#A45F70',
-        'fill_color': '#D39AA8',
-        'fill_width': min(percent_value, 100.0)
-    }
-
-
-def _build_ventilation_note(label, gap_value):
-    label_text = str(label).lower()
-
-    if gap_value is None:
-        if 'culatas' in label_text:
-            return 'Este bloque no contiene culatas para este frente de ventilacion.'
-        return 'No hay referencia tecnica disponible para este componente.'
-
-    absolute_gap = _format_area_value(abs(gap_value))
-    if gap_value > 0:
-        return f'Faltan {absolute_gap} m&sup2; para alcanzar la apertura ideal.'
-    if gap_value < 0:
-        return f'Supera la apertura ideal por {absolute_gap} m&sup2;.'
-    return 'La apertura real coincide con la apertura ideal del bloque.'
-
-
-def _render_block_ventilation_panel(block_label):
-    ventilation_rows = _get_block_ventilation_rows(block_label)
-    if not ventilation_rows:
-        return
-
-    block_code = _extract_block_code(block_label)
-    block_tag = f'Bloque {block_code}' if block_code else 'Bloque'
-    items_html = []
-
-    for row in ventilation_rows:
-        label = row.get('label', 'Ventilacion')
-        ideal_value = row.get('ideal')
-        real_value = row.get('real')
-        gap_value = (
-            float(ideal_value) - float(real_value)
-            if ideal_value is not None and real_value is not None
-            else None
-        )
-        percent_value = _get_ventilation_percentage(ideal_value, real_value)
-        status_style = _get_ventilation_status_style(percent_value)
-
-        ideal_html = (
-            f'{_format_area_value(ideal_value)} <small>m&sup2;</small>'
-            if ideal_value is not None and not pd.isna(ideal_value)
-            else 'No aplica'
-        )
-        real_html = (
-            f'{_format_area_value(real_value)} <small>m&sup2;</small>'
-            if real_value is not None and not pd.isna(real_value)
-            else 'No aplica'
-        )
-        difference_html = (
-            f'{_format_area_value(abs(gap_value))} <small>m&sup2;</small>'
-            if gap_value is not None
-            else 'No aplica'
-        )
-        note_html = _build_ventilation_note(label, gap_value)
-
-        items_html.append(
-            (
-                '<div class="ventilation-item">'
-                '<div class="ventilation-item-top">'
-                '<div class="ventilation-item-heading">'
-                '<p class="ventilation-item-kicker">Tipo de ventilacion</p>'
-                f'<h4 class="ventilation-item-title">{html.escape(label)}</h4>'
-                '</div>'
-                f'<span class="ventilation-item-badge" style="background:{status_style["badge_bg"]}; color:{status_style["badge_color"]};">{html.escape(status_style["badge_text"])}</span>'
-                '</div>'
-                '<div class="ventilation-metrics">'
-                '<div class="ventilation-metric">'
-                '<span class="ventilation-metric-label">Ideal</span>'
-                f'<span class="ventilation-metric-value">{ideal_html}</span>'
-                '</div>'
-                '<div class="ventilation-metric">'
-                '<span class="ventilation-metric-label">Real</span>'
-                f'<span class="ventilation-metric-value">{real_html}</span>'
-                '</div>'
-                '<div class="ventilation-metric">'
-                '<span class="ventilation-metric-label">Brecha</span>'
-                f'<span class="ventilation-metric-value">{difference_html}</span>'
-                '</div>'
-                '</div>'
-                '<div class="ventilation-progress-track">'
-                f'<span class="ventilation-progress-fill" style="width:{status_style["fill_width"]}%; background:{status_style["fill_color"]};"></span>'
-                '</div>'
-                f'<p class="ventilation-note">{note_html}</p>'
-                '</div>'
-            )
-        )
-
-    st.markdown(
-        (
-            '<div class="ventilation-layout">'
-            '<div class="ventilation-panel">'
-            '<div class="info-panel-header">'
-            '<div class="info-panel-header-main">'
-            f'<span class="info-panel-icon">{_info_panel_icon_svg("ventilacion")}</span>'
-            '<div class="info-panel-heading">'
-            '<p class="info-panel-kicker">Ficha tecnica</p>'
-            '<h3 class="info-panel-title">Capacidad de ventilacion del bloque</h3>'
-            '</div>'
-            '</div>'
-            f'<span class="info-panel-tag">{html.escape(block_tag)}</span>'
-            '</div>'
-            f'<div class="ventilation-grid">{"".join(items_html)}</div>'
-            '<p class="info-panel-footer-note">Comparativo estatico entre apertura ideal y apertura real para la infraestructura del bloque seleccionado.</p>'
-            '</div>'
-            '</div>'
-        ),
-        unsafe_allow_html=True
-    )
 
 
 def _extract_block_code(block_name):
@@ -3219,6 +2729,8 @@ def _render_correlacion(
         cortina_color = BRAND_COLORS['hero']
         if use_cortina_area:
             axis_range_max = max(10.0, cortina_axis_max * 1.08 if cortina_axis_max > 0 else 10.0)
+            axis_range_min = -max(10.0, axis_range_max * 0.05)
+            cortina_dtick = max(50.0, round((axis_range_max / 8) / 50.0) * 50.0)
             axis_configs['y2'] = dict(
                 title=dict(
                     text='Frentes / Puertas (m2)',
@@ -3226,7 +2738,7 @@ def _render_correlacion(
                 ),
                 tickfont=dict(color=cortina_color, size=10, family='Manrope, sans-serif'),
                 tickcolor=cortina_color,
-                range=[0, axis_range_max],
+                range=[axis_range_min, axis_range_max],
                 autorange=False,
                 side='right',
                 overlaying='y',
@@ -3237,7 +2749,9 @@ def _render_correlacion(
                 linewidth=1,
                 ticks='',
                 zeroline=False,
-                tickmode='auto',
+                tickmode='linear',
+                tick0=0,
+                dtick=cortina_dtick,
                 automargin=True,
                 title_standoff=18
             )
