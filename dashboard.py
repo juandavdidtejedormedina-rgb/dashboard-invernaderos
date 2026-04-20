@@ -504,6 +504,8 @@ section[data-testid="stSidebar"] > div {{
 }}
 .summary-card {{
     position: relative;
+    display: flex;
+    flex-direction: column;
     padding: 1.08rem 1.08rem 1rem 1.08rem;
     border-radius: 24px;
     border: 1px solid rgba(76, 70, 120, 0.10);
@@ -602,7 +604,8 @@ section[data-testid="stSidebar"] > div {{
     align-items: center;
     justify-content: space-between;
     gap: 0.75rem;
-    margin-top: 0.72rem;
+    margin-top: auto;
+    padding-top: 0.72rem;
 }}
 .summary-card-chip {{
     display: inline-flex;
@@ -620,6 +623,63 @@ section[data-testid="stSidebar"] > div {{
     font-size: 0.78rem;
     font-weight: 500;
     text-align: right;
+}}
+.summary-card-day-list-wrap {{
+    position: relative;
+    z-index: 1;
+    max-height: 198px;
+    overflow: auto;
+    padding-right: 0.15rem;
+}}
+.summary-card-day-list {{
+    display: flex;
+    flex-direction: column;
+    gap: 0.18rem;
+}}
+.summary-card-day-item {{
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.7rem;
+    padding: 0.52rem 0.04rem;
+    border-bottom: 1px solid rgba(76, 70, 120, 0.08);
+}}
+.summary-card-day-item:last-child {{
+    border-bottom: none;
+    padding-bottom: 0.08rem;
+}}
+.summary-card-day-date {{
+    color: #676c79;
+    font-size: 0.8rem;
+    font-weight: 700;
+    line-height: 1.35;
+}}
+.summary-card-day-reading {{
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.2rem;
+    justify-content: flex-end;
+    text-align: right;
+    flex: 0 0 auto;
+}}
+.summary-card-day-number {{
+    color: var(--elite-graphite);
+    font-family: var(--font-display);
+    font-size: 0.96rem;
+    font-weight: 800;
+    line-height: 1;
+    letter-spacing: -0.02em;
+}}
+.summary-card-day-unit {{
+    color: #6a6e78;
+    font-size: 0.76rem;
+    font-weight: 600;
+    line-height: 1.2;
+}}
+.summary-card-day-empty {{
+    color: #8a8d97;
+    font-size: 0.84rem;
+    font-weight: 600;
 }}
 .info-panels-layout {{
     margin: 0.4rem 0 1.15rem 0;
@@ -1487,13 +1547,94 @@ def _get_summary_mode_config(summary_mode, single_day):
     chip_text = (
         f"{selected_mode['label']} diario"
         if single_day else
-        f"{selected_mode['label']} del periodo"
+        f"{selected_mode['label']} por día"
     )
     return {
         'label': selected_mode['label'],
         'calculator': selected_mode['calculator'],
         'chip_text': chip_text
     }
+
+
+def _get_summary_selected_dates(fecha_variables):
+    if fecha_variables is None:
+        return []
+
+    fecha_inicio, fecha_fin = fecha_variables
+    return [item.date() for item in pd.date_range(start=fecha_inicio, end=fecha_fin, freq='D')]
+
+
+def _get_summary_daily_values(df_variables, var_name, fecha_variables, summary_mode_config):
+    if df_variables.empty or var_name not in df_variables.columns or fecha_variables is None:
+        return []
+
+    if 'Fecha_Filtro' in df_variables.columns:
+        fechas = pd.Series(df_variables['Fecha_Filtro'])
+    elif 'DateTime' in df_variables.columns:
+        fechas = pd.to_datetime(df_variables['DateTime'], errors='coerce').dt.date
+    else:
+        return []
+
+    working_df = pd.DataFrame({
+        'Fecha': fechas,
+        'Valor': pd.to_numeric(df_variables[var_name], errors='coerce')
+    }).dropna(subset=['Fecha'])
+
+    valores_por_dia = {}
+    for fecha, datos_dia in working_df.groupby('Fecha', sort=True):
+        serie = datos_dia['Valor'].dropna()
+        valores_por_dia[fecha] = (
+            summary_mode_config['calculator'](serie)
+            if not serie.empty else None
+        )
+
+    return [
+        {
+            'fecha': fecha,
+            'value': valores_por_dia.get(fecha)
+        }
+        for fecha in _get_summary_selected_dates(fecha_variables)
+    ]
+
+
+def _build_summary_daily_list_html(daily_values, config):
+    if not daily_values:
+        return (
+            '<div class="summary-card-value is-empty">'
+            '<span class="summary-card-empty">Sin datos</span>'
+            '</div>'
+        )
+
+    rows = []
+    for item in daily_values:
+        fecha_label = _format_info_day_label(item.get('fecha'))
+        value = item.get('value')
+
+        if value is None or pd.isna(value):
+            value_html = '<span class="summary-card-day-empty">Sin datos</span>'
+        else:
+            number_text = _format_summary_number(float(value), config['decimals'])
+            value_html = (
+                '<span class="summary-card-day-reading">'
+                f'<span class="summary-card-day-number">{number_text}</span>'
+                f'<span class="summary-card-day-unit">{config["unit_html"]}</span>'
+                '</span>'
+            )
+
+        rows.append(
+            (
+                '<div class="summary-card-day-item">'
+                f'<span class="summary-card-day-date">{html.escape(fecha_label)}</span>'
+                f'{value_html}'
+                '</div>'
+            )
+        )
+
+    return (
+        '<div class="summary-card-day-list-wrap">'
+        f'<div class="summary-card-day-list">{"".join(rows)}</div>'
+        '</div>'
+    )
 
 
 def _build_summary_cards_html(df_variables, fecha_variables, summary_mode='Promedio'):
@@ -1523,16 +1664,25 @@ def _build_summary_cards_html(df_variables, fecha_variables, summary_mode='Prome
         )
 
         if not df_variables.empty and var_name in df_variables.columns:
-            serie = pd.to_numeric(df_variables[var_name], errors='coerce').dropna()
-            if not serie.empty:
-                summary_value = summary_mode_config['calculator'](serie)
-                number_text = _format_summary_number(summary_value, config['decimals'])
-                value_markup = (
-                    '<div class="summary-card-value">'
-                    f'<span class="summary-card-number">{number_text}</span>'
-                    f'<span class="summary-card-unit">{config["unit_html"]}</span>'
-                    '</div>'
+            if single_day:
+                serie = pd.to_numeric(df_variables[var_name], errors='coerce').dropna()
+                if not serie.empty:
+                    summary_value = summary_mode_config['calculator'](serie)
+                    number_text = _format_summary_number(summary_value, config['decimals'])
+                    value_markup = (
+                        '<div class="summary-card-value">'
+                        f'<span class="summary-card-number">{number_text}</span>'
+                        f'<span class="summary-card-unit">{config["unit_html"]}</span>'
+                        '</div>'
+                    )
+            else:
+                daily_values = _get_summary_daily_values(
+                    df_variables,
+                    var_name,
+                    fecha_variables,
+                    summary_mode_config
                 )
+                value_markup = _build_summary_daily_list_html(daily_values, config)
 
         cards_html.append(
             (
