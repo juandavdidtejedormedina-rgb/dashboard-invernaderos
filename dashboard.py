@@ -95,6 +95,28 @@ BLOCK_MODIFICATIONS = {
     '27': 'Sin modificación alguna.',
     '38': 'Sistema de apertura y cierre de cortinas bidireccionales manuales, incluyendo cortinas móviles en culatas.'
 }
+BLOCK_VENTILATION_DATA = {
+    '34': [
+        {'label': 'Ventilacion lateral', 'ideal': 523.6, 'real': 482.8},
+        {'label': 'Ventilacion frontal', 'ideal': 938.0, 'real': 884.4},
+        {'label': 'Ventilacion culatas', 'ideal': 201.6, 'real': 196.0}
+    ],
+    '27': [
+        {'label': 'Ventilacion lateral', 'ideal': 503.2, 'real': 435.2},
+        {'label': 'Ventilacion frontal', 'ideal': 1072.0, 'real': 956.76},
+        {'label': 'Ventilacion culatas', 'ideal': None, 'real': None}
+    ],
+    '38': [
+        {'label': 'Ventilacion lateral', 'ideal': 489.6, 'real': 435.2},
+        {'label': 'Ventilacion frontal', 'ideal': 1018.4, 'real': 938.0},
+        {'label': 'Ventilacion culatas', 'ideal': 201.6, 'real': 196.0}
+    ],
+    '35': [
+        {'label': 'Ventilacion lateral', 'ideal': 530.4, 'real': 462.4},
+        {'label': 'Ventilacion frontal', 'ideal': 951.4, 'real': 737.0},
+        {'label': 'Ventilacion culatas', 'ideal': 201.6, 'real': 98.0}
+    ]
+}
 WEEKDAY_ES = {
     0: 'Lunes',
     1: 'Martes',
@@ -1006,6 +1028,148 @@ section[data-testid="stSidebar"] > div {{
     font-size: 0.84rem;
     line-height: 1.5;
 }}
+.ventilation-layout {{
+    margin: 0.2rem 0 1.15rem 0;
+}}
+.ventilation-panel {{
+    position: relative;
+    overflow: hidden;
+    padding: 1.18rem 1.22rem 1.16rem 1.22rem;
+    border-radius: 28px;
+    border: 1px solid rgba(76, 70, 120, 0.08);
+    background: linear-gradient(180deg, rgba(255,255,255,0.95) 0%, rgba(247,244,238,0.98) 100%);
+    box-shadow:
+        0 20px 42px rgba(45, 48, 64, 0.08),
+        inset 0 1px 0 rgba(255,255,255,0.72);
+    backdrop-filter: blur(12px);
+}}
+.ventilation-panel::before {{
+    content: '';
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: 4px;
+    background: linear-gradient(90deg, var(--elite-hero), var(--elite-sky));
+}}
+.ventilation-panel::after {{
+    content: '';
+    position: absolute;
+    right: -34px;
+    top: -34px;
+    width: 190px;
+    height: 190px;
+    background: radial-gradient(circle, rgba(214, 229, 236, 0.26) 0%, rgba(255,255,255,0) 72%);
+    pointer-events: none;
+}}
+.ventilation-panel * {{
+    position: relative;
+    z-index: 1;
+}}
+.ventilation-grid {{
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.9rem;
+}}
+.ventilation-item {{
+    display: flex;
+    flex-direction: column;
+    gap: 0.8rem;
+    min-height: 228px;
+    padding: 0.98rem 1rem;
+    border-radius: 22px;
+    border: 1px solid rgba(76, 70, 120, 0.07);
+    background: linear-gradient(180deg, rgba(255,255,255,0.92), rgba(246,242,235,0.88));
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.72), 0 12px 26px rgba(45, 48, 64, 0.05);
+}}
+.ventilation-item-top {{
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.8rem;
+}}
+.ventilation-item-heading {{
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+    min-width: 0;
+}}
+.ventilation-item-kicker {{
+    margin: 0;
+    color: #7a7f8d;
+    font-size: 0.71rem;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+}}
+.ventilation-item-title {{
+    margin: 0;
+    color: var(--elite-graphite);
+    font-family: var(--font-display);
+    font-size: 1.02rem;
+    font-weight: 800;
+    line-height: 1.2;
+    letter-spacing: -0.03em;
+}}
+.ventilation-item-badge {{
+    display: inline-flex;
+    align-items: center;
+    padding: 0.32rem 0.78rem;
+    border-radius: 999px;
+    font-size: 0.82rem;
+    font-weight: 800;
+    white-space: nowrap;
+}}
+.ventilation-metrics {{
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.55rem;
+}}
+.ventilation-metric {{
+    padding: 0.66rem 0.7rem;
+    border-radius: 16px;
+    border: 1px solid rgba(76, 70, 120, 0.06);
+    background: rgba(255, 255, 255, 0.74);
+}}
+.ventilation-metric-label {{
+    display: block;
+    margin-bottom: 0.22rem;
+    color: #7b808d;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+}}
+.ventilation-metric-value {{
+    color: var(--elite-graphite);
+    font-family: var(--font-display);
+    font-size: 1rem;
+    font-weight: 800;
+    line-height: 1.25;
+}}
+.ventilation-metric-value small {{
+    color: #666c79;
+    font-size: 0.74rem;
+    font-weight: 600;
+}}
+.ventilation-progress-track {{
+    height: 0.68rem;
+    border-radius: 999px;
+    background: rgba(76, 70, 120, 0.08);
+    overflow: hidden;
+}}
+.ventilation-progress-fill {{
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+}}
+.ventilation-note {{
+    margin: 0;
+    color: #626776;
+    font-size: 0.84rem;
+    line-height: 1.5;
+}}
+.ventilation-panel .info-panel-footer-note {{
+    margin-top: 0.9rem;
+}}
 .block-note {{
     margin: 0.5rem 0 1.1rem 0;
     padding: 1rem 1.05rem;
@@ -1156,16 +1320,26 @@ div[data-testid="stDataFrame"] {{
     .info-panels-grid {{
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }}
+    .ventilation-grid {{
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }}
     .info-panel-card--observaciones {{
         grid-column: 1 / -1;
     }}
     .info-panel-card,
-    .info-panel-card--compact {{
+    .info-panel-card--compact,
+    .ventilation-item {{
         min-height: auto;
     }}
 }}
 @media (max-width: 760px) {{
     .info-panels-grid {{
+        grid-template-columns: 1fr;
+    }}
+    .ventilation-grid {{
+        grid-template-columns: 1fr;
+    }}
+    .ventilation-metrics {{
         grid-template-columns: 1fr;
     }}
     .info-panel-card--observaciones {{
@@ -1743,6 +1917,14 @@ def _info_panel_icon_svg(icon_name):
             '<path d="M12 3C9.2 7.1 6.5 9.8 6.5 13a5.5 5.5 0 0 0 11 0C17.5 9.8 14.8 7.1 12 3Z"></path>'
             '<path d="M12 9.2v5.2"></path>'
             '</svg>'
+        ),
+        'ventilacion': (
+            '<svg viewBox="0 0 24 24" aria-hidden="true">'
+            '<path d="M12 12m-1.8 0a1.8 1.8 0 1 0 3.6 0a1.8 1.8 0 1 0 -3.6 0"></path>'
+            '<path d="M12.4 4.2c2.8 0 4.4 2.1 3.2 4.5l-1.2 2.3"></path>'
+            '<path d="M18.8 11.7c1.4 2.4 0 4.9 -2.6 4.9h-2.6"></path>'
+            '<path d="M10 18.9c-1.5 2.4 -4.3 2.5 -5.8 0.3l-1.3 -2.2"></path>'
+            '</svg>'
         )
     }
     return icons.get(icon_name, '')
@@ -1978,6 +2160,187 @@ def _get_block_modification(block_name):
     if not match:
         return None
     return BLOCK_MODIFICATIONS.get(match.group(1))
+
+
+def _get_block_ventilation_rows(block_name):
+    block_code = _extract_block_code(block_name)
+    if not block_code:
+        return []
+    return BLOCK_VENTILATION_DATA.get(block_code, [])
+
+
+def _format_area_value(value):
+    if value is None or pd.isna(value):
+        return 'No aplica'
+
+    numeric_value = round(float(value), 2)
+    if abs(numeric_value - round(numeric_value)) < 1e-6:
+        decimals = 0
+    elif abs(numeric_value - round(numeric_value, 1)) < 1e-6:
+        decimals = 1
+    else:
+        decimals = 2
+
+    return _format_summary_number(numeric_value, decimals)
+
+
+def _get_ventilation_percentage(ideal_value, real_value):
+    if (
+        ideal_value is None or
+        real_value is None or
+        pd.isna(ideal_value) or
+        pd.isna(real_value) or
+        float(ideal_value) <= 0
+    ):
+        return None
+
+    return max(0.0, (float(real_value) / float(ideal_value)) * 100.0)
+
+
+def _get_ventilation_status_style(percent_value):
+    if percent_value is None:
+        return {
+            'badge_text': 'No aplica',
+            'badge_bg': 'rgba(124, 129, 138, 0.16)',
+            'badge_color': '#6D727D',
+            'fill_color': 'rgba(124, 129, 138, 0.30)',
+            'fill_width': 100
+        }
+
+    if percent_value >= 95:
+        return {
+            'badge_text': f'{round(percent_value):.0f}%',
+            'badge_bg': 'rgba(214, 229, 236, 0.42)',
+            'badge_color': '#4E7483',
+            'fill_color': '#98BECF',
+            'fill_width': min(percent_value, 100.0)
+        }
+
+    if percent_value >= 85:
+        return {
+            'badge_text': f'{round(percent_value):.0f}%',
+            'badge_bg': 'rgba(76, 70, 120, 0.14)',
+            'badge_color': BRAND_COLORS['hero'],
+            'fill_color': BRAND_COLORS['hero'],
+            'fill_width': min(percent_value, 100.0)
+        }
+
+    return {
+        'badge_text': f'{round(percent_value):.0f}%',
+        'badge_bg': 'rgba(231, 210, 218, 0.34)',
+        'badge_color': '#A45F70',
+        'fill_color': '#D39AA8',
+        'fill_width': min(percent_value, 100.0)
+    }
+
+
+def _build_ventilation_note(label, gap_value):
+    label_text = str(label).lower()
+
+    if gap_value is None:
+        if 'culatas' in label_text:
+            return 'Este bloque no contiene culatas para este frente de ventilacion.'
+        return 'No hay referencia tecnica disponible para este componente.'
+
+    absolute_gap = _format_area_value(abs(gap_value))
+    if gap_value > 0:
+        return f'Faltan {absolute_gap} m&sup2; para alcanzar la apertura ideal.'
+    if gap_value < 0:
+        return f'Supera la apertura ideal por {absolute_gap} m&sup2;.'
+    return 'La apertura real coincide con la apertura ideal del bloque.'
+
+
+def _render_block_ventilation_panel(block_label):
+    ventilation_rows = _get_block_ventilation_rows(block_label)
+    if not ventilation_rows:
+        return
+
+    block_code = _extract_block_code(block_label)
+    block_tag = f'Bloque {block_code}' if block_code else 'Bloque'
+    items_html = []
+
+    for row in ventilation_rows:
+        label = row.get('label', 'Ventilacion')
+        ideal_value = row.get('ideal')
+        real_value = row.get('real')
+        gap_value = (
+            float(ideal_value) - float(real_value)
+            if ideal_value is not None and real_value is not None
+            else None
+        )
+        percent_value = _get_ventilation_percentage(ideal_value, real_value)
+        status_style = _get_ventilation_status_style(percent_value)
+
+        ideal_html = (
+            f'{_format_area_value(ideal_value)} <small>m&sup2;</small>'
+            if ideal_value is not None and not pd.isna(ideal_value)
+            else 'No aplica'
+        )
+        real_html = (
+            f'{_format_area_value(real_value)} <small>m&sup2;</small>'
+            if real_value is not None and not pd.isna(real_value)
+            else 'No aplica'
+        )
+        difference_html = (
+            f'{_format_area_value(abs(gap_value))} <small>m&sup2;</small>'
+            if gap_value is not None
+            else 'No aplica'
+        )
+        note_html = _build_ventilation_note(label, gap_value)
+
+        items_html.append(
+            (
+                '<div class="ventilation-item">'
+                '<div class="ventilation-item-top">'
+                '<div class="ventilation-item-heading">'
+                '<p class="ventilation-item-kicker">Tipo de ventilacion</p>'
+                f'<h4 class="ventilation-item-title">{html.escape(label)}</h4>'
+                '</div>'
+                f'<span class="ventilation-item-badge" style="background:{status_style["badge_bg"]}; color:{status_style["badge_color"]};">{html.escape(status_style["badge_text"])}</span>'
+                '</div>'
+                '<div class="ventilation-metrics">'
+                '<div class="ventilation-metric">'
+                '<span class="ventilation-metric-label">Ideal</span>'
+                f'<span class="ventilation-metric-value">{ideal_html}</span>'
+                '</div>'
+                '<div class="ventilation-metric">'
+                '<span class="ventilation-metric-label">Real</span>'
+                f'<span class="ventilation-metric-value">{real_html}</span>'
+                '</div>'
+                '<div class="ventilation-metric">'
+                '<span class="ventilation-metric-label">Brecha</span>'
+                f'<span class="ventilation-metric-value">{difference_html}</span>'
+                '</div>'
+                '</div>'
+                '<div class="ventilation-progress-track">'
+                f'<span class="ventilation-progress-fill" style="width:{status_style["fill_width"]}%; background:{status_style["fill_color"]};"></span>'
+                '</div>'
+                f'<p class="ventilation-note">{note_html}</p>'
+                '</div>'
+            )
+        )
+
+    st.markdown(
+        (
+            '<div class="ventilation-layout">'
+            '<div class="ventilation-panel">'
+            '<div class="info-panel-header">'
+            '<div class="info-panel-header-main">'
+            f'<span class="info-panel-icon">{_info_panel_icon_svg("ventilacion")}</span>'
+            '<div class="info-panel-heading">'
+            '<p class="info-panel-kicker">Ficha tecnica</p>'
+            '<h3 class="info-panel-title">Capacidad de ventilacion del bloque</h3>'
+            '</div>'
+            '</div>'
+            f'<span class="info-panel-tag">{html.escape(block_tag)}</span>'
+            '</div>'
+            f'<div class="ventilation-grid">{"".join(items_html)}</div>'
+            '<p class="info-panel-footer-note">Comparativo estatico entre apertura ideal y apertura real para la infraestructura del bloque seleccionado.</p>'
+            '</div>'
+            '</div>'
+        ),
+        unsafe_allow_html=True
+    )
 
 
 def _extract_block_code(block_name):
@@ -2968,6 +3331,7 @@ with tab_correlacion:
                 annotations_by_day=annotations_by_day,
                 culatas_by_day=culatas_by_day
             )
+        _render_block_ventilation_panel(block_label)
 
         tab_corr_graf, tab_corr_regs = st.tabs(["Correlación", "Registros"])
 
