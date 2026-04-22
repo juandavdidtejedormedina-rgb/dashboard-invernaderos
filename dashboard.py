@@ -3412,6 +3412,8 @@ def _render_hourly_analysis_view(df_variables, fecha_variables, selected_blocks)
     )
     block_labels = [_format_block_display_name(block) for block in blocks_in_data]
 
+    single_day_analysis = fecha_inicio == fecha_fin
+
     # Selector para Promedio y Varianza
     metric_tabs = st.tabs(["Promedio", "Varianza"])
     
@@ -3428,13 +3430,14 @@ def _render_hourly_analysis_view(df_variables, fecha_variables, selected_blocks)
                 data = df_variables[['DateTime', 'Bloque', variable_name]].dropna(subset=['DateTime', 'Bloque', variable_name]).copy()
                 if data.empty:
                     continue
-                
-                if tab_label == "Promedio":
-                    overall_value = data[variable_name].mean()
-                else:  # Varianza
-                    overall_value = data[variable_name].var(ddof=1) if len(data) > 1 else 0.0
-                
-                metrics_data[variable_name] = overall_value
+
+                series = data[variable_name]
+                stats_payload = {
+                    'principal': series.mean() if tab_label == "Promedio" else (series.var(ddof=1) if len(series) > 1 else 0.0),
+                    'minimo': series.min(),
+                    'maximo': series.max()
+                }
+                metrics_data[variable_name] = stats_payload
             
             # Mostrar tarjetas de métricas
             metric_cols = st.columns(4)
@@ -3442,15 +3445,26 @@ def _render_hourly_analysis_view(df_variables, fecha_variables, selected_blocks)
                 if idx < len(metric_cols):
                     with metric_cols[idx]:
                         if variable_name in metrics_data:
-                            value = metrics_data[variable_name]
+                            stats_payload = metrics_data[variable_name]
+                            value = stats_payload['principal']
                             color = VARIABLE_COLORS.get(variable_name, BRAND_COLORS['graphite'])
                             unit = VARIABLE_UNITS.get(variable_name, '')
+                            min_value = stats_payload['minimo']
+                            max_value = stats_payload['maximo']
                             
                             # Decidir formato según si es promedio o varianza
                             if tab_label == "Promedio":
                                 display_value = f"{value:.1f}"
+                                descriptor = "Promedio general del periodo filtrado."
+                                footer_label = "Promedio del periodo"
                             else:
                                 display_value = f"{value:.2f}"
+                                descriptor = "Varianza general del periodo filtrado."
+                                footer_label = "Varianza del periodo"
+                                if single_day_analysis:
+                                    display_value = "0.00"
+                                    descriptor = "En un solo día la varianza se reporta en 0 por consistencia analítica."
+                                    footer_label = "Varianza en un día"
                             
                             metric_card_html = f'''
                             <div style="
@@ -3492,18 +3506,71 @@ def _render_hourly_analysis_view(df_variables, fecha_variables, selected_blocks)
                                 <p style="
                                     font-family: 'Manrope', sans-serif;
                                     font-size: 11px;
+                                    color: {BRAND_COLORS['graphite']};
+                                    margin: 10px 0 0 0;
+                                    line-height: 1.45;
+                                ">{descriptor}</p>
+                                <div style="
+                                    display: flex;
+                                    justify-content: space-between;
+                                    gap: 8px;
+                                    margin-top: 12px;
+                                    padding-top: 10px;
+                                    border-top: 1px solid rgba(76, 70, 120, 0.10);
+                                ">
+                                    <div>
+                                        <p style="
+                                            font-family: 'Manrope', sans-serif;
+                                            font-size: 10px;
+                                            color: {BRAND_COLORS['graphite']};
+                                            margin: 0 0 4px 0;
+                                            text-transform: uppercase;
+                                        ">Mínimo</p>
+                                        <p style="
+                                            font-family: 'Manrope', sans-serif;
+                                            font-size: 14px;
+                                            font-weight: 700;
+                                            color: {BRAND_COLORS['ink']};
+                                            margin: 0;
+                                        ">{min_value:.2f}</p>
+                                    </div>
+                                    <div style="text-align: right;">
+                                        <p style="
+                                            font-family: 'Manrope', sans-serif;
+                                            font-size: 10px;
+                                            color: {BRAND_COLORS['graphite']};
+                                            margin: 0 0 4px 0;
+                                            text-transform: uppercase;
+                                        ">Máximo</p>
+                                        <p style="
+                                            font-family: 'Manrope', sans-serif;
+                                            font-size: 14px;
+                                            font-weight: 700;
+                                            color: {BRAND_COLORS['ink']};
+                                            margin: 0;
+                                        ">{max_value:.2f}</p>
+                                    </div>
+                                </div>
+                                <p style="
+                                    font-family: 'Manrope', sans-serif;
+                                    font-size: 11px;
                                     color: {color};
-                                    margin: 8px 0 0 0;
+                                    margin: 10px 0 0 0;
                                     font-weight: 500;
-                                ">{tab_label} diario</p>
+                                ">{footer_label}</p>
                             </div>
                             '''
                             st.markdown(metric_card_html, unsafe_allow_html=True)
 
-            if len(selected_blocks) == 1:
-                pass
+            if len(selected_blocks) == 1 and tab_label == "Promedio":
+                st.markdown('<p class="analysis-note">Este resumen muestra el promedio consolidado del bloque seleccionado dentro del periodo filtrado y los extremos observados para cada variable.</p>', unsafe_allow_html=True)
+            elif len(selected_blocks) == 1 and tab_label == "Varianza":
+                st.markdown('<p class="analysis-note">La varianza resume qué tanto cambian las mediciones dentro del periodo. Con un solo día no hay dispersión temporal suficiente para una varianza útil por franja.</p>', unsafe_allow_html=True)
             else:
-                st.markdown('<p class="analysis-note">Explora cada variable para ver su comportamiento promedio y qué tanto fluctúa cada bloque a lo largo del periodo.</p>', unsafe_allow_html=True)
+                if tab_label == "Promedio":
+                    st.markdown('<p class="analysis-note">Explora cada variable para ver el valor promedio por franja horaria y comparar el comportamiento típico de los bloques seleccionados.</p>', unsafe_allow_html=True)
+                else:
+                    st.markdown('<p class="analysis-note">Explora cada variable para ver qué tanto fluctúa cada bloque por franja horaria. Valores más altos indican mayor variabilidad dentro del periodo analizado.</p>', unsafe_allow_html=True)
 
             # Mostrar tabs de variables dentro del tab de métrica seleccionado
             variable_tabs = st.tabs([
@@ -3519,17 +3586,21 @@ def _render_hourly_analysis_view(df_variables, fecha_variables, selected_blocks)
                         continue
 
                     if tab_label == "Promedio":
-                        st.caption('Cada punto resume el promedio de todas las mediciones disponibles en la misma franja horaria para cada bloque.')
+                        st.caption('Cada punto resume el promedio de todas las mediciones disponibles en la misma franja horaria para cada bloque. Úsalo para comparar el comportamiento típico entre bloques.')
                         _render_hourly_metric_chart(grouped_df, variable_name, 'Promedio')
                         with st.expander('Ver tabla dinámica de promedio', expanded=False):
                             st.dataframe(_prepare_hourly_pivot_display(pivot_promedio), width='stretch')
                     else:  # Varianza
-                        st.caption('La varianza muestra qué tanto fluctúa cada bloque dentro de la misma franja horaria a lo largo del periodo filtrado.')
-                        if fecha_inicio == fecha_fin:
-                            st.caption('Cuando solo hay una observación en una franja, la varianza se muestra en 0 para mantener una lectura estable del dashboard.')
-                        _render_hourly_metric_chart(grouped_df, variable_name, 'Varianza')
-                        with st.expander('Ver tabla dinámica de varianza', expanded=False):
-                            st.dataframe(_prepare_hourly_pivot_display(pivot_varianza), width='stretch')
+                        st.caption('La varianza muestra qué tanto fluctúa cada bloque dentro de la misma franja horaria a lo largo del periodo filtrado. Valores cercanos a 0 indican un comportamiento más estable.')
+                        if single_day_analysis:
+                            st.info(
+                                f'Varianza de un solo día para {VARIABLE_SELECTOR_LABELS.get(variable_name, variable_name)}: '
+                                'se muestra en 0 porque con un único día no hay suficiente repetición por franja horaria para calcular una dispersión representativa.'
+                            )
+                        else:
+                            _render_hourly_metric_chart(grouped_df, variable_name, 'Varianza')
+                            with st.expander('Ver tabla dinámica de varianza', expanded=False):
+                                st.dataframe(_prepare_hourly_pivot_display(pivot_varianza), width='stretch')
 
 
 _df_variables_all = cargar_datos(archivo_variables_bytes) if archivo_variables_bytes else pd.DataFrame()
