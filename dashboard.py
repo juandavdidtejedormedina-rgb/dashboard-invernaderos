@@ -337,6 +337,11 @@ section[data-testid="stSidebar"] > div {{
     box-shadow: 0 14px 28px rgba(0, 0, 0, 0.16);
     transform: translateX(2px);
 }}
+[data-testid="stSidebar"] [data-testid="stCheckbox"] label:has([aria-checked="true"]) {{
+    border-color: rgba(255, 255, 255, 0.24);
+    background: linear-gradient(135deg, rgba(116, 108, 170, 0.84), rgba(82, 75, 130, 0.96));
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.16), 0 16px 30px rgba(27, 23, 53, 0.30);
+}}
 [data-testid="stSidebar"] [data-testid="stCheckbox"] p {{
     font-size: 0.9rem;
     font-weight: 600;
@@ -955,12 +960,27 @@ div.stButton > button:hover {{
     background: linear-gradient(135deg, #6a639c 0%, #4c4678 100%);
     transform: translateY(-1px);
 }}
+div[data-testid="stTabs"] [data-baseweb="tab-list"] {{
+    gap: 0.55rem;
+}}
 button[data-baseweb="tab"] {{
+    border-radius: 999px;
+    padding: 0.58rem 0.96rem;
+    border: 1px solid rgba(76, 70, 120, 0.12) !important;
+    background: linear-gradient(180deg, rgba(255,255,255,0.74), rgba(247,244,238,0.94));
+    box-shadow: 0 12px 26px rgba(45, 48, 64, 0.05);
     font-family: var(--font-display);
     font-weight: 800;
 }}
+button[data-baseweb="tab"]:hover {{
+    border-color: rgba(76, 70, 120, 0.24) !important;
+    background: linear-gradient(180deg, rgba(255,255,255,0.92), rgba(247,244,238,1));
+}}
 button[data-baseweb="tab"][aria-selected="true"] {{
-    color: var(--elite-hero) !important;
+    color: var(--elite-white) !important;
+    background: linear-gradient(135deg, #655e98 0%, #4c4678 100%);
+    border-color: rgba(76, 70, 120, 0.18) !important;
+    box-shadow: 0 16px 30px rgba(46, 39, 79, 0.18);
 }}
 div[data-testid="stPlotlyChart"],
 div[data-testid="stDataFrame"] {{
@@ -985,6 +1005,135 @@ div[data-testid="stDataFrame"] {{
     border-radius: 18px;
     border-width: 1px;
 }}
+.analysis-hero {{
+    position: relative;
+    overflow: hidden;
+    margin: 0.2rem 0 1rem 0;
+    padding: 1.2rem 1.22rem 1.08rem 1.22rem;
+    border-radius: 28px;
+    border: 1px solid rgba(76, 70, 120, 0.10);
+    background:
+        radial-gradient(circle at top right, rgba(214, 229, 236, 0.45), rgba(255,255,255,0) 34%),
+        linear-gradient(180deg, rgba(255,255,255,0.94), rgba(247,244,238,0.96));
+    box-shadow: 0 24px 48px rgba(45, 48, 64, 0.08);
+}}
+.analysis-hero::before {{
+    content: '';
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: 5px;
+    background: linear-gradient(90deg, var(--elite-hero), rgba(214, 229, 236, 0.82));
+}}
+.analysis-hero-header {{
+    position: relative;
+    z-index: 1;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.9rem;
+    margin-bottom: 0.8rem;
+}}
+.analysis-kicker {{
+    margin: 0 0 0.18rem 0;
+    color: var(--elite-hero);
+    font-size: 0.76rem;
+    font-weight: 800;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+}}
+.analysis-title {{
+    margin: 0;
+    color: var(--elite-graphite);
+    font-family: var(--font-display);
+    font-size: 2rem;
+    font-weight: 800;
+    line-height: 1.05;
+}}
+.analysis-pill {{
+    display: inline-flex;
+    align-items: center;
+    padding: 0.48rem 0.88rem;
+    border-radius: 999px;
+    background: rgba(76, 70, 120, 0.10);
+    color: var(--elite-hero);
+    font-size: 0.77rem;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    white-space: nowrap;
+}}
+.analysis-copy {{
+    position: relative;
+    z-index: 1;
+    margin: 0;
+    max-width: 58rem;
+    color: #5e6471;
+    font-size: 1rem;
+    line-height: 1.72;
+}}
+.analysis-meta {{
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+    margin-top: 0.95rem;
+}}
+.analysis-meta-chip {{
+    display: inline-flex;
+    align-items: center;
+    padding: 0.34rem 0.72rem;
+    border-radius: 999px;
+    background: rgba(255,255,255,0.76);
+    border: 1px solid rgba(76, 70, 120, 0.10);
+    color: #626777;
+    font-size: 0.82rem;
+    font-weight: 600;
+}}
+.analysis-metrics-grid {{
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.85rem;
+    margin: 0 0 1rem 0;
+}}
+.analysis-metric-card {{
+    position: relative;
+    overflow: hidden;
+    padding: 0.95rem 1rem 1rem 1rem;
+    border-radius: 22px;
+    border: 1px solid rgba(76, 70, 120, 0.08);
+    background: linear-gradient(180deg, rgba(255,255,255,0.90), rgba(247,244,238,0.94));
+    box-shadow: 0 18px 36px rgba(45, 48, 64, 0.06);
+}}
+.analysis-metric-card::before {{
+    content: '';
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: 4px;
+    background: linear-gradient(90deg, var(--analysis-accent), rgba(255,255,255,0.20));
+}}
+.analysis-metric-label {{
+    margin: 0;
+    color: #676c79;
+    font-size: 0.84rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+}}
+.analysis-metric-value {{
+    margin: 0.45rem 0 0 0;
+    color: var(--elite-graphite);
+    font-family: var(--font-display);
+    font-size: 2.42rem;
+    font-weight: 800;
+    line-height: 1;
+    letter-spacing: -0.04em;
+}}
+.analysis-note {{
+    margin: 0.1rem 0 0.95rem 0;
+    color: #6d727f;
+    font-size: 0.9rem;
+}}
 [data-testid="stRadio"] label,
 [data-testid="stSelectbox"] label,
 [data-testid="stDateInput"] label {{
@@ -997,12 +1146,43 @@ div[data-testid="stDataFrame"] {{
     background: rgba(255, 255, 255, 0.08);
     border-radius: 13px;
 }}
+[data-testid="stSidebar"] [data-testid="stRadio"] div[role="radiogroup"] {{
+    display: grid;
+    gap: 0.24rem;
+}}
+[data-testid="stSidebar"] [data-testid="stRadio"] div[role="radiogroup"] > label {{
+    width: 100%;
+    margin: 0;
+    padding: 0.42rem 0.56rem;
+    border-radius: 18px;
+    border: 1px solid rgba(255, 255, 255, 0.10);
+    background: linear-gradient(180deg, rgba(255,255,255,0.12), rgba(255,255,255,0.06));
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.12);
+    transition: background 0.2s ease, transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}}
+[data-testid="stSidebar"] [data-testid="stRadio"] div[role="radiogroup"] > label:hover {{
+    background: linear-gradient(180deg, rgba(255,255,255,0.18), rgba(255,255,255,0.10));
+    border-color: rgba(214, 229, 236, 0.42);
+    box-shadow: 0 14px 28px rgba(0, 0, 0, 0.16);
+    transform: translateX(2px);
+}}
+[data-testid="stSidebar"] [data-testid="stRadio"] div[role="radiogroup"] > label:has(input:checked) {{
+    border-color: rgba(255, 255, 255, 0.26);
+    background: linear-gradient(135deg, rgba(124, 115, 177, 0.92), rgba(82, 75, 130, 0.96));
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.20), 0 16px 30px rgba(27, 23, 53, 0.30);
+}}
+[data-testid="stSidebar"] [data-testid="stRadio"] div[role="radiogroup"] > label p {{
+    font-size: 0.92rem;
+    font-weight: 700;
+}}
 [data-testid="stSidebar"] .stDateInput > label,
 [data-testid="stSidebar"] .stSelectbox > label {{
     display: none;
 }}
 [data-testid="stSidebar"] .stSelectbox > div[data-baseweb="select"] span,
 [data-testid="stSidebar"] .stSelectbox > div[data-baseweb="select"] div,
+[data-testid="stSidebar"] .stMultiSelect > div[data-baseweb="select"] span,
+[data-testid="stSidebar"] .stMultiSelect > div[data-baseweb="select"] div,
 [data-testid="stSidebar"] .stDateInput input {{
     color: var(--elite-ink) !important;
     -webkit-text-fill-color: var(--elite-ink) !important;
@@ -1014,6 +1194,7 @@ div[data-testid="stDataFrame"] {{
     -webkit-text-fill-color: rgba(56, 58, 53, 0.70) !important;
 }}
 [data-testid="stSidebar"] .stSelectbox svg,
+[data-testid="stSidebar"] .stMultiSelect svg,
 [data-testid="stSidebar"] .stDateInput svg {{
     fill: var(--elite-hero) !important;
 }}
@@ -1023,6 +1204,15 @@ div[data-testid="stDataFrame"] {{
     }}
     .hero-copy h1 {{
         font-size: 1.7rem;
+    }}
+    .analysis-metrics-grid {{
+        grid-template-columns: 1fr;
+    }}
+    .analysis-hero-header {{
+        flex-direction: column;
+    }}
+    .analysis-pill {{
+        align-self: flex-start;
     }}
 }}
 @media (max-width: 1180px) {{
@@ -1086,45 +1276,6 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
-
-# --- CONFIGURACIÓN DE URLS (Mover aquí para evitar NameError) ---
-# Selector de finca
-st.markdown("### Finca")
-selected_farm = st.radio(
-    "Selecciona la finca",
-    options=["PONDEROSA", "SEVILLA"],
-    horizontal=True,
-    key="finca_activa",
-    label_visibility="collapsed"
-)
-
-if selected_farm == "SEVILLA":
-    st.sidebar.markdown("### Sevilla")
-    st.sidebar.info("Esta sección quedó reservada para la nueva finca.")
-    st.markdown(
-        """
-        <div class="info-panel-card" style="--info-accent: #4C4678; --info-accent-soft: rgba(76, 70, 120, 0.14);">
-            <div class="info-panel-header">
-                <div class="info-panel-header-main">
-                    <div class="info-panel-heading">
-                        <h3 class="info-panel-title">Tablero base para Sevilla</h3>
-                    </div>
-                </div>
-                <span class="info-panel-tag">En preparación</span>
-            </div>
-            <div class="info-panel-body">
-                <p class="info-panel-copy">
-                    Esta vista ya quedó separada de PONDEROSA para empezar a construir la finca Sevilla dentro del mismo código.
-                </p>
-                <p class="info-panel-copy">
-                    Cuando me digas qué quieres mostrar aquí, agregamos sus filtros, métricas, tablas y gráficas sin afectar el tablero actual.
-                </p>
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
-    st.stop()
 
 # --- Configuracion de URLs (Mover aqui para evitar NameError) ---
 URL_VARIABLES = "https://raw.githubusercontent.com/juandavdidtejedormedina-rgb/dashboard-invernaderos/main/Datos_variables.xlsx"
@@ -1874,6 +2025,23 @@ def _get_selected_correlacion_vars(options):
     selected_vars = [option for option in options if st.session_state.get(_selector_state_key(option), True)]
     st.session_state['variables_correlacion'] = selected_vars
     return selected_vars
+
+
+def _analysis_block_state_key(block_code):
+    safe_code = re.sub(r'[^a-z0-9]+', '_', str(block_code).lower()).strip('_')
+    return f'bloques_analisis_{safe_code}'
+
+
+def _reset_analysis_block_selector(block_codes):
+    st.session_state['bloques_analisis'] = block_codes.copy()
+    for block_code in block_codes:
+        st.session_state[_analysis_block_state_key(block_code)] = True
+
+
+def _get_selected_analysis_blocks(block_codes):
+    selected_blocks = [block_code for block_code in block_codes if st.session_state.get(_analysis_block_state_key(block_code), True)]
+    st.session_state['bloques_analisis'] = selected_blocks
+    return selected_blocks
 
 
 def _get_block_modification(block_name):
@@ -3016,6 +3184,7 @@ def _render_hourly_metric_chart(grouped_df, variable_name, metric_column):
     ticktext = ordered_slots['Franja'].iloc[::tick_step].tolist()
     metric_title = 'Promedio por franja horaria' if metric_column == 'Promedio' else 'Varianza por franja horaria'
 
+    metric_label = VARIABLE_LABELS.get(variable_name, variable_name)
     fig = go.Figure()
     for block_name in ordered_blocks:
         serie = grouped_df[grouped_df['Bloque'] == block_name].sort_values('FranjaMinutos')
@@ -3029,52 +3198,77 @@ def _render_hourly_metric_chart(grouped_df, variable_name, metric_column):
             y=serie[metric_column],
             mode='lines+markers',
             name=block_label,
-            line=dict(color=color, width=3),
-            marker=dict(size=6, color=color),
+            line=dict(color=color, width=3.2, shape='spline', smoothing=0.38),
+            marker=dict(size=6, color=color, line=dict(color='rgba(255,255,255,0.82)', width=1)),
             customdata=serie[['Franja']],
             hovertemplate=(
                 '<b>%{customdata[0]}</b><br>' +
                 f'{block_label}<br>{metric_column}: ' +
                 '%{y:.2f}<extra></extra>'
-            )
+            ),
+            hoverlabel=dict(namelength=-1)
         ))
 
     fig.update_layout(
-        height=390,
+        height=500,
         paper_bgcolor='rgba(0,0,0,0)',
-        plot_bgcolor='rgba(255, 255, 255, 0.94)',
-        margin=dict(l=28, r=20, t=72, b=44),
+        plot_bgcolor='rgba(250,248,243,0.68)',
+        margin=dict(l=34, r=22, t=108, b=52),
         title=dict(
-            text=f'{metric_title} - {VARIABLE_LABELS.get(variable_name, variable_name)}',
+            text=f'{metric_title} - {metric_label}',
             x=0.01,
             xanchor='left',
-            font=dict(family='Manrope', size=19, color=BRAND_COLORS['ink'])
+            y=0.97,
+            font=dict(family='Manrope', size=20, color=BRAND_COLORS['ink'])
+        ),
+        hovermode='x unified',
+        template='plotly_white',
+        font=dict(family='Manrope, sans-serif', color=BRAND_COLORS['graphite']),
+        hoverlabel=dict(
+            bgcolor='rgba(249, 246, 240, 0.98)',
+            bordercolor='rgba(76, 70, 120, 0.16)',
+            font=dict(family='Manrope, sans-serif', color=BRAND_COLORS['graphite'], size=12)
         ),
         legend=dict(
             orientation='h',
             yanchor='bottom',
-            y=1.02,
+            y=1.06,
             xanchor='left',
-            x=0
+            x=0,
+            traceorder='normal',
+            font=dict(size=11, family='Manrope, sans-serif', color=BRAND_COLORS['graphite']),
+            bgcolor='rgba(255,255,255,0.74)',
+            bordercolor='rgba(76, 70, 120, 0.08)',
+            borderwidth=1
         ),
         xaxis=dict(
             title='<b>Franja horaria</b>',
             tickmode='array',
             tickvals=tickvals,
             ticktext=ticktext,
-            gridcolor='rgba(45, 48, 64, 0.10)',
+            tickfont=dict(size=11, family='Manrope, sans-serif', color=BRAND_COLORS['graphite']),
+            gridcolor='rgba(76, 70, 120, 0.07)',
             linecolor='rgba(45, 48, 64, 0.18)',
             zeroline=False
         ),
         yaxis=dict(
             title=f'<b>{metric_column}</b>',
-            gridcolor='rgba(45, 48, 64, 0.10)',
+            tickfont=dict(size=11, family='Manrope, sans-serif', color=BRAND_COLORS['graphite']),
+            gridcolor='rgba(76, 70, 120, 0.07)',
             linecolor='rgba(45, 48, 64, 0.18)',
             zerolinecolor='rgba(45, 48, 64, 0.10)'
         )
     )
 
-    st.plotly_chart(fig, width='stretch')
+    st.plotly_chart(
+        fig,
+        width='stretch',
+        config={
+            'displaylogo': False,
+            'responsive': True,
+            'modeBarButtonsToRemove': ['lasso2d', 'select2d']
+        }
+    )
 
 
 def _render_hourly_analysis_view(df_variables, fecha_variables, selected_blocks):
@@ -3093,44 +3287,48 @@ def _render_hourly_analysis_view(df_variables, fecha_variables, selected_blocks)
     total_days = int(df_variables['Fecha_Filtro'].nunique()) if 'Fecha_Filtro' in df_variables.columns else 0
     total_slots = int(df_variables['DateTime'].dt.strftime('%H:%M').nunique()) if 'DateTime' in df_variables.columns else 0
 
+    period_text = (
+        fecha_inicio.strftime("%Y-%m-%d")
+        if fecha_inicio == fecha_fin else
+        f'{fecha_inicio.strftime("%Y-%m-%d")} a {fecha_fin.strftime("%Y-%m-%d")}'
+    )
+    block_labels = [_format_block_display_name(block) for block in blocks_in_data]
+    metrics_html = (
+        '<div class="analysis-metrics-grid">'
+        f'<div class="analysis-metric-card" style="--analysis-accent: {BRAND_COLORS["hero"]};"><p class="analysis-metric-label">Bloques comparados</p><p class="analysis-metric-value">{len(blocks_in_data)}</p></div>'
+        f'<div class="analysis-metric-card" style="--analysis-accent: {BRAND_COLORS["sky"]};"><p class="analysis-metric-label">Días analizados</p><p class="analysis-metric-value">{total_days}</p></div>'
+        f'<div class="analysis-metric-card" style="--analysis-accent: {BRAND_COLORS["beige"]};"><p class="analysis-metric-label">Franjas detectadas</p><p class="analysis-metric-value">{total_slots}</p></div>'
+        '</div>'
+    )
+
     st.markdown(
         f"""
-        <div class="info-panel-card" style="--info-accent: {BRAND_COLORS['hero']}; --info-accent-soft: rgba(76, 70, 120, 0.14);">
-            <div class="info-panel-header">
-                <div class="info-panel-header-main">
-                    <div class="info-panel-heading">
-                        <h3 class="info-panel-title">Analisis horario tipo Excel</h3>
-                    </div>
+        <div class="analysis-hero">
+            <div class="analysis-hero-header">
+                <div>
+                    <p class="analysis-kicker">Replicado desde Excel</p>
+                    <h2 class="analysis-title">Análisis horario por bloque</h2>
                 </div>
-                <span class="info-panel-tag">Promedio y varianza</span>
+                <span class="analysis-pill">Promedio y varianza</span>
             </div>
-            <div class="info-panel-body">
-                <p class="info-panel-copy">
-                    Esta vista replica la logica del archivo guia: consolida las mediciones por franja horaria
-                    y compara los bloques seleccionados en las cuatro variables del tablero.
-                </p>
+            <p class="analysis-copy">
+                Replica la lógica del archivo guía y organiza las lecturas por franja horaria para comparar
+                los bloques seleccionados en temperatura, humedad relativa, radiación PAR y gramos de agua.
+            </p>
+            <div class="analysis-meta">
+                <span class="analysis-meta-chip">Periodo: {period_text}</span>
+                <span class="analysis-meta-chip">Bloques: {", ".join(block_labels)}</span>
             </div>
         </div>
+        {metrics_html}
         """,
         unsafe_allow_html=True
     )
 
-    metric_col_1, metric_col_2, metric_col_3 = st.columns(3)
-    metric_col_1.metric('Bloques comparados', len(blocks_in_data))
-    metric_col_2.metric('Dias analizados', total_days)
-    metric_col_3.metric('Franjas detectadas', total_slots)
-
-    if fecha_inicio == fecha_fin:
-        st.caption(f'Periodo analizado: {fecha_inicio.strftime("%Y-%m-%d")} | Bloques: {", ".join(_format_block_display_name(block) for block in blocks_in_data)}')
-    else:
-        st.caption(
-            'Periodo analizado: '
-            f'{fecha_inicio.strftime("%Y-%m-%d")} a {fecha_fin.strftime("%Y-%m-%d")} | '
-            f'Bloques: {", ".join(_format_block_display_name(block) for block in blocks_in_data)}'
-        )
-
     if len(selected_blocks) == 1:
-        st.info('Esta vista gana mas valor comparando varios bloques. Si quieres, puedes volver a incluir los demas desde la barra lateral.')
+        st.info('Esta vista gana más valor comparando varios bloques. Si quieres, puedes volver a incluir los demás desde la barra lateral.')
+    else:
+        st.markdown('<p class="analysis-note">Explora cada variable para ver su comportamiento promedio y qué tanto fluctúa cada bloque a lo largo del periodo.</p>', unsafe_allow_html=True)
 
     variable_tabs = st.tabs([
         VARIABLE_SELECTOR_LABELS.get(variable_name, VARIABLE_LABELS.get(variable_name, variable_name))
@@ -3149,15 +3347,15 @@ def _render_hourly_analysis_view(df_variables, fecha_variables, selected_blocks)
             with promedio_tab:
                 st.caption('Cada punto resume el promedio de todas las mediciones disponibles en la misma franja horaria para cada bloque.')
                 _render_hourly_metric_chart(grouped_df, variable_name, 'Promedio')
-                with st.expander('Ver tabla dinamica de promedio', expanded=False):
+                with st.expander('Ver tabla dinámica de promedio', expanded=False):
                     st.dataframe(_prepare_hourly_pivot_display(pivot_promedio), width='stretch')
 
             with varianza_tab:
-                st.caption('La varianza muestra que tanto fluctua cada bloque dentro de la misma franja horaria a lo largo del periodo filtrado.')
+                st.caption('La varianza muestra qué tanto fluctúa cada bloque dentro de la misma franja horaria a lo largo del periodo filtrado.')
                 if fecha_inicio == fecha_fin:
-                    st.caption('Cuando solo hay una observacion en una franja, la varianza se muestra en 0 para mantener la lectura del dashboard.')
+                    st.caption('Cuando solo hay una observación en una franja, la varianza se muestra en 0 para mantener una lectura estable del dashboard.')
                 _render_hourly_metric_chart(grouped_df, variable_name, 'Varianza')
-                with st.expander('Ver tabla dinamica de varianza', expanded=False):
+                with st.expander('Ver tabla dinámica de varianza', expanded=False):
                     st.dataframe(_prepare_hourly_pivot_display(pivot_varianza), width='stretch')
 
 
@@ -3183,11 +3381,11 @@ with st.sidebar.expander("Vista", expanded=True):
     _sidebar_field_label("filter", "Seleccionar vista")
     dashboard_mode = st.radio(
         "Seleccionar vista:",
-        options=["Correlacion", "Analisis horario"],
+        options=["Correlación", "Análisis horario"],
         key="modo_dashboard"
     )
 
-if dashboard_mode == "Analisis horario":
+if dashboard_mode == "Análisis horario":
     analysis_block_codes, analysis_variable_map, _ = _get_block_options(_df_variables_all, _df_cortinas_all)
     fecha_analisis = None
     analysis_block_names = []
@@ -3198,7 +3396,7 @@ if dashboard_mode == "Analisis horario":
         else:
             fechas_disponibles = _get_all_variable_dates(_df_variables_all)
             if not fechas_disponibles:
-                st.warning("No hay fechas disponibles en variables para construir el analisis horario.")
+                st.warning("No hay fechas disponibles en variables para construir el análisis horario.")
             else:
                 min_fecha = min(fechas_disponibles)
                 max_fecha = max(fechas_disponibles)
@@ -3210,27 +3408,27 @@ if dashboard_mode == "Analisis horario":
                     )
                     _sidebar_field_label("calendar", "Seleccionar fecha")
                     fecha_unica = st.date_input(
-                        "Seleccionar fecha para el analisis:",
+                        "Seleccionar fecha para el análisis:",
                         value=fecha_unica_default,
                         key="fecha_analisis_unica"
                     )
                     fecha_analisis = (fecha_unica, fecha_unica)
                 else:
                     modo_fechas_analisis = st.radio(
-                        "Modo de fechas del analisis:",
-                        options=["Un dÃ­a", "Varios dÃ­as"],
+                        "Modo de fechas del análisis:",
+                        options=["Un día", "Varios días"],
                         horizontal=True,
                         key="modo_fechas_analisis"
                     )
 
-                    if modo_fechas_analisis == "Un dÃ­a":
+                    if modo_fechas_analisis == "Un día":
                         fecha_unica_default = _coerce_sidebar_date(
                             st.session_state.get("fecha_analisis_un_dia", max_fecha),
                             max_fecha
                         )
                         _sidebar_field_label("calendar", "Seleccionar fecha")
                         fecha_unica = st.date_input(
-                            "Seleccionar fecha para el analisis:",
+                            "Seleccionar fecha para el análisis:",
                             value=fecha_unica_default,
                             key="fecha_analisis_un_dia"
                         )
@@ -3238,13 +3436,13 @@ if dashboard_mode == "Analisis horario":
                     else:
                         _sidebar_field_label("calendar", "Fecha inicio")
                         fecha_inicio_analisis = st.date_input(
-                            "Fecha inicio del analisis:",
+                            "Fecha inicio del análisis:",
                             value=min_fecha,
                             key="fecha_inicio_analisis"
                         )
                         _sidebar_field_label("calendar", "Fecha fin")
                         fecha_fin_analisis = st.date_input(
-                            "Fecha fin del analisis:",
+                            "Fecha fin del análisis:",
                             value=max_fecha,
                             key="fecha_fin_analisis"
                         )
@@ -3254,18 +3452,27 @@ if dashboard_mode == "Analisis horario":
 
     with st.sidebar.expander("Bloques comparados", expanded=True):
         if _df_variables_all.empty:
-            st.write("No se encontraron datos para habilitar la comparaciÃ³n de bloques.")
+            st.write("No se encontraron datos para habilitar la comparación de bloques.")
         elif not analysis_block_codes:
-            st.warning("No se detectaron bloques vÃ¡lidos dentro del archivo de variables.")
+            st.warning("No se detectaron bloques válidos dentro del archivo de variables.")
         else:
             _sidebar_field_label("location", "Bloques incluidos")
-            selected_analysis_codes = st.multiselect(
-                "Bloques incluidos:",
-                options=analysis_block_codes,
-                default=analysis_block_codes,
-                format_func=lambda code: f"Bloque {code}",
-                key="bloques_analisis"
-            )
+            current_analysis_context = tuple(analysis_block_codes)
+            previous_analysis_context = st.session_state.get('bloques_analisis_context')
+            if previous_analysis_context != current_analysis_context:
+                _reset_analysis_block_selector(analysis_block_codes)
+                st.session_state['bloques_analisis_context'] = current_analysis_context
+
+            for block_code in analysis_block_codes:
+                block_state_key = _analysis_block_state_key(block_code)
+                if block_state_key not in st.session_state:
+                    st.session_state[block_state_key] = True
+                st.checkbox(
+                    f"Bloque {block_code}",
+                    key=block_state_key
+                )
+
+            selected_analysis_codes = _get_selected_analysis_blocks(analysis_block_codes)
             analysis_block_names = [
                 analysis_variable_map[block_code]
                 for block_code in selected_analysis_codes
@@ -3273,9 +3480,9 @@ if dashboard_mode == "Analisis horario":
             ]
 
     if _df_variables_all.empty:
-        st.warning("No se encontraron datos de variables para construir el analisis horario.")
+        st.warning("No se encontraron datos de variables para construir el análisis horario.")
     elif fecha_analisis is None:
-        st.warning("Selecciona el periodo del analisis en la barra lateral.")
+        st.warning("Selecciona el periodo del análisis en la barra lateral.")
     elif not analysis_block_names:
         st.warning("Selecciona al menos un bloque para comparar en la nueva vista.")
     else:
