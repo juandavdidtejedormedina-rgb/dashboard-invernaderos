@@ -3446,7 +3446,7 @@ with st.sidebar.expander("Vista", expanded=True):
         key="modo_dashboard"
     )
 
-if dashboard_mode == "Análisis horario":
+if dashboard_mode == "Varianza Y Promedio":
     analysis_block_codes, analysis_variable_map, _ = _get_block_options(_df_variables_all, _df_cortinas_all)
     fecha_analisis = None
     analysis_block_names = []
