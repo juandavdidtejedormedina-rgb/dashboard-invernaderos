@@ -3290,8 +3290,6 @@ def _render_hourly_analysis_view(df_variables, fecha_variables, selected_blocks)
 
     fecha_inicio, fecha_fin = fecha_variables
     blocks_in_data = _sort_block_names(df_variables['Bloque'].dropna().unique().tolist())
-    total_days = int(df_variables['Fecha_Filtro'].nunique()) if 'Fecha_Filtro' in df_variables.columns else 0
-    total_slots = int(df_variables['DateTime'].dt.strftime('%H:%M').nunique()) if 'DateTime' in df_variables.columns else 0
 
     period_text = (
         fecha_inicio.strftime("%Y-%m-%d")
@@ -3299,13 +3297,6 @@ def _render_hourly_analysis_view(df_variables, fecha_variables, selected_blocks)
         f'{fecha_inicio.strftime("%Y-%m-%d")} a {fecha_fin.strftime("%Y-%m-%d")}'
     )
     block_labels = [_format_block_display_name(block) for block in blocks_in_data]
-    metrics_html = (
-        '<div class="analysis-metrics-grid">'
-        f'<div class="analysis-metric-card" style="--analysis-accent: {BRAND_COLORS["hero"]};"><p class="analysis-metric-label">Bloques comparados</p><p class="analysis-metric-value">{len(blocks_in_data)}</p></div>'
-        f'<div class="analysis-metric-card" style="--analysis-accent: {BRAND_COLORS["sky"]};"><p class="analysis-metric-label">Días analizados</p><p class="analysis-metric-value">{total_days}</p></div>'
-        f'<div class="analysis-metric-card" style="--analysis-accent: {BRAND_COLORS["beige"]};"><p class="analysis-metric-label">Franjas detectadas</p><p class="analysis-metric-value">{total_slots}</p></div>'
-        '</div>'
-    )
 
     st.markdown(
         f"""
@@ -3326,10 +3317,94 @@ def _render_hourly_analysis_view(df_variables, fecha_variables, selected_blocks)
                 <span class="analysis-meta-chip">Bloques: {", ".join(block_labels)}</span>
             </div>
         </div>
-        {metrics_html}
         """,
         unsafe_allow_html=True
     )
+
+    # Selector para Promedio y Varianza
+    metric_tabs = st.tabs(["Promedio", "Varianza"])
+    
+    for tab_idx, tab in enumerate(metric_tabs):
+        tab_label = "Promedio" if tab_idx == 0 else "Varianza"
+        with tab:
+            # Calcular métricas generales para todas las variables
+            metrics_data = {}
+            for variable_name in SENSOR_VARIABLES:
+                required_cols = {'DateTime', 'Bloque', variable_name}
+                if not required_cols.issubset(df_variables.columns):
+                    continue
+                
+                data = df_variables[['DateTime', 'Bloque', variable_name]].dropna(subset=['DateTime', 'Bloque', variable_name]).copy()
+                if data.empty:
+                    continue
+                
+                if tab_label == "Promedio":
+                    overall_value = data[variable_name].mean()
+                else:  # Varianza
+                    overall_value = data[variable_name].var(ddof=1) if len(data) > 1 else 0.0
+                
+                metrics_data[variable_name] = overall_value
+            
+            # Mostrar tarjetas de métricas
+            metric_cols = st.columns(4)
+            for idx, variable_name in enumerate(SENSOR_VARIABLES):
+                if idx < len(metric_cols):
+                    with metric_cols[idx]:
+                        if variable_name in metrics_data:
+                            value = metrics_data[variable_name]
+                            color = VARIABLE_COLORS.get(variable_name, BRAND_COLORS['graphite'])
+                            unit = VARIABLE_UNITS.get(variable_name, '')
+                            
+                            # Decidir formato según si es promedio o varianza
+                            if tab_label == "Promedio":
+                                display_value = f"{value:.1f}"
+                            else:
+                                display_value = f"{value:.2f}"
+                            
+                            metric_card_html = f'''
+                            <div style="
+                                background: linear-gradient(135deg, rgba(255,255,255,0.95) 0%, rgba(255,255,255,0.85) 100%);
+                                border-left: 4px solid {color};
+                                padding: 20px;
+                                border-radius: 8px;
+                                box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+                            ">
+                                <p style="
+                                    font-family: 'Manrope', sans-serif;
+                                    font-size: 13px;
+                                    color: {color};
+                                    font-weight: 500;
+                                    margin: 0 0 12px 0;
+                                    text-transform: uppercase;
+                                    letter-spacing: 0.5px;
+                                ">{variable_name}</p>
+                                <div style="display: flex; align-items: baseline; gap: 6px;">
+                                    <p style="
+                                        font-family: 'Manrope', sans-serif;
+                                        font-size: 32px;
+                                        font-weight: 700;
+                                        color: {BRAND_COLORS['ink']};
+                                        margin: 0;
+                                        line-height: 1;
+                                    ">{display_value}</p>
+                                    <p style="
+                                        font-family: 'Manrope', sans-serif;
+                                        font-size: 14px;
+                                        color: {BRAND_COLORS['graphite']};
+                                        margin: 0;
+                                        font-weight: 500;
+                                    ">{unit}</p>
+                                </div>
+                                <p style="
+                                    font-family: 'Manrope', sans-serif;
+                                    font-size: 11px;
+                                    color: {color};
+                                    margin: 8px 0 0 0;
+                                    font-weight: 500;
+                                ">{tab_label} diario</p>
+                            </div>
+                            '''
+                            st.markdown(metric_card_html, unsafe_allow_html=True)
 
     if len(selected_blocks) == 1:
         st.info('Esta vista gana más valor comparando varios bloques. Si quieres, puedes volver a incluir los demás desde la barra lateral.')
