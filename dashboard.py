@@ -58,6 +58,26 @@ VARIABLE_SELECTOR_LABELS = {
     'PUERTA 1': 'Puerta 1',
     'PUERTA 2': 'Puerta 2'
 }
+FILTER_HELP_TEXTS = {
+    'modo_dashboard': 'Elige entre la vista de correlación por bloque y la vista comparativa de varianza y promedio por franja horaria.',
+    'modo_fechas': 'Define si quieres analizar un solo día o un rango de varios días.',
+    'fecha': 'Selecciona la fecha o el rango que se usará para filtrar los registros visibles en la vista actual.',
+    'bloque': 'Selecciona el bloque principal que quieres analizar en la correlación.',
+    'bloques_comparados': 'Activa o desactiva los bloques que quieres incluir en la comparación de varianza y promedio.',
+    'series_visibles': 'Activa las variables ambientales y operativas que deseas mostrar en la gráfica.',
+    'comparar_almacen': 'Muestra la serie equivalente del Almacén para cada variable ambiental seleccionada.',
+    'aperturas_ideales': 'Superpone la apertura ideal calculada sobre las series de frentes y puertas cuando exista la referencia del bloque.'
+}
+VARIABLE_FILTER_HELP = {
+    'Temperatura': 'Muestra la temperatura del bloque seleccionado.',
+    'Humedad Relativa': 'Muestra la humedad relativa del bloque seleccionado.',
+    'Radiación PAR': 'Muestra la radiación PAR del bloque seleccionado.',
+    'Gramos de agua': 'Muestra los gramos de agua del bloque seleccionado.',
+    'FRENTE 1': 'Muestra la apertura del Frente 1.',
+    'FRENTE 2': 'Muestra la apertura del Frente 2.',
+    'PUERTA 1': 'Muestra la apertura de la Puerta 1.',
+    'PUERTA 2': 'Muestra la apertura de la Puerta 2.'
+}
 BRAND_COLORS = {
     'hero': '#4C4678',
     'sky': '#D6E5EC',
@@ -2984,14 +3004,25 @@ def _render_correlacion(
         trace['yaxis'] = None if axis_name == 'y' else axis_name
         fig_corr.add_trace(go.Scatter(**trace))
 
-        serie = df_plot[['DateTime', var_name]].dropna(subset=[var_name]).copy()
-        min_val = float(serie[var_name].min())
-        max_val = float(serie[var_name].max())
-        padding = 2 if var_name == 'Temperatura' else 5 if var_name == 'Humedad Relativa' else max(100, (max_val - min_val) * 0.08) if var_name == 'Radiación PAR' else 2
+        axis_var_name = var_name.replace('_almacen', '')
+        series_for_axis = []
+        serie = df_plot[[axis_var_name]].dropna(subset=[axis_var_name]).copy()
+        if not serie.empty:
+            series_for_axis.append(serie[axis_var_name])
+        if axis_var_name in compare_sensor_vars and not df_plot_almacen.empty and axis_var_name in df_plot_almacen.columns:
+            serie_almacen_axis = df_plot_almacen[[axis_var_name]].dropna(subset=[axis_var_name]).copy()
+            if not serie_almacen_axis.empty:
+                series_for_axis.append(serie_almacen_axis[axis_var_name])
+        serie_combinada = pd.concat(series_for_axis, ignore_index=True) if series_for_axis else pd.Series(dtype=float)
+        if serie_combinada.empty:
+            continue
+        min_val = float(serie_combinada.min())
+        max_val = float(serie_combinada.max())
+        padding = 2 if axis_var_name == 'Temperatura' else 5 if axis_var_name == 'Humedad Relativa' else max(100, (max_val - min_val) * 0.08) if axis_var_name == 'Radiación PAR' else 2
         range_min = min_val - padding
         if min_val >= 0:
             range_min = max(0, range_min)
-        if 'PAR' in var_name and min_val >= 0:
+        if 'PAR' in axis_var_name and min_val >= 0:
             range_min = -max(35, padding * 0.35)
         range_max = max_val + padding
         axis_range = [range_min, range_max]
@@ -3001,7 +3032,7 @@ def _render_correlacion(
 
         axis_kwargs = dict(
             title=dict(
-                text=CORR_AXIS_TITLES.get(var_name, var_name),
+                text=CORR_AXIS_TITLES.get(axis_var_name, axis_var_name),
                 font=dict(color=color, size=11, family='Manrope, sans-serif')
             ),
             tickfont=dict(color=color, size=10, family='Manrope, sans-serif'),
@@ -3526,7 +3557,8 @@ with st.sidebar.expander("Vista", expanded=True):
     dashboard_mode = st.radio(
         "Seleccionar vista:",
         options=["Correlación", "Varianza Y Promedio"],
-        key="modo_dashboard"
+        key="modo_dashboard",
+        help=FILTER_HELP_TEXTS['modo_dashboard']
     )
 
 if dashboard_mode == "Varianza Y Promedio":
@@ -3554,7 +3586,8 @@ if dashboard_mode == "Varianza Y Promedio":
                     fecha_unica = st.date_input(
                         "Seleccionar fecha para el análisis:",
                         value=fecha_unica_default,
-                        key="fecha_analisis_unica"
+                        key="fecha_analisis_unica",
+                        help=FILTER_HELP_TEXTS['fecha']
                     )
                     fecha_analisis = (fecha_unica, fecha_unica)
                 else:
@@ -3562,7 +3595,8 @@ if dashboard_mode == "Varianza Y Promedio":
                         "Modo de fechas del análisis:",
                         options=["Un día", "Varios días"],
                         horizontal=True,
-                        key="modo_fechas_analisis"
+                        key="modo_fechas_analisis",
+                        help=FILTER_HELP_TEXTS['modo_fechas']
                     )
 
                     if modo_fechas_analisis == "Un día":
@@ -3574,7 +3608,8 @@ if dashboard_mode == "Varianza Y Promedio":
                         fecha_unica = st.date_input(
                             "Seleccionar fecha para el análisis:",
                             value=fecha_unica_default,
-                            key="fecha_analisis_un_dia"
+                            key="fecha_analisis_un_dia",
+                            help=FILTER_HELP_TEXTS['fecha']
                         )
                         fecha_analisis = (fecha_unica, fecha_unica)
                     else:
@@ -3582,13 +3617,15 @@ if dashboard_mode == "Varianza Y Promedio":
                         fecha_inicio_analisis = st.date_input(
                             "Fecha inicio del análisis:",
                             value=min_fecha,
-                            key="fecha_inicio_analisis"
+                            key="fecha_inicio_analisis",
+                            help=FILTER_HELP_TEXTS['fecha']
                         )
                         _sidebar_field_label("calendar", "Fecha fin")
                         fecha_fin_analisis = st.date_input(
                             "Fecha fin del análisis:",
                             value=max_fecha,
-                            key="fecha_fin_analisis"
+                            key="fecha_fin_analisis",
+                            help=FILTER_HELP_TEXTS['fecha']
                         )
                         if fecha_fin_analisis < fecha_inicio_analisis:
                             fecha_inicio_analisis, fecha_fin_analisis = fecha_fin_analisis, fecha_inicio_analisis
@@ -3613,7 +3650,8 @@ if dashboard_mode == "Varianza Y Promedio":
                     st.session_state[block_state_key] = True
                 st.checkbox(
                     _format_block_display_name(block_code),
-                    key=block_state_key
+                    key=block_state_key,
+                    help=FILTER_HELP_TEXTS['bloques_comparados']
                 )
 
             selected_analysis_codes = _get_selected_analysis_blocks(analysis_block_codes)
@@ -3682,7 +3720,7 @@ with st.sidebar.expander("Periodo", expanded=True):
                     "Seleccionar fecha:",
                     value=fecha_unica_default,
                     key="fecha_calendario_unica",
-                    help="Puedes elegir cualquier día. Si no existen datos para esa fecha, el tablero mostrará el aviso correspondiente."
+                    help=FILTER_HELP_TEXTS['fecha']
                 )
                 fecha_variables = (fecha_unica, fecha_unica)
                 fecha_cortinas = (fecha_unica, fecha_unica)
@@ -3691,7 +3729,8 @@ with st.sidebar.expander("Periodo", expanded=True):
                     "Modo de fechas:",
                     options=["Un día", "Varios días"],
                     horizontal=True,
-                    key="modo_fechas_compartidas"
+                    key="modo_fechas_compartidas",
+                    help=FILTER_HELP_TEXTS['modo_fechas']
                 )
 
                 if modo_fechas == "Un día":
@@ -3704,7 +3743,7 @@ with st.sidebar.expander("Periodo", expanded=True):
                         "Seleccionar fecha:",
                         value=fecha_unica_default,
                         key="fecha_calendario_un_dia",
-                        help="Puedes elegir cualquier día. Si no existen datos para esa fecha, el tablero mostrará el aviso correspondiente."
+                        help=FILTER_HELP_TEXTS['fecha']
                     )
                     fecha_variables = (fecha_unica, fecha_unica)
                     fecha_cortinas = (fecha_unica, fecha_unica)
@@ -3713,13 +3752,15 @@ with st.sidebar.expander("Periodo", expanded=True):
                     fecha_inicio = st.date_input(
                         "Fecha inicio:",
                         value=min_fecha,
-                        key="fecha_inicio_compartida"
+                        key="fecha_inicio_compartida",
+                        help=FILTER_HELP_TEXTS['fecha']
                     )
                     _sidebar_field_label("calendar", "Fecha fin")
                     fecha_fin = st.date_input(
                         "Fecha fin:",
                         value=max_fecha,
-                        key="fecha_fin_compartida"
+                        key="fecha_fin_compartida",
+                        help=FILTER_HELP_TEXTS['fecha']
                     )
                     if fecha_fin < fecha_inicio:
                         fecha_inicio, fecha_fin = fecha_fin, fecha_inicio
@@ -3737,7 +3778,8 @@ with st.sidebar.expander("Bloque", expanded=True):
             "Seleccionar bloque:",
             options=block_codes,
             format_func=_format_block_display_name,
-            key="bloque_compartido"
+            key="bloque_compartido",
+            help=FILTER_HELP_TEXTS['bloque']
         )
         bloque_variables = variable_block_map.get(selected_block_code)
         bloque_seleccionado = cortina_block_map.get(selected_block_code)
@@ -3799,7 +3841,8 @@ with st.sidebar.expander("Series visibles", expanded=True):
                 st.session_state[state_key] = option in available_correlacion_vars
             st.checkbox(
                 VARIABLE_SELECTOR_LABELS.get(option, VARIABLE_LABELS.get(option, option)),
-                key=state_key
+                key=state_key,
+                help=VARIABLE_FILTER_HELP.get(option, FILTER_HELP_TEXTS['series_visibles'])
             )
 
         selected_vars_sidebar = _get_selected_correlacion_vars(available_correlacion_vars)
@@ -3807,11 +3850,12 @@ with st.sidebar.expander("Series visibles", expanded=True):
             "Comparar con Almacén",
             key="comparar_con_almacen",
             disabled=selected_block_code == 'ALMACEN' or df_variables_almacen_corr.empty,
-            help="Muestra la serie equivalente del Almacén para cada variable ambiental seleccionada."
+            help=FILTER_HELP_TEXTS['comparar_almacen']
         )
         st.checkbox(
             "Aperturas ideales",
-            key="mostrar_aperturas_ideales"
+            key="mostrar_aperturas_ideales",
+            help=FILTER_HELP_TEXTS['aperturas_ideales']
         )
 
 toggle_chart_label = "Mostrar correlación" if not st.session_state.graficar_correlacion else "Ocultar correlación"
