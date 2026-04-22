@@ -1082,45 +1082,6 @@ st.markdown(
 )
 
 # --- CONFIGURACIÓN DE URLS (Mover aquí para evitar NameError) ---
-# Selector de finca
-st.markdown("### Finca")
-selected_farm = st.radio(
-    "Selecciona la finca",
-    options=["PONDEROSA", "SEVILLA"],
-    horizontal=True,
-    key="finca_activa",
-    label_visibility="collapsed"
-)
-
-if selected_farm == "SEVILLA":
-    st.sidebar.markdown("### Sevilla")
-    st.sidebar.info("Esta sección quedó reservada para la nueva finca.")
-    st.markdown(
-        """
-        <div class="info-panel-card" style="--info-accent: #4C4678; --info-accent-soft: rgba(76, 70, 120, 0.14);">
-            <div class="info-panel-header">
-                <div class="info-panel-header-main">
-                    <div class="info-panel-heading">
-                        <h3 class="info-panel-title">Tablero base para Sevilla</h3>
-                    </div>
-                </div>
-                <span class="info-panel-tag">En preparación</span>
-            </div>
-            <div class="info-panel-body">
-                <p class="info-panel-copy">
-                    Esta vista ya quedó separada de PONDEROSA para empezar a construir la finca Sevilla dentro del mismo código.
-                </p>
-                <p class="info-panel-copy">
-                    Cuando me digas qué quieres mostrar aquí, agregamos sus filtros, métricas, tablas y gráficas sin afectar el tablero actual.
-                </p>
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
-    st.stop()
-
-# --- Configuracion de URLs (Mover aqui para evitar NameError) ---
 URL_VARIABLES = "https://raw.githubusercontent.com/juandavdidtejedormedina-rgb/dashboard-invernaderos/main/Datos_variables.xlsx"
 URL_CORTINAS = "https://raw.githubusercontent.com/juandavdidtejedormedina-rgb/dashboard-invernaderos/main/Registro_Cortinas_Final.xlsx"
 
