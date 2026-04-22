@@ -3442,7 +3442,7 @@ with st.sidebar.expander("Vista", expanded=True):
     _sidebar_field_label("filter", "Seleccionar vista")
     dashboard_mode = st.radio(
         "Seleccionar vista:",
-        options=["Correlación", "Análisis horario"],
+        options=["Correlación", "Varianza Y Promedio"],
         key="modo_dashboard"
     )
 
@@ -3457,7 +3457,7 @@ if dashboard_mode == "Varianza Y Promedio":
         else:
             fechas_disponibles = _get_all_variable_dates(_df_variables_all)
             if not fechas_disponibles:
-                st.warning("No hay fechas disponibles en variables para construir el análisis horario.")
+                st.warning("No hay fechas disponibles en variables para construir el análisis de varianza y promedio.")
             else:
                 min_fecha = min(fechas_disponibles)
                 max_fecha = max(fechas_disponibles)
@@ -3541,7 +3541,7 @@ if dashboard_mode == "Varianza Y Promedio":
             ]
 
     if _df_variables_all.empty:
-        st.warning("No se encontraron datos de variables para construir el análisis horario.")
+        st.warning("No se encontraron datos de variables para construir el análisis de varianza y promedio.")
     elif fecha_analisis is None:
         st.warning("Selecciona el periodo del análisis en la barra lateral.")
     elif not analysis_block_names:
