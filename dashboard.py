@@ -3298,29 +3298,6 @@ def _render_hourly_analysis_view(df_variables, fecha_variables, selected_blocks)
     )
     block_labels = [_format_block_display_name(block) for block in blocks_in_data]
 
-    st.markdown(
-        f"""
-        <div class="analysis-hero">
-            <div class="analysis-hero-header">
-                <div>
-                    <p class="analysis-kicker">Replicado desde Excel</p>
-                    <h2 class="analysis-title">Análisis horario por bloque</h2>
-                </div>
-                <span class="analysis-pill">Promedio y varianza</span>
-            </div>
-            <p class="analysis-copy">
-                Replica la lógica del archivo guía y organiza las lecturas por franja horaria para comparar
-                los bloques seleccionados en temperatura, humedad relativa, radiación PAR y gramos de agua.
-            </p>
-            <div class="analysis-meta">
-                <span class="analysis-meta-chip">Periodo: {period_text}</span>
-                <span class="analysis-meta-chip">Bloques: {", ".join(block_labels)}</span>
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
-
     # Selector para Promedio y Varianza
     metric_tabs = st.tabs(["Promedio", "Varianza"])
     
@@ -3407,7 +3384,7 @@ def _render_hourly_analysis_view(df_variables, fecha_variables, selected_blocks)
                             st.markdown(metric_card_html, unsafe_allow_html=True)
 
     if len(selected_blocks) == 1:
-        st.info('Esta vista gana más valor comparando varios bloques. Si quieres, puedes volver a incluir los demás desde la barra lateral.')
+        pass
     else:
         st.markdown('<p class="analysis-note">Explora cada variable para ver su comportamiento promedio y qué tanto fluctúa cada bloque a lo largo del periodo.</p>', unsafe_allow_html=True)
 
