@@ -2691,7 +2691,9 @@ def _render_correlacion(
     fecha_variables,
     variables_seleccionadas=None,
     block_label=None,
-    show_ideal_aperturas=False
+    show_ideal_aperturas=False,
+    df_variables_almacen=None,
+    compare_with_almacen=False
 ):
     fecha_inicio, fecha_fin = fecha_variables
     multi_day_view = fecha_inicio != fecha_fin
@@ -2700,6 +2702,7 @@ def _render_correlacion(
     xaxis_title_text = '<b>Fecha y hora</b>' if multi_day_view else '<b>Hora del Día</b>'
 
     sensor_vars = _get_available_sensor_vars(df_variables)
+    almacen_sensor_vars = _get_available_sensor_vars(df_variables_almacen) if isinstance(df_variables_almacen, pd.DataFrame) else []
     available_cortinas = _get_available_cortina_vars(datos_cortinas_sel)
     available_vars = list(dict.fromkeys(sensor_vars + available_cortinas))
     selected_vars = variables_seleccionadas or []
@@ -2738,6 +2741,14 @@ def _render_correlacion(
             st.warning("No hay registros de sensores para las variables seleccionadas.")
             return
 
+    compare_sensor_vars = []
+    df_plot_almacen = pd.DataFrame()
+    if compare_with_almacen and not str(block_label).strip().lower() == 'almacén':
+        compare_sensor_vars = [var_name for var_name in selected_sensors if var_name in almacen_sensor_vars]
+        if compare_sensor_vars:
+            df_plot_almacen = df_variables_almacen[['DateTime'] + compare_sensor_vars].copy()
+            df_plot_almacen = df_plot_almacen.dropna(how='all', subset=compare_sensor_vars)
+
     fig_corr = go.Figure()
     palette = ['#d62728', '#9467bd', '#8c564b', '#e377c2']
     sensor_render_priority = {
@@ -2747,6 +2758,7 @@ def _render_correlacion(
         'Radiación PAR': 4
     }
     sensor_traces = []
+    compare_sensor_traces = []
     cortina_traces = []
     cortina_axis_max = 100.0 if not use_cortina_area else 0.0
     sensor_legend_title_added = False
@@ -2790,6 +2802,43 @@ def _render_correlacion(
                 VARIABLE_COLORS.get(var_name, palette[order % len(palette)]),
                 sensor_render_priority.get(var_name, 0)
             ))
+
+            if var_name in compare_sensor_vars and not df_plot_almacen.empty:
+                serie_almacen = df_plot_almacen[['DateTime', var_name]].dropna(subset=[var_name]).copy()
+                if not serie_almacen.empty:
+                    serie_almacen_plot = _add_day_breaks_to_series(serie_almacen, var_name) if multi_day_view else serie_almacen
+                    almacen_trace = dict(
+                        x=serie_almacen_plot['DateTime'],
+                        y=serie_almacen_plot[var_name],
+                        name=f'{var_name} - Almacén',
+                        mode='lines+markers',
+                        line=dict(
+                            color=VARIABLE_COLORS.get(var_name, palette[order % len(palette)]),
+                            width=2,
+                            dash='dot'
+                        ),
+                        marker=dict(
+                            size=4,
+                            color=VARIABLE_COLORS.get(var_name, palette[order % len(palette)]),
+                            symbol='diamond-open'
+                        ),
+                        opacity=0.95,
+                        legendrank=order + 0.5,
+                        hovertemplate=(
+                            f'<b>%{{x|{hover_time_format}}}</b><br>' +
+                            f'{var_name} - Almacén: ' +
+                            '%{y:.2f} ' +
+                            VARIABLE_UNITS.get(var_name, '') +
+                            '<extra></extra>'
+                        ),
+                        legendgroup=f'sensor_{var_name}_almacen'
+                    )
+                    compare_sensor_traces.append((
+                        f'{var_name}_almacen',
+                        almacen_trace,
+                        VARIABLE_COLORS.get(var_name, palette[order % len(palette)]),
+                        sensor_render_priority.get(var_name, 0)
+                    ))
         elif var_name in selected_cortinas:
             for config in SIDE_CONFIGS.values():
                 if config['element_col'] not in datos_cortinas_sel.columns:
@@ -2925,11 +2974,13 @@ def _render_correlacion(
 
     right_positions = [axis_start + i * ((axis_end - axis_start) / max(1, num_axes - 1)) for i in range(num_axes)]
     sensor_axis_names = ['y', 'y3', 'y4', 'y5']
+    sensor_axis_map = {}
 
     sensor_traces = sorted(sensor_traces, key=lambda item: item[3])
 
     for idx, (var_name, trace, color, _) in enumerate(sensor_traces):
         axis_name = sensor_axis_names[idx] if idx < len(sensor_axis_names) else f'y{idx + 2}'
+        sensor_axis_map[var_name] = axis_name
         trace['yaxis'] = None if axis_name == 'y' else axis_name
         fig_corr.add_trace(go.Scatter(**trace))
 
@@ -2984,6 +3035,12 @@ def _render_correlacion(
             })
 
         axis_configs[axis_name] = axis_kwargs
+
+    for var_name, trace, _, _ in compare_sensor_traces:
+        base_var_name = var_name.replace('_almacen', '')
+        axis_name = sensor_axis_map.get(base_var_name, 'y')
+        trace['yaxis'] = None if axis_name == 'y' else axis_name
+        fig_corr.add_trace(go.Scatter(**trace))
 
     if cortina_traces:
         for var_name, trace, color in cortina_traces:
@@ -3451,6 +3508,8 @@ if 'graficar_correlacion' not in st.session_state:
     st.session_state.graficar_correlacion = False
 if 'mostrar_aperturas_ideales' not in st.session_state:
     st.session_state.mostrar_aperturas_ideales = False
+if 'comparar_con_almacen' not in st.session_state:
+    st.session_state.comparar_con_almacen = False
 
 st.sidebar.markdown(
     f"""
@@ -3684,6 +3743,7 @@ with st.sidebar.expander("Bloque", expanded=True):
         bloque_seleccionado = cortina_block_map.get(selected_block_code)
 
 df_variables_corr = pd.DataFrame()
+df_variables_almacen_corr = pd.DataFrame()
 datos_cortinas_sel = pd.DataFrame()
 available_correlacion_vars = []
 
@@ -3695,6 +3755,14 @@ if fecha_variables is not None and bloque_variables is not None:
         fecha_inicio,
         fecha_fin
     )
+    bloque_almacen = variable_block_map.get('ALMACEN')
+    if bloque_almacen and bloque_almacen != bloque_variables:
+        df_variables_almacen_corr = _filter_variables_range(
+            _df_variables_all,
+            bloque_almacen,
+            fecha_inicio,
+            fecha_fin
+        )
 
 if fecha_cortinas is not None:
     fecha_cortinas_inicio, fecha_cortinas_fin = fecha_cortinas
@@ -3735,6 +3803,12 @@ with st.sidebar.expander("Series visibles", expanded=True):
             )
 
         selected_vars_sidebar = _get_selected_correlacion_vars(available_correlacion_vars)
+        st.checkbox(
+            "Comparar con Almacén",
+            key="comparar_con_almacen",
+            disabled=selected_block_code == 'ALMACEN' or df_variables_almacen_corr.empty,
+            help="Muestra la serie equivalente del Almacén para cada variable ambiental seleccionada."
+        )
         st.checkbox(
             "Aperturas ideales",
             key="mostrar_aperturas_ideales"
@@ -3814,7 +3888,9 @@ with tab_correlacion:
                         fecha_variables,
                         selected_vars,
                         block_label=block_label,
-                        show_ideal_aperturas=st.session_state.get('mostrar_aperturas_ideales', False)
+                        show_ideal_aperturas=st.session_state.get('mostrar_aperturas_ideales', False),
+                        df_variables_almacen=df_variables_almacen_corr,
+                        compare_with_almacen=st.session_state.get('comparar_con_almacen', False)
                     )
 
         with tab_corr_regs:
