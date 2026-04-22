@@ -1277,7 +1277,7 @@ st.markdown(
         </div>
         <div class="hero-copy">
             <p class="hero-kicker">The Elite Flower • Dashboard Ejecutivo</p>
-            <h1>Monitore de Variables y Automatización</h1>
+            <h1>Monitoreo de Variables y Automatización</h1>
             <p class="hero-subtitle">
                 Vista ejecutiva para el seguimiento de variables ambientales, cortinas y operación por bloques.
             </p>
