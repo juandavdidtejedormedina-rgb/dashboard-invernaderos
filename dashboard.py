@@ -123,6 +123,12 @@ BLOCK_VENTILATION_DATA = {
         {'label': 'Ventilacion culatas', 'ideal': 201.6, 'real': 98.0}
     ]
 }
+BLOCK_ANALYSIS_COLORS = {
+    '27': '#8077AE',
+    '34': '#6E97F2',
+    '35': '#8CBD63',
+    '38': '#D39A58'
+}
 WEEKDAY_ES = {
     0: 'Lunes',
     1: 'Martes',
@@ -1082,6 +1088,45 @@ st.markdown(
 )
 
 # --- CONFIGURACIÓN DE URLS (Mover aquí para evitar NameError) ---
+# Selector de finca
+st.markdown("### Finca")
+selected_farm = st.radio(
+    "Selecciona la finca",
+    options=["PONDEROSA", "SEVILLA"],
+    horizontal=True,
+    key="finca_activa",
+    label_visibility="collapsed"
+)
+
+if selected_farm == "SEVILLA":
+    st.sidebar.markdown("### Sevilla")
+    st.sidebar.info("Esta sección quedó reservada para la nueva finca.")
+    st.markdown(
+        """
+        <div class="info-panel-card" style="--info-accent: #4C4678; --info-accent-soft: rgba(76, 70, 120, 0.14);">
+            <div class="info-panel-header">
+                <div class="info-panel-header-main">
+                    <div class="info-panel-heading">
+                        <h3 class="info-panel-title">Tablero base para Sevilla</h3>
+                    </div>
+                </div>
+                <span class="info-panel-tag">En preparación</span>
+            </div>
+            <div class="info-panel-body">
+                <p class="info-panel-copy">
+                    Esta vista ya quedó separada de PONDEROSA para empezar a construir la finca Sevilla dentro del mismo código.
+                </p>
+                <p class="info-panel-copy">
+                    Cuando me digas qué quieres mostrar aquí, agregamos sus filtros, métricas, tablas y gráficas sin afectar el tablero actual.
+                </p>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+    st.stop()
+
+# --- Configuracion de URLs (Mover aqui para evitar NameError) ---
 URL_VARIABLES = "https://raw.githubusercontent.com/juandavdidtejedormedina-rgb/dashboard-invernaderos/main/Datos_variables.xlsx"
 URL_CORTINAS = "https://raw.githubusercontent.com/juandavdidtejedormedina-rgb/dashboard-invernaderos/main/Registro_Cortinas_Final.xlsx"
 
@@ -2217,6 +2262,14 @@ def _get_available_variable_dates(df_variables_all, bloque_variables):
     return sorted(fechas_variables)
 
 
+def _get_all_variable_dates(df_variables_all):
+    if df_variables_all.empty or 'Fecha_Filtro' not in df_variables_all.columns:
+        return []
+
+    fechas_variables = pd.Series(df_variables_all['Fecha_Filtro'].dropna().unique()).tolist()
+    return sorted(fechas_variables)
+
+
 def _filter_variables_range(df_variables_all, bloque_variables, fecha_inicio, fecha_fin):
     if (
         df_variables_all.empty or
@@ -2233,6 +2286,27 @@ def _filter_variables_range(df_variables_all, bloque_variables, fecha_inicio, fe
         (df_variables_all['Fecha_Filtro'] <= fecha_fin) &
         (df_variables_all['Bloque'] == bloque_variables)
     ].copy()
+
+
+def _filter_variables_multi_block_range(df_variables_all, fecha_inicio, fecha_fin, bloques=None):
+    if (
+        df_variables_all.empty or
+        'Fecha_Filtro' not in df_variables_all.columns or
+        'Bloque' not in df_variables_all.columns or
+        fecha_inicio is None or
+        fecha_fin is None
+    ):
+        return pd.DataFrame()
+
+    mask = (
+        (df_variables_all['Fecha_Filtro'] >= fecha_inicio) &
+        (df_variables_all['Fecha_Filtro'] <= fecha_fin)
+    )
+
+    if bloques:
+        mask &= df_variables_all['Bloque'].isin(bloques)
+
+    return df_variables_all[mask].copy()
 
 
 def _filter_cortinas_range(df_cortinas_all, bloque_seleccionado, fecha_inicio, fecha_fin):
@@ -2837,6 +2911,256 @@ def _render_correlacion(
         st.info('No hay información de motores para el periodo seleccionado. Se muestran únicamente las variables ambientales.')
 
 # 4. Datos cargados en memoria para evitar recálculos repetidos
+def _sort_block_names(block_names):
+    return sorted(
+        block_names,
+        key=lambda value: (
+            0 if _extract_block_code(value) is not None else 1,
+            int(_extract_block_code(value) or 0),
+            str(value)
+        )
+    )
+
+
+def _get_block_analysis_color(block_name):
+    return BLOCK_ANALYSIS_COLORS.get(_extract_block_code(block_name), BRAND_COLORS['hero'])
+
+
+def _format_block_display_name(block_name):
+    block_code = _extract_block_code(block_name)
+    return f'Bloque {block_code}' if block_code else str(block_name)
+
+
+def _build_hourly_block_analysis(df_variables, variable_name):
+    required_cols = {'DateTime', 'Bloque', variable_name}
+    if df_variables.empty or not required_cols.issubset(df_variables.columns):
+        return pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
+
+    data = df_variables[['DateTime', 'Bloque', variable_name]].dropna(subset=['DateTime', 'Bloque', variable_name]).copy()
+    if data.empty:
+        return pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
+
+    data['FranjaMinutos'] = data['DateTime'].dt.hour * 60 + data['DateTime'].dt.minute
+    data['Franja'] = data['DateTime'].dt.strftime('%H:%M')
+
+    grouped = (
+        data.groupby(['FranjaMinutos', 'Franja', 'Bloque'], as_index=False)
+        .agg(
+            Promedio=(variable_name, 'mean'),
+            Varianza=(variable_name, lambda serie: serie.var(ddof=1) if len(serie) > 1 else 0.0),
+            Registros=(variable_name, 'count')
+        )
+        .sort_values(['FranjaMinutos', 'Bloque'])
+        .reset_index(drop=True)
+    )
+    grouped['Varianza'] = grouped['Varianza'].fillna(0.0)
+
+    ordered_blocks = _sort_block_names(grouped['Bloque'].dropna().unique().tolist())
+    base_columns = ['FranjaMinutos', 'Franja']
+
+    pivot_promedio = (
+        grouped.pivot(index=base_columns, columns='Bloque', values='Promedio')
+        .reset_index()
+        .sort_values('FranjaMinutos')
+        .reindex(columns=base_columns + ordered_blocks)
+    )
+    pivot_varianza = (
+        grouped.pivot(index=base_columns, columns='Bloque', values='Varianza')
+        .reset_index()
+        .sort_values('FranjaMinutos')
+        .reindex(columns=base_columns + ordered_blocks)
+    )
+
+    return grouped, pivot_promedio, pivot_varianza
+
+
+def _prepare_hourly_pivot_display(pivot_df):
+    if pivot_df.empty:
+        return pivot_df
+
+    display_df = pivot_df.copy()
+    display_df = display_df.rename(columns={'Franja': 'Franja horaria'})
+    display_df = display_df.drop(columns=['FranjaMinutos'], errors='ignore')
+
+    rename_map = {
+        column: _format_block_display_name(column)
+        for column in display_df.columns
+        if column != 'Franja horaria'
+    }
+    display_df = display_df.rename(columns=rename_map)
+    display_df.columns.name = None
+    return display_df.round(2)
+
+
+def _render_hourly_metric_chart(grouped_df, variable_name, metric_column):
+    if grouped_df.empty:
+        return
+
+    ordered_blocks = _sort_block_names(grouped_df['Bloque'].dropna().unique().tolist())
+    ordered_slots = (
+        grouped_df[['FranjaMinutos', 'Franja']]
+        .drop_duplicates()
+        .sort_values('FranjaMinutos')
+        .reset_index(drop=True)
+    )
+    if ordered_slots.empty:
+        return
+
+    tick_step = 1
+    if len(ordered_slots) > 18:
+        tick_step = 2
+    if len(ordered_slots) > 36:
+        tick_step = 4
+
+    tickvals = ordered_slots['FranjaMinutos'].iloc[::tick_step].tolist()
+    ticktext = ordered_slots['Franja'].iloc[::tick_step].tolist()
+    metric_title = 'Promedio por franja horaria' if metric_column == 'Promedio' else 'Varianza por franja horaria'
+
+    fig = go.Figure()
+    for block_name in ordered_blocks:
+        serie = grouped_df[grouped_df['Bloque'] == block_name].sort_values('FranjaMinutos')
+        if serie.empty:
+            continue
+
+        block_label = _format_block_display_name(block_name)
+        color = _get_block_analysis_color(block_name)
+        fig.add_trace(go.Scatter(
+            x=serie['FranjaMinutos'],
+            y=serie[metric_column],
+            mode='lines+markers',
+            name=block_label,
+            line=dict(color=color, width=3),
+            marker=dict(size=6, color=color),
+            customdata=serie[['Franja']],
+            hovertemplate=(
+                '<b>%{customdata[0]}</b><br>' +
+                f'{block_label}<br>{metric_column}: ' +
+                '%{y:.2f}<extra></extra>'
+            )
+        ))
+
+    fig.update_layout(
+        height=390,
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor='rgba(255, 255, 255, 0.94)',
+        margin=dict(l=28, r=20, t=72, b=44),
+        title=dict(
+            text=f'{metric_title} - {VARIABLE_LABELS.get(variable_name, variable_name)}',
+            x=0.01,
+            xanchor='left',
+            font=dict(family='Manrope', size=19, color=BRAND_COLORS['ink'])
+        ),
+        legend=dict(
+            orientation='h',
+            yanchor='bottom',
+            y=1.02,
+            xanchor='left',
+            x=0
+        ),
+        xaxis=dict(
+            title='<b>Franja horaria</b>',
+            tickmode='array',
+            tickvals=tickvals,
+            ticktext=ticktext,
+            gridcolor='rgba(45, 48, 64, 0.10)',
+            linecolor='rgba(45, 48, 64, 0.18)',
+            zeroline=False
+        ),
+        yaxis=dict(
+            title=f'<b>{metric_column}</b>',
+            gridcolor='rgba(45, 48, 64, 0.10)',
+            linecolor='rgba(45, 48, 64, 0.18)',
+            zerolinecolor='rgba(45, 48, 64, 0.10)'
+        )
+    )
+
+    st.plotly_chart(fig, width='stretch')
+
+
+def _render_hourly_analysis_view(df_variables, fecha_variables, selected_blocks):
+    if df_variables.empty:
+        fecha_inicio, fecha_fin = fecha_variables
+        fecha_label = (
+            fecha_inicio.strftime('%Y-%m-%d')
+            if fecha_inicio == fecha_fin else
+            f"{fecha_inicio.strftime('%Y-%m-%d')} a {fecha_fin.strftime('%Y-%m-%d')}"
+        )
+        st.warning(f'No se encontraron datos de variables para el rango seleccionado: {fecha_label}.')
+        return
+
+    fecha_inicio, fecha_fin = fecha_variables
+    blocks_in_data = _sort_block_names(df_variables['Bloque'].dropna().unique().tolist())
+    total_days = int(df_variables['Fecha_Filtro'].nunique()) if 'Fecha_Filtro' in df_variables.columns else 0
+    total_slots = int(df_variables['DateTime'].dt.strftime('%H:%M').nunique()) if 'DateTime' in df_variables.columns else 0
+
+    st.markdown(
+        f"""
+        <div class="info-panel-card" style="--info-accent: {BRAND_COLORS['hero']}; --info-accent-soft: rgba(76, 70, 120, 0.14);">
+            <div class="info-panel-header">
+                <div class="info-panel-header-main">
+                    <div class="info-panel-heading">
+                        <h3 class="info-panel-title">Analisis horario tipo Excel</h3>
+                    </div>
+                </div>
+                <span class="info-panel-tag">Promedio y varianza</span>
+            </div>
+            <div class="info-panel-body">
+                <p class="info-panel-copy">
+                    Esta vista replica la logica del archivo guia: consolida las mediciones por franja horaria
+                    y compara los bloques seleccionados en las cuatro variables del tablero.
+                </p>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+    metric_col_1, metric_col_2, metric_col_3 = st.columns(3)
+    metric_col_1.metric('Bloques comparados', len(blocks_in_data))
+    metric_col_2.metric('Dias analizados', total_days)
+    metric_col_3.metric('Franjas detectadas', total_slots)
+
+    if fecha_inicio == fecha_fin:
+        st.caption(f'Periodo analizado: {fecha_inicio.strftime("%Y-%m-%d")} | Bloques: {", ".join(_format_block_display_name(block) for block in blocks_in_data)}')
+    else:
+        st.caption(
+            'Periodo analizado: '
+            f'{fecha_inicio.strftime("%Y-%m-%d")} a {fecha_fin.strftime("%Y-%m-%d")} | '
+            f'Bloques: {", ".join(_format_block_display_name(block) for block in blocks_in_data)}'
+        )
+
+    if len(selected_blocks) == 1:
+        st.info('Esta vista gana mas valor comparando varios bloques. Si quieres, puedes volver a incluir los demas desde la barra lateral.')
+
+    variable_tabs = st.tabs([
+        VARIABLE_SELECTOR_LABELS.get(variable_name, VARIABLE_LABELS.get(variable_name, variable_name))
+        for variable_name in SENSOR_VARIABLES
+    ])
+
+    for variable_name, variable_tab in zip(SENSOR_VARIABLES, variable_tabs):
+        with variable_tab:
+            grouped_df, pivot_promedio, pivot_varianza = _build_hourly_block_analysis(df_variables, variable_name)
+            if grouped_df.empty:
+                st.info(f'No se encontraron datos para {variable_name} en el rango seleccionado.')
+                continue
+
+            promedio_tab, varianza_tab = st.tabs(['Promedio por franja', 'Varianza por franja'])
+
+            with promedio_tab:
+                st.caption('Cada punto resume el promedio de todas las mediciones disponibles en la misma franja horaria para cada bloque.')
+                _render_hourly_metric_chart(grouped_df, variable_name, 'Promedio')
+                with st.expander('Ver tabla dinamica de promedio', expanded=False):
+                    st.dataframe(_prepare_hourly_pivot_display(pivot_promedio), width='stretch')
+
+            with varianza_tab:
+                st.caption('La varianza muestra que tanto fluctua cada bloque dentro de la misma franja horaria a lo largo del periodo filtrado.')
+                if fecha_inicio == fecha_fin:
+                    st.caption('Cuando solo hay una observacion en una franja, la varianza se muestra en 0 para mantener la lectura del dashboard.')
+                _render_hourly_metric_chart(grouped_df, variable_name, 'Varianza')
+                with st.expander('Ver tabla dinamica de varianza', expanded=False):
+                    st.dataframe(_prepare_hourly_pivot_display(pivot_varianza), width='stretch')
+
+
 _df_variables_all = cargar_datos(archivo_variables_bytes) if archivo_variables_bytes else pd.DataFrame()
 _df_cortinas_all = cargar_cortinas(archivo_cortinas_bytes) if archivo_cortinas_bytes else pd.DataFrame()
 
@@ -2854,6 +3178,120 @@ st.sidebar.markdown(
     """,
     unsafe_allow_html=True
 )
+
+with st.sidebar.expander("Vista", expanded=True):
+    _sidebar_field_label("filter", "Seleccionar vista")
+    dashboard_mode = st.radio(
+        "Seleccionar vista:",
+        options=["Correlacion", "Analisis horario"],
+        key="modo_dashboard"
+    )
+
+if dashboard_mode == "Analisis horario":
+    analysis_block_codes, analysis_variable_map, _ = _get_block_options(_df_variables_all, _df_cortinas_all)
+    fecha_analisis = None
+    analysis_block_names = []
+
+    with st.sidebar.expander("Periodo", expanded=True):
+        if _df_variables_all.empty:
+            st.write("No hay datos de variables para habilitar el filtro de fechas.")
+        else:
+            fechas_disponibles = _get_all_variable_dates(_df_variables_all)
+            if not fechas_disponibles:
+                st.warning("No hay fechas disponibles en variables para construir el analisis horario.")
+            else:
+                min_fecha = min(fechas_disponibles)
+                max_fecha = max(fechas_disponibles)
+
+                if min_fecha == max_fecha:
+                    fecha_unica_default = _coerce_sidebar_date(
+                        st.session_state.get("fecha_analisis_unica", max_fecha),
+                        max_fecha
+                    )
+                    _sidebar_field_label("calendar", "Seleccionar fecha")
+                    fecha_unica = st.date_input(
+                        "Seleccionar fecha para el analisis:",
+                        value=fecha_unica_default,
+                        key="fecha_analisis_unica"
+                    )
+                    fecha_analisis = (fecha_unica, fecha_unica)
+                else:
+                    modo_fechas_analisis = st.radio(
+                        "Modo de fechas del analisis:",
+                        options=["Un dÃ­a", "Varios dÃ­as"],
+                        horizontal=True,
+                        key="modo_fechas_analisis"
+                    )
+
+                    if modo_fechas_analisis == "Un dÃ­a":
+                        fecha_unica_default = _coerce_sidebar_date(
+                            st.session_state.get("fecha_analisis_un_dia", max_fecha),
+                            max_fecha
+                        )
+                        _sidebar_field_label("calendar", "Seleccionar fecha")
+                        fecha_unica = st.date_input(
+                            "Seleccionar fecha para el analisis:",
+                            value=fecha_unica_default,
+                            key="fecha_analisis_un_dia"
+                        )
+                        fecha_analisis = (fecha_unica, fecha_unica)
+                    else:
+                        _sidebar_field_label("calendar", "Fecha inicio")
+                        fecha_inicio_analisis = st.date_input(
+                            "Fecha inicio del analisis:",
+                            value=min_fecha,
+                            key="fecha_inicio_analisis"
+                        )
+                        _sidebar_field_label("calendar", "Fecha fin")
+                        fecha_fin_analisis = st.date_input(
+                            "Fecha fin del analisis:",
+                            value=max_fecha,
+                            key="fecha_fin_analisis"
+                        )
+                        if fecha_fin_analisis < fecha_inicio_analisis:
+                            fecha_inicio_analisis, fecha_fin_analisis = fecha_fin_analisis, fecha_inicio_analisis
+                        fecha_analisis = (fecha_inicio_analisis, fecha_fin_analisis)
+
+    with st.sidebar.expander("Bloques comparados", expanded=True):
+        if _df_variables_all.empty:
+            st.write("No se encontraron datos para habilitar la comparaciÃ³n de bloques.")
+        elif not analysis_block_codes:
+            st.warning("No se detectaron bloques vÃ¡lidos dentro del archivo de variables.")
+        else:
+            _sidebar_field_label("location", "Bloques incluidos")
+            selected_analysis_codes = st.multiselect(
+                "Bloques incluidos:",
+                options=analysis_block_codes,
+                default=analysis_block_codes,
+                format_func=lambda code: f"Bloque {code}",
+                key="bloques_analisis"
+            )
+            analysis_block_names = [
+                analysis_variable_map[block_code]
+                for block_code in selected_analysis_codes
+                if block_code in analysis_variable_map
+            ]
+
+    if _df_variables_all.empty:
+        st.warning("No se encontraron datos de variables para construir el analisis horario.")
+    elif fecha_analisis is None:
+        st.warning("Selecciona el periodo del analisis en la barra lateral.")
+    elif not analysis_block_names:
+        st.warning("Selecciona al menos un bloque para comparar en la nueva vista.")
+    else:
+        fecha_inicio_analisis, fecha_fin_analisis = fecha_analisis
+        df_variables_analisis = _filter_variables_multi_block_range(
+            _df_variables_all,
+            fecha_inicio_analisis,
+            fecha_fin_analisis,
+            analysis_block_names
+        )
+        _render_hourly_analysis_view(
+            df_variables_analisis,
+            fecha_analisis,
+            analysis_block_names
+        )
+    st.stop()
 
 block_codes, variable_block_map, cortina_block_map = _get_block_options(_df_variables_all, _df_cortinas_all)
 bloque_variables = None
