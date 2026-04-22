@@ -65,7 +65,7 @@ FILTER_HELP_TEXTS = {
     'bloque': 'Selecciona el bloque principal que quieres analizar en la correlación.',
     'bloques_comparados': 'Activa o desactiva los bloques que quieres incluir en la comparación de varianza y promedio.',
     'series_visibles': 'Activa las variables ambientales y operativas que deseas mostrar en la gráfica.',
-    'comparar_almacen': 'Muestra la serie equivalente del Almacén para cada variable ambiental seleccionada.',
+    'comparar_almacen': 'Muestra la serie equivalente de la Estación externa para cada variable ambiental seleccionada.',
     'aperturas_ideales': 'Superpone la apertura ideal calculada sobre las series de frentes y puertas cuando exista la referencia del bloque.'
 }
 VARIABLE_FILTER_HELP = {
@@ -151,7 +151,7 @@ BLOCK_ANALYSIS_COLORS = {
     'ALMACEN': '#B56576'
 }
 SPECIAL_BLOCK_LABELS = {
-    'ALMACEN': 'Almacén'
+    'ALMACEN': 'Estación externa'
 }
 WEEKDAY_ES = {
     0: 'Lunes',
@@ -2763,7 +2763,7 @@ def _render_correlacion(
 
     compare_sensor_vars = []
     df_plot_almacen = pd.DataFrame()
-    if compare_with_almacen and not str(block_label).strip().lower() == 'almacén':
+    if compare_with_almacen and not str(block_label).strip().lower() == 'estación externa':
         compare_sensor_vars = [var_name for var_name in selected_sensors if var_name in almacen_sensor_vars]
         if compare_sensor_vars:
             df_plot_almacen = df_variables_almacen[['DateTime'] + compare_sensor_vars].copy()
@@ -2830,7 +2830,7 @@ def _render_correlacion(
                     almacen_trace = dict(
                         x=serie_almacen_plot['DateTime'],
                         y=serie_almacen_plot[var_name],
-                        name=f'{var_name} - Almacén',
+                        name=f'{var_name} - Estación externa',
                         mode='lines+markers',
                         line=dict(
                             color=VARIABLE_COLORS.get(var_name, palette[order % len(palette)]),
@@ -2846,7 +2846,7 @@ def _render_correlacion(
                         legendrank=order + 0.5,
                         hovertemplate=(
                             f'<b>%{{x|{hover_time_format}}}</b><br>' +
-                            f'{var_name} - Almacén: ' +
+                            f'{var_name} - Estación externa: ' +
                             '%{y:.2f} ' +
                             VARIABLE_UNITS.get(var_name, '') +
                             '<extra></extra>'
@@ -3931,7 +3931,7 @@ with st.sidebar.expander("Series visibles", expanded=True):
 
         selected_vars_sidebar = _get_selected_correlacion_vars(available_correlacion_vars)
         st.checkbox(
-            "Comparar con Almacén",
+            "Comparar con Estación externa",
             key="comparar_con_almacen",
             disabled=selected_block_code == 'ALMACEN' or df_variables_almacen_corr.empty,
             help=FILTER_HELP_TEXTS['comparar_almacen']
