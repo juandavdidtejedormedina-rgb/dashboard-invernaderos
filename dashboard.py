@@ -127,7 +127,11 @@ BLOCK_ANALYSIS_COLORS = {
     '27': '#8077AE',
     '34': '#6E97F2',
     '35': '#8CBD63',
-    '38': '#D39A58'
+    '38': '#D39A58',
+    'ALMACEN': '#B56576'
+}
+SPECIAL_BLOCK_LABELS = {
+    'ALMACEN': 'Almacén'
 }
 WEEKDAY_ES = {
     0: 'Lunes',
@@ -1348,13 +1352,13 @@ def _normalize_variable_column_name(column_name):
     normalized_key = re.sub(r'\bc\b$', ' ', normalized_key)
     normalized_key = re.sub(r'\s+', ' ', normalized_key).strip()
 
-    if normalized_key.startswith('temperatura'):
+    if 'temperatura' in normalized_key:
         return 'Temperatura'
-    if normalized_key.startswith('humedad relativa'):
+    if 'humedad relativa' in normalized_key:
         return 'Humedad Relativa'
-    if normalized_key.startswith('radiacion par'):
+    if 'radiacion par' in normalized_key:
         return 'Radiación PAR'
-    if normalized_key.startswith('gramos de agua'):
+    if 'gramos de agua' in normalized_key:
         return 'Gramos de agua'
 
     return text
@@ -2181,23 +2185,35 @@ def _extract_block_code(block_name):
     return match.group(1) if match else None
 
 
+def _extract_block_identifier(block_name):
+    block_code = _extract_block_code(block_name)
+    if block_code:
+        return block_code
+
+    normalized_key = _build_normalized_text_key(block_name)
+    if 'almacen' in normalized_key:
+        return 'ALMACEN'
+
+    return None
+
+
 def _get_block_options(df_variables_all, df_cortinas_all):
     variable_map = {}
     cortina_map = {}
 
     if not df_variables_all.empty and 'Bloque' in df_variables_all.columns:
         for block_name in sorted(df_variables_all['Bloque'].dropna().unique()):
-            block_code = _extract_block_code(block_name)
-            if block_code:
-                variable_map[block_code] = block_name
+            block_identifier = _extract_block_identifier(block_name)
+            if block_identifier:
+                variable_map[block_identifier] = block_name
 
     if not df_cortinas_all.empty and 'Bloque' in df_cortinas_all.columns:
         for block_name in sorted(df_cortinas_all['Bloque'].dropna().unique()):
-            block_code = _extract_block_code(block_name)
-            if block_code:
-                cortina_map[block_code] = block_name
+            block_identifier = _extract_block_identifier(block_name)
+            if block_identifier:
+                cortina_map[block_identifier] = block_name
 
-    block_codes = sorted(variable_map, key=lambda value: int(value))
+    block_codes = _sort_block_names(list(variable_map.keys()))
     return block_codes, variable_map, cortina_map
 
 
@@ -3086,23 +3102,33 @@ def _render_correlacion(
 
 # 4. Datos cargados en memoria para evitar recálculos repetidos
 def _sort_block_names(block_names):
+    def sort_key(value):
+        block_identifier = _extract_block_identifier(value)
+        is_numeric_block = bool(block_identifier and str(block_identifier).isdigit())
+        return (
+            0 if is_numeric_block else 1,
+            int(block_identifier) if is_numeric_block else 9999,
+            _format_block_display_name(value)
+        )
+
     return sorted(
         block_names,
-        key=lambda value: (
-            0 if _extract_block_code(value) is not None else 1,
-            int(_extract_block_code(value) or 0),
-            str(value)
-        )
+        key=sort_key
     )
 
 
 def _get_block_analysis_color(block_name):
-    return BLOCK_ANALYSIS_COLORS.get(_extract_block_code(block_name), BRAND_COLORS['hero'])
+    block_identifier = _extract_block_identifier(block_name)
+    return BLOCK_ANALYSIS_COLORS.get(block_identifier, BRAND_COLORS['hero'])
 
 
 def _format_block_display_name(block_name):
-    block_code = _extract_block_code(block_name)
-    return f'Bloque {block_code}' if block_code else str(block_name)
+    block_identifier = _extract_block_identifier(block_name)
+    if block_identifier in SPECIAL_BLOCK_LABELS:
+        return SPECIAL_BLOCK_LABELS[block_identifier]
+    if block_identifier and str(block_identifier).isdigit():
+        return f'Bloque {block_identifier}'
+    return str(block_name)
 
 
 def _build_hourly_block_analysis(df_variables, variable_name):
@@ -3527,7 +3553,7 @@ if dashboard_mode == "Varianza Y Promedio":
                 if block_state_key not in st.session_state:
                     st.session_state[block_state_key] = True
                 st.checkbox(
-                    f"Bloque {block_code}",
+                    _format_block_display_name(block_code),
                     key=block_state_key
                 )
 
@@ -3651,7 +3677,7 @@ with st.sidebar.expander("Bloque", expanded=True):
         selected_block_code = st.selectbox(
             "Seleccionar bloque:",
             options=block_codes,
-            format_func=lambda code: f"Bloque {code}",
+            format_func=_format_block_display_name,
             key="bloque_compartido"
         )
         bloque_variables = variable_block_map.get(selected_block_code)
@@ -3737,7 +3763,7 @@ with tab_correlacion:
         )
         _render_summary_cards_selector(df_variables_corr, fecha_variables)
 
-        block_label = bloque_seleccionado or bloque_variables
+        block_label = _format_block_display_name(bloque_seleccionado or bloque_variables)
         block_modification = _get_block_modification(block_label)
         culatas_observation = _get_culatas_daily_observation(datos_cortinas_sel, block_label)
         culatas_by_day = _get_culatas_observation_by_day(datos_cortinas_sel, block_label)
