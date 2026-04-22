@@ -3345,6 +3345,7 @@ def _render_hourly_analysis_view(df_variables, fecha_variables, selected_blocks)
                                 padding: 20px;
                                 border-radius: 8px;
                                 box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+                                overflow: hidden;
                             ">
                                 <p style="
                                     font-family: 'Manrope', sans-serif;
@@ -3355,7 +3356,7 @@ def _render_hourly_analysis_view(df_variables, fecha_variables, selected_blocks)
                                     text-transform: uppercase;
                                     letter-spacing: 0.5px;
                                 ">{variable_name}</p>
-                                <div style="display: flex; align-items: baseline; gap: 6px;">
+                                <div style="display: flex; align-items: baseline; gap: 4px; flex-wrap: wrap;">
                                     <p style="
                                         font-family: 'Manrope', sans-serif;
                                         font-size: 32px;
@@ -3366,10 +3367,12 @@ def _render_hourly_analysis_view(df_variables, fecha_variables, selected_blocks)
                                     ">{display_value}</p>
                                     <p style="
                                         font-family: 'Manrope', sans-serif;
-                                        font-size: 14px;
+                                        font-size: 12px;
                                         color: {BRAND_COLORS['graphite']};
                                         margin: 0;
                                         font-weight: 500;
+                                        word-break: break-word;
+                                        line-height: 1.3;
                                     ">{unit}</p>
                                 </div>
                                 <p style="
