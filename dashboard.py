@@ -3228,8 +3228,11 @@ def _build_hourly_block_analysis(df_variables, variable_name):
     if data.empty:
         return pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
 
-    data['FranjaMinutos'] = data['DateTime'].dt.hour * 60 + data['DateTime'].dt.minute
-    data['Franja'] = data['DateTime'].dt.strftime('%H:%M')
+    # Normaliza pequeñas desviaciones del Excel como 01:31 o 01:32
+    # para consolidar la lectura en franjas limpias de 30 minutos.
+    data['FranjaDateTime'] = data['DateTime'].dt.round('30min')
+    data['FranjaMinutos'] = data['FranjaDateTime'].dt.hour * 60 + data['FranjaDateTime'].dt.minute
+    data['Franja'] = data['FranjaDateTime'].dt.strftime('%H:%M')
 
     grouped = (
         data.groupby(['FranjaMinutos', 'Franja', 'Bloque'], as_index=False)
@@ -3294,14 +3297,16 @@ def _render_hourly_metric_chart(grouped_df, variable_name, metric_column):
     if ordered_slots.empty:
         return
 
-    tick_step = 1
-    if len(ordered_slots) > 18:
-        tick_step = 2
-    if len(ordered_slots) > 36:
-        tick_step = 4
-
-    tickvals = ordered_slots['FranjaMinutos'].iloc[::tick_step].tolist()
-    ticktext = ordered_slots['Franja'].iloc[::tick_step].tolist()
+    slot_minutes = ordered_slots['FranjaMinutos'].dropna().astype(int).tolist()
+    use_half_hour_axis = bool(slot_minutes) and all(minute % 30 == 0 for minute in slot_minutes)
+    if use_half_hour_axis:
+        display_slots = [
+            f'{hour:02d}:{minute:02d}'
+            for hour in range(24)
+            for minute in (0, 30)
+        ]
+    else:
+        display_slots = ordered_slots['Franja'].tolist()
     metric_title = 'Promedio por franja horaria' if metric_column == 'Promedio' else 'Varianza por franja horaria'
 
     metric_label = VARIABLE_LABELS.get(variable_name, variable_name)
@@ -3314,15 +3319,14 @@ def _render_hourly_metric_chart(grouped_df, variable_name, metric_column):
         block_label = _format_block_display_name(block_name)
         color = _get_block_analysis_color(block_name)
         fig.add_trace(go.Scatter(
-            x=serie['FranjaMinutos'],
+            x=serie['Franja'],
             y=serie[metric_column],
             mode='lines+markers',
             name=block_label,
             line=dict(color=color, width=3.2, shape='spline', smoothing=0.38),
             marker=dict(size=6, color=color, line=dict(color='rgba(255,255,255,0.82)', width=1)),
-            customdata=serie[['Franja']],
             hovertemplate=(
-                '<b>%{customdata[0]}</b><br>' +
+                '<b>%{x}</b><br>' +
                 f'{block_label}<br>{metric_column}: ' +
                 '%{y:.2f}<extra></extra>'
             ),
@@ -3333,7 +3337,7 @@ def _render_hourly_metric_chart(grouped_df, variable_name, metric_column):
         height=500,
         paper_bgcolor='rgba(0,0,0,0)',
         plot_bgcolor='rgba(250,248,243,0.68)',
-        margin=dict(l=34, r=22, t=108, b=52),
+        margin=dict(l=34, r=22, t=108, b=96),
         title=dict(
             text=f'{metric_title} - {metric_label}',
             x=0.01,
@@ -3363,13 +3367,18 @@ def _render_hourly_metric_chart(grouped_df, variable_name, metric_column):
         ),
         xaxis=dict(
             title='<b>Franja horaria</b>',
+            type='category',
+            categoryorder='array',
+            categoryarray=display_slots,
             tickmode='array',
-            tickvals=tickvals,
-            ticktext=ticktext,
-            tickfont=dict(size=11, family='Manrope, sans-serif', color=BRAND_COLORS['graphite']),
+            tickvals=display_slots,
+            ticktext=display_slots,
+            tickangle=-90,
+            tickfont=dict(size=10, family='Manrope, sans-serif', color=BRAND_COLORS['graphite']),
             gridcolor='rgba(76, 70, 120, 0.07)',
             linecolor='rgba(45, 48, 64, 0.18)',
-            zeroline=False
+            zeroline=False,
+            automargin=True
         ),
         yaxis=dict(
             title=f'<b>{metric_column}</b>',
