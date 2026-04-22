@@ -3464,12 +3464,16 @@ def _render_hourly_analysis_view(df_variables, fecha_variables, selected_blocks)
                             # Decidir formato según si es promedio o varianza
                             if tab_label == "Promedio":
                                 display_value = f"{value:.1f}"
-                                descriptor = "Promedio general del periodo filtrado."
-                                footer_label = "Promedio del periodo"
+                                if single_day_analysis:
+                                    descriptor = "Promedio general de todas las mediciones del día seleccionado."
+                                    footer_label = "Promedio general del día"
+                                else:
+                                    descriptor = "Promedio general de todas las mediciones del rango seleccionado."
+                                    footer_label = "Promedio general del periodo"
                             else:
                                 display_value = f"{value:.2f}"
-                                descriptor = "Varianza general del periodo filtrado."
-                                footer_label = "Varianza del periodo"
+                                descriptor = "Varianza general calculada con todas las mediciones del rango seleccionado."
+                                footer_label = "Varianza general del periodo"
                                 if single_day_analysis:
                                     display_value = "0.00"
                                     descriptor = "En un solo día la varianza se reporta en 0 por consistencia analítica."
