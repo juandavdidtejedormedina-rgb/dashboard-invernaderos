@@ -3386,38 +3386,36 @@ def _render_hourly_analysis_view(df_variables, fecha_variables, selected_blocks)
                             '''
                             st.markdown(metric_card_html, unsafe_allow_html=True)
 
-    if len(selected_blocks) == 1:
-        pass
-    else:
-        st.markdown('<p class="analysis-note">Explora cada variable para ver su comportamiento promedio y qué tanto fluctúa cada bloque a lo largo del periodo.</p>', unsafe_allow_html=True)
+            if len(selected_blocks) == 1:
+                pass
+            else:
+                st.markdown('<p class="analysis-note">Explora cada variable para ver su comportamiento promedio y qué tanto fluctúa cada bloque a lo largo del periodo.</p>', unsafe_allow_html=True)
 
-    variable_tabs = st.tabs([
-        VARIABLE_SELECTOR_LABELS.get(variable_name, VARIABLE_LABELS.get(variable_name, variable_name))
-        for variable_name in SENSOR_VARIABLES
-    ])
+            # Mostrar tabs de variables dentro del tab de métrica seleccionado
+            variable_tabs = st.tabs([
+                VARIABLE_SELECTOR_LABELS.get(variable_name, VARIABLE_LABELS.get(variable_name, variable_name))
+                for variable_name in SENSOR_VARIABLES
+            ])
 
-    for variable_name, variable_tab in zip(SENSOR_VARIABLES, variable_tabs):
-        with variable_tab:
-            grouped_df, pivot_promedio, pivot_varianza = _build_hourly_block_analysis(df_variables, variable_name)
-            if grouped_df.empty:
-                st.info(f'No se encontraron datos para {variable_name} en el rango seleccionado.')
-                continue
+            for variable_name, variable_tab in zip(SENSOR_VARIABLES, variable_tabs):
+                with variable_tab:
+                    grouped_df, pivot_promedio, pivot_varianza = _build_hourly_block_analysis(df_variables, variable_name)
+                    if grouped_df.empty:
+                        st.info(f'No se encontraron datos para {variable_name} en el rango seleccionado.')
+                        continue
 
-            promedio_tab, varianza_tab = st.tabs(['Promedio por franja', 'Varianza por franja'])
-
-            with promedio_tab:
-                st.caption('Cada punto resume el promedio de todas las mediciones disponibles en la misma franja horaria para cada bloque.')
-                _render_hourly_metric_chart(grouped_df, variable_name, 'Promedio')
-                with st.expander('Ver tabla dinámica de promedio', expanded=False):
-                    st.dataframe(_prepare_hourly_pivot_display(pivot_promedio), width='stretch')
-
-            with varianza_tab:
-                st.caption('La varianza muestra qué tanto fluctúa cada bloque dentro de la misma franja horaria a lo largo del periodo filtrado.')
-                if fecha_inicio == fecha_fin:
-                    st.caption('Cuando solo hay una observación en una franja, la varianza se muestra en 0 para mantener una lectura estable del dashboard.')
-                _render_hourly_metric_chart(grouped_df, variable_name, 'Varianza')
-                with st.expander('Ver tabla dinámica de varianza', expanded=False):
-                    st.dataframe(_prepare_hourly_pivot_display(pivot_varianza), width='stretch')
+                    if tab_label == "Promedio":
+                        st.caption('Cada punto resume el promedio de todas las mediciones disponibles en la misma franja horaria para cada bloque.')
+                        _render_hourly_metric_chart(grouped_df, variable_name, 'Promedio')
+                        with st.expander('Ver tabla dinámica de promedio', expanded=False):
+                            st.dataframe(_prepare_hourly_pivot_display(pivot_promedio), width='stretch')
+                    else:  # Varianza
+                        st.caption('La varianza muestra qué tanto fluctúa cada bloque dentro de la misma franja horaria a lo largo del periodo filtrado.')
+                        if fecha_inicio == fecha_fin:
+                            st.caption('Cuando solo hay una observación en una franja, la varianza se muestra en 0 para mantener una lectura estable del dashboard.')
+                        _render_hourly_metric_chart(grouped_df, variable_name, 'Varianza')
+                        with st.expander('Ver tabla dinámica de varianza', expanded=False):
+                            st.dataframe(_prepare_hourly_pivot_display(pivot_varianza), width='stretch')
 
 
 _df_variables_all = cargar_datos(archivo_variables_bytes) if archivo_variables_bytes else pd.DataFrame()
