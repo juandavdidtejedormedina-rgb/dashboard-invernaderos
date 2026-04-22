@@ -982,6 +982,12 @@ button[data-baseweb="tab"][aria-selected="true"] {{
     border-color: rgba(76, 70, 120, 0.18) !important;
     box-shadow: 0 16px 30px rgba(46, 39, 79, 0.18);
 }}
+div[data-testid="stTabs"] [data-baseweb="tab-highlight"] {{
+    display: none !important;
+}}
+div[data-testid="stTabs"] [data-baseweb="tab-border"] {{
+    background: rgba(76, 70, 120, 0.10) !important;
+}}
 div[data-testid="stPlotlyChart"],
 div[data-testid="stDataFrame"] {{
     border-radius: 24px;
