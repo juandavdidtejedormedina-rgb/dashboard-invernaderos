@@ -90,6 +90,8 @@ BRAND_COLORS = {
 }
 APP_DIR = Path(__file__).resolve().parent
 LOGO_PATH = APP_DIR / 'logo elite.png'
+LOGO_URL_LARGE = "https://raw.githubusercontent.com/juandavdidtejedormedina-rgb/dashboard-invernaderos/main/logo%20elite.png"
+LOGO_URL_SMALL = LOGO_URL_LARGE
 CORR_AXIS_TITLES = {
     'Temperatura': 'Temp.',
     'Humedad Relativa': 'Humedad',
@@ -196,6 +198,11 @@ st.set_page_config(
     page_title="The Elite Flower | Dashboard Ejecutivo",
     page_icon="📊",
     layout="wide"
+)
+st.logo(
+    LOGO_URL_LARGE,
+    link="https://streamlit.io/gallery",
+    icon_image=LOGO_URL_SMALL,
 )
 logo_base64 = _image_to_base64(LOGO_PATH)
 logo_html = (
