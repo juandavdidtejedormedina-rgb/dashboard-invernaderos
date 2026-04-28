@@ -92,9 +92,9 @@ APP_DIR = Path(__file__).resolve().parent
 LOGO_PATH = APP_DIR / 'logo elite.png'
 LOGO_URL_LARGE = "https://raw.githubusercontent.com/juandavdidtejedormedina-rgb/dashboard-invernaderos/main/logo%20elite.png"
 LOGO_URL_SMALL = LOGO_URL_LARGE
-STREAMLIT_LOGO_WIDTH = 72
-STREAMLIT_LOGO_HEIGHT = 72
-STREAMLIT_LOGO_BORDER_RADIUS = 10
+STREAMLIT_LOGO_WIDTH = 92
+STREAMLIT_LOGO_HEIGHT = 92
+STREAMLIT_LOGO_BORDER_RADIUS = 12
 CORR_AXIS_TITLES = {
     'Temperatura': 'Temp.',
     'Humedad Relativa': 'Humedad',
@@ -294,6 +294,7 @@ section[data-testid="stSidebar"] > div {{
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    margin: 0.35rem auto 1rem auto;
 }}
 [data-testid="stSidebarHeader"] img,
 [data-testid="stSidebarHeader"] [data-testid="stLogo"] img {{
