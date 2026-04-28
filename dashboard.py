@@ -294,7 +294,12 @@ section[data-testid="stSidebar"] > div {{
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    margin: 0.35rem auto 1rem auto;
+    margin: 0.75rem auto 1rem auto;
+    padding: 0.3rem;
+    border: 1px solid rgba(255, 255, 255, 0.72);
+    border-radius: calc(var(--streamlit-logo-radius) + 4px);
+    background: rgba(255, 255, 255, 0.06);
+    box-shadow: 0 10px 24px rgba(16, 18, 32, 0.18);
 }}
 [data-testid="stSidebarHeader"] img,
 [data-testid="stSidebarHeader"] [data-testid="stLogo"] img {{
