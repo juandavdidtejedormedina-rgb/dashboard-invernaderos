@@ -92,6 +92,9 @@ APP_DIR = Path(__file__).resolve().parent
 LOGO_PATH = APP_DIR / 'logo elite.png'
 LOGO_URL_LARGE = "https://raw.githubusercontent.com/juandavdidtejedormedina-rgb/dashboard-invernaderos/main/logo%20elite.png"
 LOGO_URL_SMALL = LOGO_URL_LARGE
+STREAMLIT_LOGO_WIDTH = 72
+STREAMLIT_LOGO_HEIGHT = 72
+STREAMLIT_LOGO_BORDER_RADIUS = 10
 CORR_AXIS_TITLES = {
     'Temperatura': 'Temp.',
     'Humedad Relativa': 'Humedad',
@@ -226,6 +229,9 @@ st.markdown(f"""
     --font-display: 'Manrope', sans-serif;
     --font-body: 'Manrope', sans-serif;
     --font-brand: 'Cormorant Garamond', serif;
+    --streamlit-logo-width: {STREAMLIT_LOGO_WIDTH}px;
+    --streamlit-logo-height: {STREAMLIT_LOGO_HEIGHT}px;
+    --streamlit-logo-radius: {STREAMLIT_LOGO_BORDER_RADIUS}px;
 }}
 
 .stApp {{
@@ -283,6 +289,19 @@ section[data-testid="stSidebar"] > div {{
 }}
 [data-testid="stSidebar"] * {{
     color: #f7f7fb;
+}}
+[data-testid="stSidebarHeader"] a {{
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}}
+[data-testid="stSidebarHeader"] img,
+[data-testid="stSidebarHeader"] [data-testid="stLogo"] img {{
+    width: var(--streamlit-logo-width) !important;
+    height: var(--streamlit-logo-height) !important;
+    max-width: none !important;
+    object-fit: contain;
+    border-radius: var(--streamlit-logo-radius);
 }}
 .sidebar-title {{
     display: flex;
