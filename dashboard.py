@@ -93,7 +93,7 @@ LOGO_PATH = APP_DIR / 'logo elite.png'
 LOGO_URL_LARGE = "https://raw.githubusercontent.com/juandavdidtejedormedina-rgb/dashboard-invernaderos/main/logo%20elite.png"
 LOGO_URL_SMALL = LOGO_URL_LARGE
 STREAMLIT_LOGO_WIDTH = 150
-STREAMLIT_LOGO_HEIGHT = 92
+STREAMLIT_LOGO_HEIGHT = 150
 STREAMLIT_LOGO_BORDER_RADIUS = 12
 CORR_AXIS_TITLES = {
     'Temperatura': 'Temp.',
