@@ -92,9 +92,9 @@ APP_DIR = Path(__file__).resolve().parent
 LOGO_PATH = APP_DIR / 'logo elite.png'
 LOGO_URL_LARGE = "https://raw.githubusercontent.com/juandavdidtejedormedina-rgb/dashboard-invernaderos/main/logo%20elite.png"
 LOGO_URL_SMALL = LOGO_URL_LARGE
-STREAMLIT_LOGO_WIDTH = 150
-STREAMLIT_LOGO_HEIGHT = 150
-STREAMLIT_LOGO_BORDER_RADIUS = 20
+STREAMLIT_LOGO_WIDTH = 74
+STREAMLIT_LOGO_HEIGHT = 74
+STREAMLIT_LOGO_BORDER_RADIUS = 10
 CORR_AXIS_TITLES = {
     'Temperatura': 'Temp.',
     'Humedad Relativa': 'Humedad',
@@ -290,16 +290,27 @@ section[data-testid="stSidebar"] > div {{
 [data-testid="stSidebar"] * {{
     color: #f7f7fb;
 }}
+[data-testid="stSidebarHeader"] {{
+    padding-top: 0.9rem !important;
+    padding-bottom: 0.35rem !important;
+    overflow: visible !important;
+}}
+[data-testid="stSidebarHeader"] > div {{
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    overflow: visible !important;
+}}
 [data-testid="stSidebarHeader"] a {{
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    margin: 0.75rem auto 1rem auto;
-    padding: 0.3rem;
-    border: 1px solid rgba(255, 255, 255, 0.72);
-    border-radius: calc(var(--streamlit-logo-radius) + 4px);
-    background: rgba(255, 255, 255, 0.06);
-    box-shadow: 0 10px 24px rgba(16, 18, 32, 0.18);
+    margin: 0 auto 0.8rem auto;
+    padding: 0.28rem;
+    border: 1px solid rgba(255, 255, 255, 0.42);
+    border-radius: calc(var(--streamlit-logo-radius) + 6px);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.03) 100%);
+    box-shadow: 0 10px 22px rgba(16, 18, 32, 0.16);
 }}
 [data-testid="stSidebarHeader"] img,
 [data-testid="stSidebarHeader"] [data-testid="stLogo"] img {{
@@ -313,7 +324,7 @@ section[data-testid="stSidebar"] > div {{
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    margin: 0.2rem 0 0.8rem 0.15rem;
+    margin: 0.05rem 0 0.8rem 0.15rem;
     color: #ffffff;
     font-family: var(--font-display);
     font-size: 1.42rem;
