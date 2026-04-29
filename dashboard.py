@@ -11,6 +11,7 @@ import base64
 import unicodedata
 from pathlib import Path
 from datetime import date, datetime, timedelta
+from urllib.parse import quote_plus
 def _image_to_base64(image_path):
     try:
         return base64.b64encode(Path(image_path).read_bytes()).decode('utf-8')
@@ -33,6 +34,12 @@ def _youtube_embed_url(video_url):
             return f"https://www.youtube.com/embed/{match.group(1)}"
 
     return ""
+
+def _google_maps_embed_url(location_query):
+    query = str(location_query or "").strip()
+    if not query:
+        return ""
+    return f"https://www.google.com/maps?q={quote_plus(query)}&output=embed"
 
 SENSOR_VARIABLES = ['Temperatura', 'Humedad Relativa', 'Radiación PAR', 'Gramos de agua']
 VARIABLE_LABELS = {
@@ -111,6 +118,7 @@ LOGO_PATH = APP_DIR / 'logo elite.png'
 LOGO_URL_LARGE = "https://raw.githubusercontent.com/juandavdidtejedormedina-rgb/dashboard-invernaderos/main/logo%20elite.png"
 LOGO_URL_SMALL = LOGO_URL_LARGE
 DASHBOARD_VIDEO_URL = "https://raw.githubusercontent.com/juandavdidtejedormedina-rgb/dashboard-invernaderos/92e7785e8f5bd984f6ffff48ceb3153a2a2d9d36/For%20Creciendo.mp4"
+DASHBOARD_LOCATION_QUERY = "Finca Santa Maria The Elite Flower Facatativa Cundinamarca Colombia"
 STREAMLIT_LOGO_WIDTH = 74
 STREAMLIT_LOGO_HEIGHT = 74
 STREAMLIT_LOGO_BORDER_RADIUS = 10
@@ -1454,6 +1462,14 @@ if DASHBOARD_VIDEO_URL.strip():
             components.iframe(youtube_embed_url, height=430, scrolling=False)
         else:
             st.video(DASHBOARD_VIDEO_URL)
+
+if DASHBOARD_LOCATION_QUERY.strip():
+    with st.expander("Ubicación", expanded=False):
+        components.iframe(
+            _google_maps_embed_url(DASHBOARD_LOCATION_QUERY),
+            height=430,
+            scrolling=False
+        )
 
 # --- Configuracion de URLs (Mover aqui para evitar NameError) ---
 URL_VARIABLES = "https://raw.githubusercontent.com/juandavdidtejedormedina-rgb/dashboard-invernaderos/main/Datos_variables.xlsx"
