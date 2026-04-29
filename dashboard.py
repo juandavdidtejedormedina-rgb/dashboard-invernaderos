@@ -92,7 +92,7 @@ APP_DIR = Path(__file__).resolve().parent
 LOGO_PATH = APP_DIR / 'logo elite.png'
 LOGO_URL_LARGE = "https://raw.githubusercontent.com/juandavdidtejedormedina-rgb/dashboard-invernaderos/main/logo%20elite.png"
 LOGO_URL_SMALL = LOGO_URL_LARGE
-DASHBOARD_VIDEO_URL = "https://youtu.be/AYQy7qJVV0o?si=edaYAGb9nGTLFHUY"
+DASHBOARD_VIDEO_URL = ""
 STREAMLIT_LOGO_WIDTH = 74
 STREAMLIT_LOGO_HEIGHT = 74
 STREAMLIT_LOGO_BORDER_RADIUS = 10
@@ -459,7 +459,7 @@ section[data-testid="stSidebar"] > div {{
 }}
 .hero-card {{
     position: relative;
-    display: grid;
+    display: none;
     grid-template-columns: 200px minmax(0, 1fr);
     gap: 1.15rem;
     align-items: stretch;
@@ -1384,14 +1384,6 @@ st.markdown(
 )
 
 if DASHBOARD_VIDEO_URL.strip():
-    st.markdown(
-        """
-        <div class="video-panel">
-            <p class="video-panel-title">Video de referencia</p>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
     st.video(DASHBOARD_VIDEO_URL)
 
 # --- Configuracion de URLs (Mover aqui para evitar NameError) ---
