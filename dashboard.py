@@ -110,7 +110,7 @@ APP_DIR = Path(__file__).resolve().parent
 LOGO_PATH = APP_DIR / 'logo elite.png'
 LOGO_URL_LARGE = "https://raw.githubusercontent.com/juandavdidtejedormedina-rgb/dashboard-invernaderos/main/logo%20elite.png"
 LOGO_URL_SMALL = LOGO_URL_LARGE
-DASHBOARD_VIDEO_URL = "https://raw.githubusercontent.com/juandavdidtejedormedina-rgb/dashboard-invernaderos/92e7785e8f5bd984f6ffff48ceb3153a2a2d9d36/For%20Creciendo.mp4"
+DASHBOARD_VIDEO_URL = "https://youtu.be/AYQy7qJVV0o?si=edaYAGb9nGTLFHUY"
 STREAMLIT_LOGO_WIDTH = 74
 STREAMLIT_LOGO_HEIGHT = 74
 STREAMLIT_LOGO_BORDER_RADIUS = 10
@@ -1402,11 +1402,12 @@ st.markdown(
 )
 
 if DASHBOARD_VIDEO_URL.strip():
-    youtube_embed_url = _youtube_embed_url(DASHBOARD_VIDEO_URL)
-    if youtube_embed_url:
-        components.iframe(youtube_embed_url, height=430, scrolling=False)
-    else:
-        st.video(DASHBOARD_VIDEO_URL)
+    with st.expander("Video introductorio", expanded=False):
+        youtube_embed_url = _youtube_embed_url(DASHBOARD_VIDEO_URL)
+        if youtube_embed_url:
+            components.iframe(youtube_embed_url, height=430, scrolling=False)
+        else:
+            st.video(DASHBOARD_VIDEO_URL)
 
 # --- Configuracion de URLs (Mover aqui para evitar NameError) ---
 URL_VARIABLES = "https://raw.githubusercontent.com/juandavdidtejedormedina-rgb/dashboard-invernaderos/main/Datos_variables.xlsx"
