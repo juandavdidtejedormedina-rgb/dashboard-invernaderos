@@ -302,6 +302,12 @@ section[data-testid="stSidebar"] > div {{
     align-items: center;
     overflow: visible !important;
 }}
+[data-testid="stSidebarCollapseButton"] {{
+    position: absolute !important;
+    top: 1.7rem !important;
+    right: 0.45rem !important;
+    z-index: 20 !important;
+}}
 [data-testid="stSidebarHeader"] a {{
     display: inline-flex;
     align-items: center;
