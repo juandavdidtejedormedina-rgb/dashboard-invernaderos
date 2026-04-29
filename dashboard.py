@@ -92,7 +92,7 @@ APP_DIR = Path(__file__).resolve().parent
 LOGO_PATH = APP_DIR / 'logo elite.png'
 LOGO_URL_LARGE = "https://raw.githubusercontent.com/juandavdidtejedormedina-rgb/dashboard-invernaderos/main/logo%20elite.png"
 LOGO_URL_SMALL = LOGO_URL_LARGE
-DASHBOARD_VIDEO_URL = ""
+DASHBOARD_VIDEO_URL = "https://youtu.be/AYQy7qJVV0o?si=edaYAGb9nGTLFHUY"
 STREAMLIT_LOGO_WIDTH = 74
 STREAMLIT_LOGO_HEIGHT = 74
 STREAMLIT_LOGO_BORDER_RADIUS = 10
