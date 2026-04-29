@@ -310,6 +310,13 @@ section[data-testid="stSidebar"] > div {{
     left: auto !important;
     z-index: 20 !important;
 }}
+[data-testid="stSidebarHeader"] button {{
+    position: absolute !important;
+    top: 1.7rem !important;
+    right: 0.45rem !important;
+    left: auto !important;
+    z-index: 20 !important;
+}}
 [data-testid="stSidebarHeader"] a {{
     display: inline-flex;
     align-items: center;
