@@ -708,15 +708,28 @@ section[data-testid="stSidebar"] > div {{
     display: inline-flex;
     align-items: center;
     align-self: flex-start;
-    gap: 0.28rem;
+    gap: 0.34rem;
     margin-top: 0.52rem;
-    padding: 0.24rem 0.58rem;
+    padding: 0.26rem 0.58rem;
     border-radius: 999px;
     background: rgba(79, 127, 191, 0.10);
     color: #365F98;
-    font-size: 0.74rem;
-    font-weight: 800;
+    font-size: 0.7rem;
+    font-weight: 750;
     letter-spacing: 0.01em;
+    max-width: 100%;
+    line-height: 1.15;
+}}
+.summary-card-delta-value {{
+    flex: 0 0 auto;
+    white-space: nowrap;
+    font-weight: 850;
+}}
+.summary-card-delta-label {{
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }}
 .summary-card-delta.is-positive {{
     background: rgba(28, 132, 87, 0.11);
@@ -1883,7 +1896,8 @@ def _build_summary_delta_html(df_variables, df_reference, var_name, config, summ
 
     return (
         f'<span class="summary-card-delta {delta_class}">'
-        f'{sign}{delta_text} {config["unit_html"]} vs {html.escape(reference_label)}'
+        f'<span class="summary-card-delta-value">{sign}{delta_text} {config["unit_html"]}</span>'
+        f'<span class="summary-card-delta-label">vs {html.escape(reference_label)}</span>'
         '</span>'
     )
 
@@ -1975,7 +1989,7 @@ def _render_summary_cards(df_variables, fecha_variables, summary_mode='Promedio'
         st.markdown(cards_html, unsafe_allow_html=True)
 
 
-def _render_reference_summary_cards(df_reference, fecha_variables, summary_mode, reference_label):
+def _render_reference_summary_cards(df_reference, fecha_variables, summary_mode, reference_label, df_base=None, base_label='Bloque seleccionado'):
     if not isinstance(df_reference, pd.DataFrame) or df_reference.empty:
         return
 
@@ -1983,23 +1997,29 @@ def _render_reference_summary_cards(df_reference, fecha_variables, summary_mode,
         f'<p class="analysis-note"><strong>{html.escape(reference_label)}</strong></p>',
         unsafe_allow_html=True
     )
-    _render_summary_cards(df_reference, fecha_variables, summary_mode=summary_mode)
+    _render_summary_cards(
+        df_reference,
+        fecha_variables,
+        summary_mode=summary_mode,
+        df_reference=df_base,
+        reference_label=base_label
+    )
 
 
-def _render_summary_cards_selector(df_variables, fecha_variables, df_reference=None, reference_label='Estación externa'):
+def _render_summary_cards_selector(df_variables, fecha_variables, df_reference=None, reference_label='Estación externa', base_label='Bloque seleccionado'):
     tab_promedio, tab_maximo, tab_minimo = st.tabs(["Promedio", "Máximo", "Mínimo"])
 
     with tab_promedio:
         _render_summary_cards(df_variables, fecha_variables, summary_mode='Promedio', df_reference=df_reference, reference_label=reference_label)
-        _render_reference_summary_cards(df_reference, fecha_variables, 'Promedio', reference_label)
+        _render_reference_summary_cards(df_reference, fecha_variables, 'Promedio', reference_label, df_base=df_variables, base_label=base_label)
 
     with tab_maximo:
         _render_summary_cards(df_variables, fecha_variables, summary_mode='Máximo', df_reference=df_reference, reference_label=reference_label)
-        _render_reference_summary_cards(df_reference, fecha_variables, 'Máximo', reference_label)
+        _render_reference_summary_cards(df_reference, fecha_variables, 'Máximo', reference_label, df_base=df_variables, base_label=base_label)
 
     with tab_minimo:
         _render_summary_cards(df_variables, fecha_variables, summary_mode='Mínimo', df_reference=df_reference, reference_label=reference_label)
-        _render_reference_summary_cards(df_reference, fecha_variables, 'Mínimo', reference_label)
+        _render_reference_summary_cards(df_reference, fecha_variables, 'Mínimo', reference_label, df_base=df_variables, base_label=base_label)
 
 
 def _info_panel_icon_svg(icon_name):
@@ -4349,7 +4369,8 @@ with tab_correlacion:
             df_variables_corr,
             fecha_variables,
             df_reference=summary_reference_df,
-            reference_label='Estación externa'
+            reference_label='Estación externa',
+            base_label=block_label
         )
 
         block_label = _format_block_display_name(bloque_seleccionado or bloque_variables)
