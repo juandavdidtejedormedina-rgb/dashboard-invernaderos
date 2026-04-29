@@ -245,6 +245,11 @@ st.markdown(f"""
     --elite-ink: {BRAND_COLORS['ink']};
     --elite-paper: {BRAND_COLORS['paper']};
     --elite-white: {BRAND_COLORS['white']};
+    --control-idle: rgba(255, 255, 255, 0.10);
+    --control-idle-strong: rgba(255, 255, 255, 0.15);
+    --control-active: #4F7FBF;
+    --control-active-deep: #365F98;
+    --control-hover: rgba(214, 229, 236, 0.20);
     --font-display: 'Manrope', sans-serif;
     --font-body: 'Manrope', sans-serif;
     --font-brand: 'Cormorant Garamond', serif;
@@ -429,21 +434,21 @@ section[data-testid="stSidebar"] > div {{
     width: 100%;
     padding: 0.38rem 0.56rem;
     border-radius: 18px;
-    border: 1px solid rgba(255, 255, 255, 0.10);
-    background: linear-gradient(180deg, rgba(255,255,255,0.13), rgba(255,255,255,0.06));
-    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.12);
+    border: 1px solid var(--control-idle-strong);
+    background: linear-gradient(180deg, rgba(255,255,255,0.11), rgba(255,255,255,0.055));
+    box-shadow: 0 8px 18px rgba(0, 0, 0, 0.10);
     transition: background 0.2s ease, transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
 }}
 [data-testid="stSidebar"] [data-testid="stCheckbox"] label:hover {{
-    background: linear-gradient(180deg, rgba(255,255,255,0.18), rgba(255,255,255,0.10));
-    border-color: rgba(214, 229, 236, 0.42);
-    box-shadow: 0 14px 28px rgba(0, 0, 0, 0.16);
+    background: linear-gradient(180deg, var(--control-hover), rgba(255,255,255,0.08));
+    border-color: rgba(214, 229, 236, 0.50);
+    box-shadow: 0 12px 24px rgba(0, 0, 0, 0.14);
     transform: translateX(2px);
 }}
 [data-testid="stSidebar"] [data-testid="stCheckbox"] label:has([aria-checked="true"]) {{
-    border-color: rgba(255, 255, 255, 0.24);
-    background: linear-gradient(135deg, rgba(116, 108, 170, 0.84), rgba(82, 75, 130, 0.96));
-    box-shadow: inset 0 1px 0 rgba(255,255,255,0.16), 0 16px 30px rgba(27, 23, 53, 0.30);
+    border-color: rgba(214, 229, 236, 0.58);
+    background: linear-gradient(135deg, rgba(79, 127, 191, 0.92), rgba(54, 95, 152, 0.96));
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.18), 0 14px 28px rgba(25, 48, 83, 0.26);
 }}
 [data-testid="stSidebar"] [data-testid="stCheckbox"] p {{
     font-size: 0.9rem;
@@ -460,18 +465,18 @@ section[data-testid="stSidebar"] > div {{
     width: 100%;
     min-height: 2.95rem;
     border-radius: 999px;
-    border: 1px solid rgba(255, 255, 255, 0.14);
-    background: linear-gradient(135deg, #6a639c 0%, #4c4678 100%);
+    border: 1px solid rgba(214, 229, 236, 0.26);
+    background: linear-gradient(135deg, var(--control-active) 0%, var(--control-active-deep) 100%);
     color: var(--elite-white);
     font-family: var(--font-display);
     font-weight: 800;
     font-size: 0.92rem;
     letter-spacing: 0.02em;
-    box-shadow: inset 0 1px 0 rgba(255,255,255,0.16), 0 18px 32px rgba(27, 23, 53, 0.32);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.18), 0 16px 30px rgba(25, 48, 83, 0.30);
 }}
 [data-testid="stSidebar"] div.stButton > button:hover {{
-    border-color: rgba(255, 255, 255, 0.22);
-    background: linear-gradient(135deg, #776fb0 0%, #575184 100%);
+    border-color: rgba(214, 229, 236, 0.42);
+    background: linear-gradient(135deg, #5E8ED0 0%, #416EA9 100%);
     color: var(--elite-white);
     transform: translateY(-1px);
 }}
@@ -1279,21 +1284,21 @@ div[data-testid="stDataFrame"] {{
     margin: 0;
     padding: 0.42rem 0.56rem;
     border-radius: 18px;
-    border: 1px solid rgba(255, 255, 255, 0.10);
-    background: linear-gradient(180deg, rgba(255,255,255,0.12), rgba(255,255,255,0.06));
-    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.12);
+    border: 1px solid var(--control-idle-strong);
+    background: linear-gradient(180deg, rgba(255,255,255,0.11), rgba(255,255,255,0.055));
+    box-shadow: 0 8px 18px rgba(0, 0, 0, 0.10);
     transition: background 0.2s ease, transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
 }}
 [data-testid="stSidebar"] [data-testid="stRadio"] div[role="radiogroup"] > label:hover {{
-    background: linear-gradient(180deg, rgba(255,255,255,0.18), rgba(255,255,255,0.10));
-    border-color: rgba(214, 229, 236, 0.42);
-    box-shadow: 0 14px 28px rgba(0, 0, 0, 0.16);
+    background: linear-gradient(180deg, var(--control-hover), rgba(255,255,255,0.08));
+    border-color: rgba(214, 229, 236, 0.50);
+    box-shadow: 0 12px 24px rgba(0, 0, 0, 0.14);
     transform: translateX(2px);
 }}
 [data-testid="stSidebar"] [data-testid="stRadio"] div[role="radiogroup"] > label:has(input:checked) {{
-    border-color: rgba(255, 255, 255, 0.26);
-    background: linear-gradient(135deg, rgba(124, 115, 177, 0.92), rgba(82, 75, 130, 0.96));
-    box-shadow: inset 0 1px 0 rgba(255,255,255,0.20), 0 16px 30px rgba(27, 23, 53, 0.30);
+    border-color: rgba(214, 229, 236, 0.58);
+    background: linear-gradient(135deg, rgba(79, 127, 191, 0.92), rgba(54, 95, 152, 0.96));
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.18), 0 14px 28px rgba(25, 48, 83, 0.26);
 }}
 [data-testid="stSidebar"] [data-testid="stRadio"] div[role="radiogroup"] > label p {{
     font-size: 0.92rem;
