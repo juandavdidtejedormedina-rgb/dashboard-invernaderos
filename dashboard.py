@@ -306,7 +306,7 @@ section[data-testid="stSidebar"] > div {{
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    margin: 0 auto 1rem auto !important;
+    margin: 1.1rem auto 1rem auto !important;
     padding: 0.28rem;
     border: 1px solid rgba(255, 255, 255, 0.42);
     border-radius: calc(var(--streamlit-logo-radius) + 6px);
@@ -314,7 +314,7 @@ section[data-testid="stSidebar"] > div {{
     box-shadow: 0 10px 22px rgba(16, 18, 32, 0.16);
     position: relative;
     left: 50%;
-    transform: translateX(-50%);
+    transform: translateX(-50%) translateY(10px);
 }}
 [data-testid="stSidebarHeader"] img,
 [data-testid="stSidebarHeader"] [data-testid="stLogo"] img {{
