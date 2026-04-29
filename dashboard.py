@@ -278,7 +278,7 @@ section[data-testid="stSidebar"] > div {{
     width: 268px !important;
 }}
 [data-testid="stSidebar"] .block-container {{
-    padding: 0.8rem 0.7rem 1rem 0.7rem;
+    padding: 3.1rem 0.7rem 1rem 0.7rem;
 }}
 [data-testid="stSidebar"] {{
     background:
@@ -291,26 +291,30 @@ section[data-testid="stSidebar"] > div {{
     color: #f7f7fb;
 }}
 [data-testid="stSidebarHeader"] {{
-    padding-top: 0.9rem !important;
-    padding-bottom: 0.35rem !important;
+    padding-top: 2.1rem !important;
+    padding-bottom: 0.6rem !important;
     overflow: visible !important;
 }}
 [data-testid="stSidebarHeader"] > div {{
     width: 100%;
     display: flex;
     justify-content: center;
+    align-items: center;
     overflow: visible !important;
 }}
 [data-testid="stSidebarHeader"] a {{
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    margin: 0 auto 0.8rem auto;
+    margin: 1.1rem auto 1rem auto !important;
     padding: 0.28rem;
     border: 1px solid rgba(255, 255, 255, 0.42);
     border-radius: calc(var(--streamlit-logo-radius) + 6px);
     background: linear-gradient(180deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.03) 100%);
     box-shadow: 0 10px 22px rgba(16, 18, 32, 0.16);
+    position: relative;
+    left: 50%;
+    transform: translateX(-50%) translateY(10px);
 }}
 [data-testid="stSidebarHeader"] img,
 [data-testid="stSidebarHeader"] [data-testid="stLogo"] img {{
@@ -324,7 +328,7 @@ section[data-testid="stSidebar"] > div {{
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    margin: 0.05rem 0 0.8rem 0.15rem;
+    margin: 1.2rem 0 1.2rem 0.15rem;
     color: #ffffff;
     font-family: var(--font-display);
     font-size: 1.42rem;
