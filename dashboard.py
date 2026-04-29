@@ -1935,7 +1935,7 @@ def _build_summary_cards_html(df_variables, fecha_variables, summary_mode='Prome
             config,
             summary_mode_config,
             reference_label
-        )
+        ) if single_day else ''
 
         if not df_variables.empty and var_name in df_variables.columns:
             if single_day:
