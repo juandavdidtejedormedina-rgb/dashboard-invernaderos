@@ -1705,6 +1705,7 @@ def _get_summary_metric_config(var_name):
         return {
             'label': 'Temperatura',
             'unit_html': '&deg;C',
+            'delta_unit_html': '&deg;C',
             'decimals': 1,
             'icon_svg': (
                 '<svg viewBox="0 0 24 24" aria-hidden="true">'
@@ -1717,6 +1718,7 @@ def _get_summary_metric_config(var_name):
         return {
             'label': 'Humedad Relativa',
             'unit_html': '%',
+            'delta_unit_html': '%',
             'decimals': 1,
             'icon_svg': (
                 '<svg viewBox="0 0 24 24" aria-hidden="true">'
@@ -1728,6 +1730,7 @@ def _get_summary_metric_config(var_name):
         return {
             'label': 'Radiación PAR',
             'unit_html': 'umol m<sup>-2</sup> s<sup>-1</sup>',
+            'delta_unit_html': 'umol/m2/s',
             'decimals': 0,
             'icon_svg': (
                 '<svg viewBox="0 0 24 24" aria-hidden="true">'
@@ -1747,6 +1750,7 @@ def _get_summary_metric_config(var_name):
         return {
             'label': 'Gramos de agua',
             'unit_html': 'g',
+            'delta_unit_html': 'g',
             'decimals': 1,
             'icon_svg': (
                 '<svg viewBox="0 0 24 24" aria-hidden="true">'
@@ -1760,6 +1764,7 @@ def _get_summary_metric_config(var_name):
     return {
         'label': str(var_name),
         'unit_html': '',
+        'delta_unit_html': '',
         'decimals': 1,
         'icon_svg': (
             '<svg viewBox="0 0 24 24" aria-hidden="true">'
@@ -1912,7 +1917,7 @@ def _build_summary_delta_html(df_variables, df_reference, var_name, config, summ
 
     return (
         f'<span class="summary-card-delta {delta_class}">'
-        f'<span class="summary-card-delta-value">{sign}{delta_text} {config["unit_html"]}</span>'
+        f'<span class="summary-card-delta-value">{sign}{delta_text} {config.get("delta_unit_html", config["unit_html"])}</span>'
         f'<span class="summary-card-delta-label">vs {html.escape(reference_label)}</span>'
         '</span>'
     )
