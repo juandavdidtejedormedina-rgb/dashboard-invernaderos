@@ -4360,6 +4360,7 @@ with tab_correlacion:
             df_variables_corr[['DateTime'] + variables_sensor].dropna(how='all', subset=variables_sensor)
             if variables_sensor else pd.DataFrame()
         )
+        block_label = _format_block_display_name(bloque_seleccionado or bloque_variables)
         summary_reference_df = (
             df_variables_almacen_corr
             if not df_variables_almacen_corr.empty and selected_block_code != 'ALMACEN'
@@ -4373,7 +4374,6 @@ with tab_correlacion:
             base_label=block_label
         )
 
-        block_label = _format_block_display_name(bloque_seleccionado or bloque_variables)
         block_modification = _get_block_modification(block_label)
         culatas_observation = _get_culatas_daily_observation(datos_cortinas_sel, block_label)
         culatas_by_day = _get_culatas_observation_by_day(datos_cortinas_sel, block_label)
