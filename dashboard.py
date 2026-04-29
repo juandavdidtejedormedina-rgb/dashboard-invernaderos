@@ -702,6 +702,34 @@ section[data-testid="stSidebar"] > div {{
     font-weight: 500;
     text-align: right;
 }}
+.summary-card-delta {{
+    position: relative;
+    z-index: 1;
+    display: inline-flex;
+    align-items: center;
+    align-self: flex-start;
+    gap: 0.28rem;
+    margin-top: 0.52rem;
+    padding: 0.24rem 0.58rem;
+    border-radius: 999px;
+    background: rgba(79, 127, 191, 0.10);
+    color: #365F98;
+    font-size: 0.74rem;
+    font-weight: 800;
+    letter-spacing: 0.01em;
+}}
+.summary-card-delta.is-positive {{
+    background: rgba(28, 132, 87, 0.11);
+    color: #1C8457;
+}}
+.summary-card-delta.is-negative {{
+    background: rgba(181, 86, 97, 0.12);
+    color: #A34858;
+}}
+.summary-card-delta.is-neutral {{
+    background: rgba(95, 100, 114, 0.12);
+    color: #5f6472;
+}}
 .summary-card-day-list-wrap {{
     position: relative;
     z-index: 1;
@@ -1830,13 +1858,44 @@ def _build_summary_daily_list_html(daily_values, config):
     )
 
 
-def _build_summary_cards_html(df_variables, fecha_variables, summary_mode='Promedio'):
+def _calculate_summary_value(df_variables, var_name, summary_mode_config):
+    if df_variables.empty or var_name not in df_variables.columns:
+        return None
+
+    serie = pd.to_numeric(df_variables[var_name], errors='coerce').dropna()
+    if serie.empty:
+        return None
+
+    return summary_mode_config['calculator'](serie)
+
+
+def _build_summary_delta_html(df_variables, df_reference, var_name, config, summary_mode_config, reference_label):
+    summary_value = _calculate_summary_value(df_variables, var_name, summary_mode_config)
+    reference_value = _calculate_summary_value(df_reference, var_name, summary_mode_config)
+
+    if summary_value is None or reference_value is None:
+        return ''
+
+    delta_value = float(summary_value) - float(reference_value)
+    delta_text = _format_summary_number(abs(delta_value), config['decimals'])
+    sign = '+' if delta_value > 0 else '-' if delta_value < 0 else ''
+    delta_class = 'is-positive' if delta_value > 0 else 'is-negative' if delta_value < 0 else 'is-neutral'
+
+    return (
+        f'<span class="summary-card-delta {delta_class}">'
+        f'{sign}{delta_text} {config["unit_html"]} vs {html.escape(reference_label)}'
+        '</span>'
+    )
+
+
+def _build_summary_cards_html(df_variables, fecha_variables, summary_mode='Promedio', df_reference=None, reference_label='Estación externa'):
     if fecha_variables is None:
         return ''
 
     fecha_inicio, fecha_fin = fecha_variables
     single_day = fecha_inicio == fecha_fin
     summary_mode_config = _get_summary_mode_config(summary_mode, single_day)
+    df_reference = df_reference if isinstance(df_reference, pd.DataFrame) else pd.DataFrame()
     period_chip = summary_mode_config['chip_text']
     period_text = (
         fecha_inicio.strftime('%d/%m/%Y')
@@ -1855,12 +1914,19 @@ def _build_summary_cards_html(df_variables, fecha_variables, summary_mode='Prome
             '<span class="summary-card-empty">Sin datos</span>'
             '</div>'
         )
+        delta_markup = _build_summary_delta_html(
+            df_variables,
+            df_reference,
+            var_name,
+            config,
+            summary_mode_config,
+            reference_label
+        )
 
         if not df_variables.empty and var_name in df_variables.columns:
             if single_day:
-                serie = pd.to_numeric(df_variables[var_name], errors='coerce').dropna()
-                if not serie.empty:
-                    summary_value = summary_mode_config['calculator'](serie)
+                summary_value = _calculate_summary_value(df_variables, var_name, summary_mode_config)
+                if summary_value is not None:
                     number_text = _format_summary_number(summary_value, config['decimals'])
                     value_markup = (
                         '<div class="summary-card-value">'
@@ -1885,6 +1951,7 @@ def _build_summary_cards_html(df_variables, fecha_variables, summary_mode='Prome
                 f'<span class="summary-card-label">{html.escape(config["label"])}</span>'
                 '</div>'
                 f'{value_markup}'
+                f'{delta_markup}'
                 '<div class="summary-card-footer">'
                 f'<span class="summary-card-chip">{html.escape(period_chip)}</span>'
                 f'<span class="summary-card-period">{html.escape(period_text)}</span>'
@@ -1896,23 +1963,43 @@ def _build_summary_cards_html(df_variables, fecha_variables, summary_mode='Prome
     return f'<div class="summary-grid">{"".join(cards_html)}</div>'
 
 
-def _render_summary_cards(df_variables, fecha_variables, summary_mode='Promedio'):
-    cards_html = _build_summary_cards_html(df_variables, fecha_variables, summary_mode=summary_mode)
+def _render_summary_cards(df_variables, fecha_variables, summary_mode='Promedio', df_reference=None, reference_label='Estación externa'):
+    cards_html = _build_summary_cards_html(
+        df_variables,
+        fecha_variables,
+        summary_mode=summary_mode,
+        df_reference=df_reference,
+        reference_label=reference_label
+    )
     if cards_html:
         st.markdown(cards_html, unsafe_allow_html=True)
 
 
-def _render_summary_cards_selector(df_variables, fecha_variables):
+def _render_reference_summary_cards(df_reference, fecha_variables, summary_mode, reference_label):
+    if not isinstance(df_reference, pd.DataFrame) or df_reference.empty:
+        return
+
+    st.markdown(
+        f'<p class="analysis-note"><strong>{html.escape(reference_label)}</strong></p>',
+        unsafe_allow_html=True
+    )
+    _render_summary_cards(df_reference, fecha_variables, summary_mode=summary_mode)
+
+
+def _render_summary_cards_selector(df_variables, fecha_variables, df_reference=None, reference_label='Estación externa'):
     tab_promedio, tab_maximo, tab_minimo = st.tabs(["Promedio", "Máximo", "Mínimo"])
 
     with tab_promedio:
-        _render_summary_cards(df_variables, fecha_variables, summary_mode='Promedio')
+        _render_summary_cards(df_variables, fecha_variables, summary_mode='Promedio', df_reference=df_reference, reference_label=reference_label)
+        _render_reference_summary_cards(df_reference, fecha_variables, 'Promedio', reference_label)
 
     with tab_maximo:
-        _render_summary_cards(df_variables, fecha_variables, summary_mode='Máximo')
+        _render_summary_cards(df_variables, fecha_variables, summary_mode='Máximo', df_reference=df_reference, reference_label=reference_label)
+        _render_reference_summary_cards(df_reference, fecha_variables, 'Máximo', reference_label)
 
     with tab_minimo:
-        _render_summary_cards(df_variables, fecha_variables, summary_mode='Mínimo')
+        _render_summary_cards(df_variables, fecha_variables, summary_mode='Mínimo', df_reference=df_reference, reference_label=reference_label)
+        _render_reference_summary_cards(df_reference, fecha_variables, 'Mínimo', reference_label)
 
 
 def _info_panel_icon_svg(icon_name):
@@ -3507,7 +3594,171 @@ def _render_hourly_metric_chart(grouped_df, variable_name, metric_column):
     )
 
 
-def _render_hourly_analysis_view(df_variables, fecha_variables, selected_blocks):
+def _collect_analysis_metrics(df_source, tab_label):
+    metrics_data = {}
+    if not isinstance(df_source, pd.DataFrame) or df_source.empty:
+        return metrics_data
+
+    for variable_name in SENSOR_VARIABLES:
+        required_cols = {'DateTime', 'Bloque', variable_name}
+        if not required_cols.issubset(df_source.columns):
+            continue
+
+        data = df_source[['DateTime', 'Bloque', variable_name]].dropna(subset=['DateTime', 'Bloque', variable_name]).copy()
+        if data.empty:
+            continue
+
+        series = pd.to_numeric(data[variable_name], errors='coerce').dropna()
+        if series.empty:
+            continue
+
+        metrics_data[variable_name] = {
+            'principal': series.mean() if tab_label == "Promedio" else (series.var(ddof=1) if len(series) > 1 else 0.0),
+            'minimo': series.min(),
+            'maximo': series.max()
+        }
+
+    return metrics_data
+
+
+def _render_analysis_metric_cards_row(metrics_data, tab_label, single_day_analysis, heading=None):
+    if not metrics_data:
+        return
+
+    if heading:
+        st.markdown(
+            f'<p class="analysis-note"><strong>{html.escape(heading)}</strong></p>',
+            unsafe_allow_html=True
+        )
+
+    metric_cols = st.columns(4)
+    for idx, variable_name in enumerate(SENSOR_VARIABLES):
+        if idx >= len(metric_cols) or variable_name not in metrics_data:
+            continue
+
+        with metric_cols[idx]:
+            stats_payload = metrics_data[variable_name]
+            value = stats_payload['principal']
+            color = VARIABLE_COLORS.get(variable_name, BRAND_COLORS['graphite'])
+            unit = VARIABLE_UNITS.get(variable_name, '')
+            min_value = stats_payload['minimo']
+            max_value = stats_payload['maximo']
+
+            if tab_label == "Promedio":
+                display_value = f"{value:.1f}"
+                if single_day_analysis:
+                    descriptor = "Promedio general de todas las mediciones del día seleccionado."
+                    footer_label = "Promedio general del día"
+                else:
+                    descriptor = "Promedio general de todas las mediciones del rango seleccionado."
+                    footer_label = "Promedio general del periodo"
+            else:
+                display_value = f"{value:.2f}"
+                descriptor = "Varianza general calculada con todas las mediciones del rango seleccionado."
+                footer_label = "Varianza general del periodo"
+                if single_day_analysis:
+                    display_value = "0.00"
+                    descriptor = "En un solo día la varianza se reporta en 0 por consistencia analítica."
+                    footer_label = "Varianza en un día"
+
+            metric_card_html = f'''
+            <div style="
+                background: linear-gradient(135deg, rgba(255,255,255,0.95) 0%, rgba(255,255,255,0.85) 100%);
+                border-left: 4px solid {color};
+                padding: 20px;
+                border-radius: 8px;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+                overflow: hidden;
+            ">
+                <p style="
+                    font-family: 'Manrope', sans-serif;
+                    font-size: 13px;
+                    color: {color};
+                    font-weight: 500;
+                    margin: 0 0 12px 0;
+                    text-transform: uppercase;
+                    letter-spacing: 0.5px;
+                ">{html.escape(variable_name)}</p>
+                <div style="display: flex; align-items: baseline; gap: 4px; flex-wrap: wrap;">
+                    <p style="
+                        font-family: 'Manrope', sans-serif;
+                        font-size: 32px;
+                        font-weight: 700;
+                        color: {BRAND_COLORS['ink']};
+                        margin: 0;
+                        line-height: 1;
+                    ">{display_value}</p>
+                    <p style="
+                        font-family: 'Manrope', sans-serif;
+                        font-size: 12px;
+                        color: {BRAND_COLORS['graphite']};
+                        margin: 0;
+                        font-weight: 500;
+                        word-break: break-word;
+                        line-height: 1.3;
+                    ">{unit}</p>
+                </div>
+                <p style="
+                    font-family: 'Manrope', sans-serif;
+                    font-size: 11px;
+                    color: {BRAND_COLORS['graphite']};
+                    margin: 10px 0 0 0;
+                    line-height: 1.45;
+                ">{descriptor}</p>
+                <div style="
+                    display: flex;
+                    justify-content: space-between;
+                    gap: 8px;
+                    margin-top: 12px;
+                    padding-top: 10px;
+                    border-top: 1px solid rgba(76, 70, 120, 0.10);
+                ">
+                    <div>
+                        <p style="
+                            font-family: 'Manrope', sans-serif;
+                            font-size: 10px;
+                            color: {BRAND_COLORS['graphite']};
+                            margin: 0 0 4px 0;
+                            text-transform: uppercase;
+                        ">Mínimo</p>
+                        <p style="
+                            font-family: 'Manrope', sans-serif;
+                            font-size: 14px;
+                            font-weight: 700;
+                            color: {BRAND_COLORS['ink']};
+                            margin: 0;
+                        ">{min_value:.2f}</p>
+                    </div>
+                    <div style="text-align: right;">
+                        <p style="
+                            font-family: 'Manrope', sans-serif;
+                            font-size: 10px;
+                            color: {BRAND_COLORS['graphite']};
+                            margin: 0 0 4px 0;
+                            text-transform: uppercase;
+                        ">Máximo</p>
+                        <p style="
+                            font-family: 'Manrope', sans-serif;
+                            font-size: 14px;
+                            font-weight: 700;
+                            color: {BRAND_COLORS['ink']};
+                            margin: 0;
+                        ">{max_value:.2f}</p>
+                    </div>
+                </div>
+                <p style="
+                    font-family: 'Manrope', sans-serif;
+                    font-size: 11px;
+                    color: {color};
+                    margin: 10px 0 0 0;
+                    font-weight: 500;
+                ">{footer_label}</p>
+            </div>
+            '''
+            st.markdown(metric_card_html, unsafe_allow_html=True)
+
+
+def _render_hourly_analysis_view(df_variables, fecha_variables, selected_blocks, df_external_station=None):
     if df_variables.empty:
         fecha_inicio, fecha_fin = fecha_variables
         fecha_label = (
@@ -3681,6 +3932,14 @@ def _render_hourly_analysis_view(df_variables, fecha_variables, selected_blocks)
                             </div>
                             '''
                             st.markdown(metric_card_html, unsafe_allow_html=True)
+
+            external_metrics_data = _collect_analysis_metrics(df_external_station, tab_label)
+            _render_analysis_metric_cards_row(
+                external_metrics_data,
+                tab_label,
+                single_day_analysis,
+                heading='Estación externa'
+            )
 
             if len(selected_blocks) == 1 and tab_label == "Promedio":
                 st.markdown('<p class="analysis-note">Este resumen muestra el promedio consolidado del bloque seleccionado dentro del periodo filtrado y los extremos observados para cada variable.</p>', unsafe_allow_html=True)
@@ -3866,10 +4125,21 @@ if dashboard_mode == "Varianza Y Promedio":
             fecha_fin_analisis,
             analysis_block_names
         )
+        estacion_externa_name = analysis_variable_map.get('ALMACEN')
+        df_estacion_externa_analisis = (
+            _filter_variables_multi_block_range(
+                _df_variables_all,
+                fecha_inicio_analisis,
+                fecha_fin_analisis,
+                [estacion_externa_name]
+            )
+            if estacion_externa_name else pd.DataFrame()
+        )
         _render_hourly_analysis_view(
             df_variables_analisis,
             fecha_analisis,
-            analysis_block_names
+            analysis_block_names,
+            df_external_station=df_estacion_externa_analisis
         )
     st.stop()
 
@@ -4070,7 +4340,17 @@ with tab_correlacion:
             df_variables_corr[['DateTime'] + variables_sensor].dropna(how='all', subset=variables_sensor)
             if variables_sensor else pd.DataFrame()
         )
-        _render_summary_cards_selector(df_variables_corr, fecha_variables)
+        summary_reference_df = (
+            df_variables_almacen_corr
+            if not df_variables_almacen_corr.empty and selected_block_code != 'ALMACEN'
+            else None
+        )
+        _render_summary_cards_selector(
+            df_variables_corr,
+            fecha_variables,
+            df_reference=summary_reference_df,
+            reference_label='Estación externa'
+        )
 
         block_label = _format_block_display_name(bloque_seleccionado or bloque_variables)
         block_modification = _get_block_modification(block_label)
