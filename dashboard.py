@@ -110,7 +110,7 @@ APP_DIR = Path(__file__).resolve().parent
 LOGO_PATH = APP_DIR / 'logo elite.png'
 LOGO_URL_LARGE = "https://raw.githubusercontent.com/juandavdidtejedormedina-rgb/dashboard-invernaderos/main/logo%20elite.png"
 LOGO_URL_SMALL = LOGO_URL_LARGE
-DASHBOARD_VIDEO_URL = "https://youtu.be/AYQy7qJVV0o?si=edaYAGb9nGTLFHUY"
+DASHBOARD_VIDEO_URL = ""
 STREAMLIT_LOGO_WIDTH = 74
 STREAMLIT_LOGO_HEIGHT = 74
 STREAMLIT_LOGO_BORDER_RADIUS = 10
@@ -427,7 +427,8 @@ section[data-testid="stSidebar"] > div {{
 }}
 [data-testid="stSidebar"] [data-testid="stCheckbox"] label {{
     width: 100%;
-    padding: 0.38rem 0.56rem;
+    min-height: 2.42rem;
+    padding: 0.38rem 0.46rem 0.38rem 0.52rem;
     border-radius: 18px;
     border: 1px solid rgba(255, 255, 255, 0.10);
     background: linear-gradient(180deg, rgba(255,255,255,0.13), rgba(255,255,255,0.06));
@@ -446,9 +447,22 @@ section[data-testid="stSidebar"] > div {{
     box-shadow: inset 0 1px 0 rgba(255,255,255,0.16), 0 16px 30px rgba(27, 23, 53, 0.30);
 }}
 [data-testid="stSidebar"] [data-testid="stCheckbox"] p {{
-    font-size: 0.9rem;
+    font-size: 0.82rem;
     font-weight: 600;
     letter-spacing: 0.01em;
+    line-height: 1.15;
+    white-space: nowrap;
+}}
+[data-testid="stSidebar"] [data-testid="stCheckbox"] label > div {{
+    flex: 0 0 auto;
+}}
+[data-testid="stSidebar"] [data-testid="stCheckbox"] label > div:last-child {{
+    min-width: 0;
+    flex: 1 1 auto;
+}}
+[data-testid="stSidebar"] [data-testid="stCheckbox"] [data-testid="stTooltipIcon"] {{
+    margin-left: auto;
+    flex: 0 0 auto;
 }}
 [data-testid="stSidebar"] [data-testid="stCheckbox"] svg {{
     fill: var(--elite-white);
