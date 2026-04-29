@@ -92,6 +92,7 @@ APP_DIR = Path(__file__).resolve().parent
 LOGO_PATH = APP_DIR / 'logo elite.png'
 LOGO_URL_LARGE = "https://raw.githubusercontent.com/juandavdidtejedormedina-rgb/dashboard-invernaderos/main/logo%20elite.png"
 LOGO_URL_SMALL = LOGO_URL_LARGE
+DASHBOARD_VIDEO_URL = ""
 STREAMLIT_LOGO_WIDTH = 74
 STREAMLIT_LOGO_HEIGHT = 74
 STREAMLIT_LOGO_BORDER_RADIUS = 10
@@ -534,6 +535,21 @@ section[data-testid="stSidebar"] > div {{
     color: rgba(255, 255, 255, 0.82);
     font-size: 1.03rem;
     line-height: 1.7;
+}}
+.video-panel {{
+    margin: -0.35rem 0 1.25rem 0;
+    padding: 1rem;
+    border-radius: 20px;
+    border: 1px solid rgba(76, 70, 120, 0.12);
+    background: rgba(255, 255, 255, 0.78);
+    box-shadow: 0 16px 36px rgba(45, 48, 64, 0.08);
+}}
+.video-panel-title {{
+    margin: 0 0 0.75rem 0;
+    color: var(--elite-ink);
+    font-family: var(--font-display);
+    font-size: 1.02rem;
+    font-weight: 800;
 }}
 .summary-grid {{
     display: grid;
@@ -1366,6 +1382,17 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
+
+if DASHBOARD_VIDEO_URL.strip():
+    st.markdown(
+        """
+        <div class="video-panel">
+            <p class="video-panel-title">Video de referencia</p>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+    st.video(DASHBOARD_VIDEO_URL)
 
 # --- Configuracion de URLs (Mover aqui para evitar NameError) ---
 URL_VARIABLES = "https://raw.githubusercontent.com/juandavdidtejedormedina-rgb/dashboard-invernaderos/main/Datos_variables.xlsx"
