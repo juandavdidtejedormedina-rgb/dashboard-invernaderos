@@ -94,7 +94,7 @@ LOGO_URL_LARGE = "https://raw.githubusercontent.com/juandavdidtejedormedina-rgb/
 LOGO_URL_SMALL = LOGO_URL_LARGE
 STREAMLIT_LOGO_WIDTH = 150
 STREAMLIT_LOGO_HEIGHT = 150
-STREAMLIT_LOGO_BORDER_RADIUS = 12
+STREAMLIT_LOGO_BORDER_RADIUS = 20
 CORR_AXIS_TITLES = {
     'Temperatura': 'Temp.',
     'Humedad Relativa': 'Humedad',
