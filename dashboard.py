@@ -1,4 +1,5 @@
 import streamlit as st
+import streamlit.components.v1 as components
 import pandas as pd
 import plotly.graph_objects as go
 import io
@@ -15,6 +16,23 @@ def _image_to_base64(image_path):
         return base64.b64encode(Path(image_path).read_bytes()).decode('utf-8')
     except Exception:
         return None
+
+def _youtube_embed_url(video_url):
+    if not video_url:
+        return ""
+
+    url = str(video_url).strip()
+    youtube_patterns = [
+        r"(?:youtube\.com/watch\?v=|youtu\.be/|youtube\.com/embed/)([A-Za-z0-9_-]{11})",
+        r"youtube\.com/shorts/([A-Za-z0-9_-]{11})",
+    ]
+
+    for pattern in youtube_patterns:
+        match = re.search(pattern, url)
+        if match:
+            return f"https://www.youtube.com/embed/{match.group(1)}"
+
+    return ""
 
 SENSOR_VARIABLES = ['Temperatura', 'Humedad Relativa', 'Radiación PAR', 'Gramos de agua']
 VARIABLE_LABELS = {
@@ -92,7 +110,7 @@ APP_DIR = Path(__file__).resolve().parent
 LOGO_PATH = APP_DIR / 'logo elite.png'
 LOGO_URL_LARGE = "https://raw.githubusercontent.com/juandavdidtejedormedina-rgb/dashboard-invernaderos/main/logo%20elite.png"
 LOGO_URL_SMALL = LOGO_URL_LARGE
-DASHBOARD_VIDEO_URL = ""
+DASHBOARD_VIDEO_URL = "https://youtu.be/AYQy7qJVV0o?si=edaYAGb9nGTLFHUY"
 STREAMLIT_LOGO_WIDTH = 74
 STREAMLIT_LOGO_HEIGHT = 74
 STREAMLIT_LOGO_BORDER_RADIUS = 10
@@ -1384,7 +1402,11 @@ st.markdown(
 )
 
 if DASHBOARD_VIDEO_URL.strip():
-    st.video(DASHBOARD_VIDEO_URL)
+    youtube_embed_url = _youtube_embed_url(DASHBOARD_VIDEO_URL)
+    if youtube_embed_url:
+        components.iframe(youtube_embed_url, height=430, scrolling=False)
+    else:
+        st.video(DASHBOARD_VIDEO_URL)
 
 # --- Configuracion de URLs (Mover aqui para evitar NameError) ---
 URL_VARIABLES = "https://raw.githubusercontent.com/juandavdidtejedormedina-rgb/dashboard-invernaderos/main/Datos_variables.xlsx"
