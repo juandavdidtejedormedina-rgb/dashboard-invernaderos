@@ -290,11 +290,11 @@ st.markdown(f"""
     margin-right: auto;
 }}
 section[data-testid="stSidebar"] {{
-    min-width: 268px !important;
-    max-width: 268px !important;
+    min-width: 300px !important;
+    max-width: 300px !important;
 }}
 section[data-testid="stSidebar"] > div {{
-    width: 268px !important;
+    width: 300px !important;
 }}
 [data-testid="stSidebar"] .block-container {{
     padding: 3.1rem 0.7rem 1rem 0.7rem;
@@ -427,8 +427,7 @@ section[data-testid="stSidebar"] > div {{
 }}
 [data-testid="stSidebar"] [data-testid="stCheckbox"] label {{
     width: 100%;
-    min-height: 2.42rem;
-    padding: 0.38rem 0.46rem 0.38rem 0.52rem;
+    padding: 0.38rem 0.56rem;
     border-radius: 18px;
     border: 1px solid rgba(255, 255, 255, 0.10);
     background: linear-gradient(180deg, rgba(255,255,255,0.13), rgba(255,255,255,0.06));
@@ -447,22 +446,9 @@ section[data-testid="stSidebar"] > div {{
     box-shadow: inset 0 1px 0 rgba(255,255,255,0.16), 0 16px 30px rgba(27, 23, 53, 0.30);
 }}
 [data-testid="stSidebar"] [data-testid="stCheckbox"] p {{
-    font-size: 0.82rem;
+    font-size: 0.9rem;
     font-weight: 600;
     letter-spacing: 0.01em;
-    line-height: 1.15;
-    white-space: nowrap;
-}}
-[data-testid="stSidebar"] [data-testid="stCheckbox"] label > div {{
-    flex: 0 0 auto;
-}}
-[data-testid="stSidebar"] [data-testid="stCheckbox"] label > div:last-child {{
-    min-width: 0;
-    flex: 1 1 auto;
-}}
-[data-testid="stSidebar"] [data-testid="stCheckbox"] [data-testid="stTooltipIcon"] {{
-    margin-left: auto;
-    flex: 0 0 auto;
 }}
 [data-testid="stSidebar"] [data-testid="stCheckbox"] svg {{
     fill: var(--elite-white);
