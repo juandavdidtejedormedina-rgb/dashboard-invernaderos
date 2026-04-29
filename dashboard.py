@@ -305,14 +305,14 @@ section[data-testid="stSidebar"] > div {{
 }}
 [data-testid="stSidebarCollapseButton"] {{
     position: absolute !important;
-    top: 1.7rem !important;
+    top: 1.35rem !important;
     right: 0.45rem !important;
     left: auto !important;
     z-index: 20 !important;
 }}
 [data-testid="stSidebarHeader"] button {{
     position: absolute !important;
-    top: 1.7rem !important;
+    top: 1.35rem !important;
     right: 0.45rem !important;
     left: auto !important;
     z-index: 20 !important;
@@ -341,7 +341,7 @@ section[data-testid="stSidebar"] > div {{
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    margin: 1.2rem 0 1.2rem 0.15rem;
+    margin: 1.65rem 0 1.2rem 0.15rem;
     color: #ffffff;
     font-family: var(--font-display);
     font-size: 1.42rem;
