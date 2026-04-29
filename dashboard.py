@@ -291,7 +291,7 @@ section[data-testid="stSidebar"] > div {{
     color: #f7f7fb;
 }}
 [data-testid="stSidebarHeader"] {{
-    padding-top: 1.35rem !important;
+    padding-top: 2.1rem !important;
     padding-bottom: 0.6rem !important;
     overflow: visible !important;
 }}
