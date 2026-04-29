@@ -302,6 +302,21 @@ section[data-testid="stSidebar"] > div {{
     align-items: center;
     overflow: visible !important;
 }}
+[data-testid="stSidebarCollapseButton"] {{
+    position: absolute !important;
+    top: 1.15rem !important;
+    right: 0.85rem !important;
+    z-index: 20 !important;
+}}
+[data-testid="stSidebarCollapseButton"] button {{
+    background: rgba(255, 255, 255, 0.08) !important;
+    border: 1px solid rgba(255, 255, 255, 0.16) !important;
+    border-radius: 999px !important;
+    box-shadow: 0 8px 18px rgba(16, 18, 32, 0.12) !important;
+}}
+[data-testid="stSidebarCollapseButton"] svg {{
+    color: #f7f7fb !important;
+}}
 [data-testid="stSidebarHeader"] a {{
     display: inline-flex;
     align-items: center;
