@@ -294,6 +294,7 @@ section[data-testid="stSidebar"] > div {{
     padding-top: 2.1rem !important;
     padding-bottom: 0.6rem !important;
     overflow: visible !important;
+    position: relative !important;
 }}
 [data-testid="stSidebarHeader"] > div {{
     width: 100%;
@@ -306,6 +307,7 @@ section[data-testid="stSidebar"] > div {{
     position: absolute !important;
     top: 1.7rem !important;
     right: 0.45rem !important;
+    left: auto !important;
     z-index: 20 !important;
 }}
 [data-testid="stSidebarHeader"] a {{
@@ -318,9 +320,7 @@ section[data-testid="stSidebar"] > div {{
     border-radius: calc(var(--streamlit-logo-radius) + 6px);
     background: linear-gradient(180deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.03) 100%);
     box-shadow: 0 10px 22px rgba(16, 18, 32, 0.16);
-    position: relative;
-    left: 50%;
-    transform: translateX(-50%) translateY(10px);
+    transform: translateY(10px);
 }}
 [data-testid="stSidebarHeader"] img,
 [data-testid="stSidebarHeader"] [data-testid="stLogo"] img {{
