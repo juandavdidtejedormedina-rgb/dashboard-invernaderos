@@ -117,7 +117,7 @@ APP_DIR = Path(__file__).resolve().parent
 LOGO_PATH = APP_DIR / 'logo elite.png'
 LOGO_URL_LARGE = "https://raw.githubusercontent.com/juandavdidtejedormedina-rgb/dashboard-invernaderos/main/logo%20elite.png"
 LOGO_URL_SMALL = LOGO_URL_LARGE
-DASHBOARD_VIDEO_URL = "https://raw.githubusercontent.com/juandavdidtejedormedina-rgb/dashboard-invernaderos/92e7785e8f5bd984f6ffff48ceb3153a2a2d9d36/For%20Creciendo.mp4"
+DASHBOARD_VIDEO_URL = "https://raw.githubusercontent.com/juandavdidtejedormedina-rgb/dashboard-invernaderos/59df2b2f7fee2b9632ae4865fedae119e81b3b79/flor%20video.mp4"
 DASHBOARD_LOCATION_QUERY = "La Ponderosa - The Elite Flower SAS CI Madrid Cundinamarca Colombia"
 STREAMLIT_LOGO_WIDTH = 74
 STREAMLIT_LOGO_HEIGHT = 74
@@ -1457,38 +1457,25 @@ st.markdown(
 
 if DASHBOARD_VIDEO_URL.strip():
     with st.expander("Video introductorio", expanded=False):
-        if st.checkbox("Cargar video", key="cargar_video_dashboard"):
-            youtube_embed_url = _youtube_embed_url(DASHBOARD_VIDEO_URL)
-            if youtube_embed_url:
-                components.iframe(youtube_embed_url, height=430, scrolling=False)
-            else:
-                st.video(DASHBOARD_VIDEO_URL)
+        youtube_embed_url = _youtube_embed_url(DASHBOARD_VIDEO_URL)
+        if youtube_embed_url:
+            components.iframe(youtube_embed_url, height=430, scrolling=False)
         else:
-            st.caption("Carga el video solo cuando lo necesites para evitar recargas pesadas.")
+            st.video(DASHBOARD_VIDEO_URL)
 
 if DASHBOARD_LOCATION_QUERY.strip():
     with st.expander("Ubicación", expanded=False):
-        if st.checkbox("Cargar mapa", key="cargar_mapa_dashboard"):
-            components.iframe(
-                _google_maps_embed_url(DASHBOARD_LOCATION_QUERY),
-                height=430,
-                scrolling=False
-            )
-        else:
-            st.caption("Carga el mapa solo cuando lo necesites para mantener la página más fluida.")
+        components.iframe(
+            _google_maps_embed_url(DASHBOARD_LOCATION_QUERY),
+            height=430,
+            scrolling=False
+        )
 
-# Fuentes de datos
+# --- Configuracion de URLs (Mover aqui para evitar NameError) ---
 URL_VARIABLES = "https://raw.githubusercontent.com/juandavdidtejedormedina-rgb/dashboard-invernaderos/main/Datos_variables.xlsx"
 URL_CORTINAS = "https://raw.githubusercontent.com/juandavdidtejedormedina-rgb/dashboard-invernaderos/main/Registro_Cortinas_Final.xlsx"
-EXCLUDED_EXCEL_SHEETS = {'plantilla'}
-ANNOTATION_COLUMN_PAIRS = (
-    ('Frente A', 'Anotacion A'),
-    ('Puerta B', 'Anotacion B')
-)
-CORRELATION_MARKER_SIZE_DEFAULT = 5
-CORRELATION_MARKER_SIZE_PAR = 7
-CORRELATION_MARKER_SIZE_MULTI_DAY = 0
 
+# Definición de la función de descarga
 @st.cache_data(show_spinner="Descargando datos desde el repositorio...")
 def descargar_desde_github(url):
     try:
@@ -1502,7 +1489,7 @@ def descargar_desde_github(url):
 archivo_variables_bytes = descargar_desde_github(URL_VARIABLES)
 archivo_cortinas_bytes = descargar_desde_github(URL_CORTINAS)
 
-# Funciones de carga de datos
+# 3. Funciones de carga de datos con corrección de FECHAS
 
 def _limpiar_columnas(df):
     df = df.copy()
@@ -1514,19 +1501,13 @@ def _limpiar_columnas(df):
     return df
 
 
-def _leer_excel_desde_bytes(excel_source, sheet_name, **kwargs):
-    if isinstance(excel_source, pd.ExcelFile):
-        return excel_source.parse(sheet_name=sheet_name, **kwargs)
+def _leer_excel_desde_bytes(ruta_bytes, sheet_name, **kwargs):
     return pd.read_excel(
-        io.BytesIO(excel_source),
+        io.BytesIO(ruta_bytes),
         sheet_name=sheet_name,
         engine="openpyxl",
         **kwargs
     )
-
-
-def _get_excel_data_sheet_names(xls):
-    return [sheet for sheet in xls.sheet_names if sheet.lower() not in EXCLUDED_EXCEL_SHEETS]
 
 
 def _build_normalized_text_key(value):
@@ -1598,11 +1579,11 @@ def cargar_datos(ruta_bytes):
         xls = pd.ExcelFile(io.BytesIO(ruta_bytes), engine="openpyxl")
         registros = []
 
-        for sheet in _get_excel_data_sheet_names(xls):
+        for sheet in [s for s in xls.sheet_names if s.lower() != 'plantilla']:
             df_sheet = pd.DataFrame()
 
             for read_kwargs in ({}, {'skiprows': 1}):
-                candidate = _leer_excel_desde_bytes(xls, sheet_name=sheet, **read_kwargs)
+                candidate = _leer_excel_desde_bytes(ruta_bytes, sheet_name=sheet, **read_kwargs)
                 candidate = _prepare_variables_sheet(candidate)
                 candidate = _limpiar_columnas(candidate)
                 if 'DateTime' in candidate.columns:
@@ -1653,78 +1634,6 @@ def _coerce_sidebar_date(value, fallback):
     if isinstance(value, date):
         return value
     return fallback
-
-
-def _resample_sensor_series_30min(df_series, value_column, fecha_inicio=None, fecha_fin=None, keep_full_range=False):
-    required_cols = {'DateTime', value_column}
-    if df_series.empty or not required_cols.issubset(df_series.columns):
-        return pd.DataFrame(columns=['DateTime', value_column])
-
-    series = df_series[['DateTime', value_column]].dropna(subset=['DateTime', value_column]).copy()
-    if series.empty:
-        return pd.DataFrame(columns=['DateTime', value_column])
-
-    series['DateTime'] = pd.to_datetime(series['DateTime'], errors='coerce')
-    series = series.dropna(subset=['DateTime']).sort_values('DateTime')
-    if series.empty:
-        return pd.DataFrame(columns=['DateTime', value_column])
-
-    resampled = (
-        series.set_index('DateTime')[[value_column]]
-        .resample('30min')
-        .mean()
-        .reset_index()
-    )
-    if keep_full_range and fecha_inicio is not None and fecha_fin is not None:
-        start_dt = pd.Timestamp(datetime.combine(fecha_inicio, datetime.min.time()))
-        end_dt = pd.Timestamp(datetime.combine(fecha_fin, datetime.max.time())).floor('30min')
-        full_index = pd.date_range(start=start_dt, end=end_dt, freq='30min')
-        resampled = (
-            resampled.set_index('DateTime')
-            .reindex(full_index)
-            .rename_axis('DateTime')
-            .reset_index()
-        )
-    else:
-        resampled = resampled.dropna(how='all', subset=[value_column])
-    return resampled
-
-
-def _get_correlation_xaxis_dtick(fecha_inicio, fecha_fin):
-    total_days = max(1, (fecha_fin - fecha_inicio).days + 1)
-    if total_days <= 2:
-        return 30 * 60 * 1000
-    if total_days <= 5:
-        return 60 * 60 * 1000
-    if total_days <= 10:
-        return 2 * 60 * 60 * 1000
-    if total_days <= 20:
-        return 4 * 60 * 60 * 1000
-    return 6 * 60 * 60 * 1000
-
-
-def _get_correlation_multiday_axis_config(fecha_inicio, fecha_fin):
-    total_days = max(1, (fecha_fin - fecha_inicio).days + 1)
-    if total_days <= 7:
-        return {
-            'dtick': 24 * 60 * 60 * 1000,
-            'tickformat': '%d/%m',
-            'title': '<b>Fecha</b>',
-            'nticks': min(8, total_days + 1)
-        }
-    if total_days <= 21:
-        return {
-            'dtick': 2 * 24 * 60 * 60 * 1000,
-            'tickformat': '%d/%m',
-            'title': '<b>Fecha</b>',
-            'nticks': 10
-        }
-    return {
-        'dtick': 3 * 24 * 60 * 60 * 1000,
-        'tickformat': '%d/%m',
-        'title': '<b>Fecha</b>',
-        'nticks': 12
-    }
 
 
 def _sidebar_icon_svg(icon_name):
@@ -2867,35 +2776,39 @@ def _get_daily_annotations(datos_cortinas):
     if datos_cortinas.empty:
         return []
 
+    annotation_pairs = [
+        ('Frente A', 'Anotacion A'),
+        ('Puerta B', 'Anotacion B')
+    ]
     annotations = []
 
     for _, row in datos_cortinas.iterrows():
-        for label_col, note_col in ANNOTATION_COLUMN_PAIRS:
-            entry = _build_annotation_entry(row, label_col, note_col)
-            if entry is not None and entry not in annotations:
+        for label_col, note_col in annotation_pairs:
+            note_value = row.get(note_col)
+            if pd.isna(note_value):
+                continue
+
+            note_text = str(note_value).strip()
+            if not note_text or note_text.lower() in {'nan', 'none'}:
+                continue
+
+            label_value = row.get(label_col)
+            label_text = str(label_value).strip() if pd.notna(label_value) else label_col
+            entry = f"{label_text}: {note_text}"
+            if entry not in annotations:
                 annotations.append(entry)
 
     return annotations
-
-
-def _build_annotation_entry(row, label_col, note_col):
-    note_value = row.get(note_col)
-    if pd.isna(note_value):
-        return None
-
-    note_text = str(note_value).strip()
-    if not note_text or note_text.lower() in {'nan', 'none'}:
-        return None
-
-    label_value = row.get(label_col)
-    label_text = str(label_value).strip() if pd.notna(label_value) else label_col
-    return f"{label_text}: {note_text}"
 
 
 def _get_annotations_by_day(datos_cortinas):
     if datos_cortinas.empty or 'Fecha' not in datos_cortinas.columns:
         return []
 
+    annotation_pairs = [
+        ('Frente A', 'Anotacion A'),
+        ('Puerta B', 'Anotacion B')
+    ]
     grouped_annotations = []
     datos_ordenados = datos_cortinas.sort_values('Fecha')
 
@@ -2903,9 +2816,19 @@ def _get_annotations_by_day(datos_cortinas):
         entries = []
 
         for _, row in datos_dia.iterrows():
-            for label_col, note_col in ANNOTATION_COLUMN_PAIRS:
-                entry = _build_annotation_entry(row, label_col, note_col)
-                if entry is not None and entry not in entries:
+            for label_col, note_col in annotation_pairs:
+                note_value = row.get(note_col)
+                if pd.isna(note_value):
+                    continue
+
+                note_text = str(note_value).strip()
+                if not note_text or note_text.lower() in {'nan', 'none'}:
+                    continue
+
+                label_value = row.get(label_col)
+                label_text = str(label_value).strip() if pd.notna(label_value) else label_col
+                entry = f"{label_text}: {note_text}"
+                if entry not in entries:
                     entries.append(entry)
 
         grouped_annotations.append({
@@ -2978,8 +2901,8 @@ def cargar_cortinas(ruta_bytes):
         xls = pd.ExcelFile(io.BytesIO(ruta_bytes), engine="openpyxl")
         registros = []
 
-        for sheet in _get_excel_data_sheet_names(xls):
-            raw = _leer_excel_desde_bytes(xls, sheet_name=sheet, header=None)
+        for sheet in [s for s in xls.sheet_names if s.lower() != 'plantilla']:
+            raw = _leer_excel_desde_bytes(ruta_bytes, sheet_name=sheet, header=None)
             if raw.shape[0] < 4:
                 continue
             raw = raw.dropna(axis=1, how='all')
@@ -3030,20 +2953,8 @@ def _render_correlacion(
     fecha_inicio, fecha_fin = fecha_variables
     multi_day_view = fecha_inicio != fecha_fin
     hover_time_format = '%d/%m %H:%M' if multi_day_view else '%H:%M'
-    if multi_day_view:
-        multiday_axis_config = _get_correlation_multiday_axis_config(fecha_inicio, fecha_fin)
-        xaxis_tickformat = multiday_axis_config['tickformat']
-        xaxis_title_text = multiday_axis_config['title']
-        xaxis_dtick = multiday_axis_config['dtick']
-        xaxis_nticks = multiday_axis_config['nticks']
-    else:
-        xaxis_tickformat = '%H:%M'
-        xaxis_title_text = '<b>Hora del Día</b>'
-        xaxis_dtick = 30 * 60 * 1000
-        xaxis_nticks = None
-    default_marker_size = CORRELATION_MARKER_SIZE_MULTI_DAY if multi_day_view else CORRELATION_MARKER_SIZE_DEFAULT
-    par_marker_size = CORRELATION_MARKER_SIZE_MULTI_DAY if multi_day_view else CORRELATION_MARKER_SIZE_PAR
-    sensor_trace_class = go.Scatter if multi_day_view else go.Scattergl
+    xaxis_tickformat = '%H:%M\n%d/%m' if multi_day_view else '%H:%M'
+    xaxis_title_text = '<b>Fecha y hora</b>' if multi_day_view else '<b>Hora del Día</b>'
 
     sensor_vars = _get_available_sensor_vars(df_variables)
     almacen_sensor_vars = _get_available_sensor_vars(df_variables_almacen) if isinstance(df_variables_almacen, pd.DataFrame) else []
@@ -3113,17 +3024,7 @@ def _render_correlacion(
             serie = df_plot[['DateTime', var_name]].dropna(subset=[var_name]).copy()
             if serie.empty:
                 continue
-            if multi_day_view:
-                serie = _resample_sensor_series_30min(
-                    serie,
-                    var_name,
-                    fecha_inicio=fecha_inicio,
-                    fecha_fin=fecha_fin,
-                    keep_full_range=True
-                )
-                if serie.empty:
-                    continue
-            serie_plot = serie if multi_day_view else serie
+            serie_plot = _add_day_breaks_to_series(serie, var_name) if multi_day_view else serie
             trace = dict(
                 x=serie_plot['DateTime'],
                 y=serie_plot[var_name],
@@ -3134,17 +3035,13 @@ def _render_correlacion(
                     width=3 if var_name == 'Radiación PAR' else 2
                 ),
                 marker=dict(
-                    size=par_marker_size if var_name == 'Radiación PAR' else default_marker_size,
+                    size=7 if var_name == 'Radiación PAR' else 5,
                     color=VARIABLE_COLORS.get(var_name, palette[order % len(palette)])
                 ),
                 opacity=0.78 if var_name == 'Gramos de agua' else 1.0,
                 legendrank=order,
                 hovertemplate=(
-                    (
-                        ''
-                        if multi_day_view else
-                        f'<b>%{{x|{hover_time_format}}}</b><br>'
-                    ) +
+                    f'<b>%{{x|{hover_time_format}}}</b><br>' +
                     var_name + ': %{y:.2f} ' +
                     VARIABLE_UNITS.get(var_name, '') +
                     '<extra></extra>'
@@ -3164,17 +3061,7 @@ def _render_correlacion(
             if var_name in compare_sensor_vars and not df_plot_almacen.empty:
                 serie_almacen = df_plot_almacen[['DateTime', var_name]].dropna(subset=[var_name]).copy()
                 if not serie_almacen.empty:
-                    if multi_day_view:
-                        serie_almacen = _resample_sensor_series_30min(
-                            serie_almacen,
-                            var_name,
-                            fecha_inicio=fecha_inicio,
-                            fecha_fin=fecha_fin,
-                            keep_full_range=True
-                        )
-                    if serie_almacen.empty:
-                        continue
-                    serie_almacen_plot = serie_almacen if multi_day_view else serie_almacen
+                    serie_almacen_plot = _add_day_breaks_to_series(serie_almacen, var_name) if multi_day_view else serie_almacen
                     almacen_trace = dict(
                         x=serie_almacen_plot['DateTime'],
                         y=serie_almacen_plot[var_name],
@@ -3193,11 +3080,7 @@ def _render_correlacion(
                         opacity=0.95,
                         legendrank=order + 0.5,
                         hovertemplate=(
-                            (
-                                ''
-                                if multi_day_view else
-                                f'<b>%{{x|{hover_time_format}}}</b><br>'
-                            ) +
+                            f'<b>%{{x|{hover_time_format}}}</b><br>' +
                             f'{var_name} - Estación externa: ' +
                             '%{y:.2f} ' +
                             VARIABLE_UNITS.get(var_name, '') +
@@ -3254,12 +3137,7 @@ def _render_correlacion(
                     line=dict(color=color, width=3.2, shape='hv'),
                     marker=dict(size=5, color=color),
                     hovertemplate=(
-                        (
-                            ''
-                            if multi_day_view else
-                            f'<b>%{{x|{hover_time_format}}}</b><br>'
-                        ) +
-                        f'%{{customdata[0]}}<br>{hover_value_line}'
+                        f'<b>%{{x|{hover_time_format}}}</b><br>%{{customdata[0]}}<br>{hover_value_line}'
                         + ('<br>%{customdata[2]}' if show_ideal_lines else '')
                         + '<br>%{customdata[1]}<extra></extra>'
                     ),
@@ -3359,32 +3237,16 @@ def _render_correlacion(
         axis_name = sensor_axis_names[idx] if idx < len(sensor_axis_names) else f'y{idx + 2}'
         sensor_axis_map[var_name] = axis_name
         trace['yaxis'] = None if axis_name == 'y' else axis_name
-        fig_corr.add_trace(sensor_trace_class(**trace))
+        fig_corr.add_trace(go.Scatter(**trace))
 
         axis_var_name = var_name.replace('_almacen', '')
         series_for_axis = []
         serie = df_plot[[axis_var_name]].dropna(subset=[axis_var_name]).copy()
         if not serie.empty:
-            if multi_day_view:
-                serie = _resample_sensor_series_30min(
-                    serie,
-                    axis_var_name,
-                    fecha_inicio=fecha_inicio,
-                    fecha_fin=fecha_fin,
-                    keep_full_range=False
-                )
             series_for_axis.append(serie[axis_var_name])
         if axis_var_name in compare_sensor_vars and not df_plot_almacen.empty and axis_var_name in df_plot_almacen.columns:
             serie_almacen_axis = df_plot_almacen[[axis_var_name]].dropna(subset=[axis_var_name]).copy()
             if not serie_almacen_axis.empty:
-                if multi_day_view:
-                    serie_almacen_axis = _resample_sensor_series_30min(
-                        serie_almacen_axis,
-                        axis_var_name,
-                        fecha_inicio=fecha_inicio,
-                        fecha_fin=fecha_fin,
-                        keep_full_range=False
-                    )
                 series_for_axis.append(serie_almacen_axis[axis_var_name])
         serie_combinada = pd.concat(series_for_axis, ignore_index=True) if series_for_axis else pd.Series(dtype=float)
         if serie_combinada.empty:
@@ -3444,7 +3306,7 @@ def _render_correlacion(
         base_var_name = var_name.replace('_almacen', '')
         axis_name = sensor_axis_map.get(base_var_name, 'y')
         trace['yaxis'] = None if axis_name == 'y' else axis_name
-        fig_corr.add_trace(sensor_trace_class(**trace))
+        fig_corr.add_trace(go.Scatter(**trace))
 
     if cortina_traces:
         for var_name, trace, color in cortina_traces:
@@ -3521,29 +3383,14 @@ def _render_correlacion(
                 text=xaxis_title_text,
                 font=dict(size=14, family='Manrope, sans-serif', color=BRAND_COLORS['graphite'])
             ),
-            tickmode='linear',
-            dtick=xaxis_dtick,
             tickformat=xaxis_tickformat,
-            nticks=xaxis_nticks,
             tickfont=dict(size=11, family='Manrope, sans-serif', color=BRAND_COLORS['graphite']),
             domain=[0, x_domain_end],
             showgrid=True,
             gridcolor='rgba(76, 70, 120, 0.07)',
-            zeroline=False,
-            ticklabelmode='period' if multi_day_view else 'instant',
-            showspikes=multi_day_view,
-            spikemode='across',
-            spikesnap='cursor',
-            spikedash='dot',
-            spikecolor='rgba(45, 48, 64, 0.55)',
-            spikethickness=1,
-            unifiedhovertitle=dict(
-                text='%{x|%d/%m %H:%M}' if multi_day_view else '%{x|%H:%M}'
-            )
+            zeroline=False
         ),
         hovermode='x unified',
-        hoverdistance=30,
-        spikedistance=30,
         template='plotly_white',
         font=dict(family='Manrope, sans-serif', color=BRAND_COLORS['graphite']),
         paper_bgcolor='rgba(255,255,255,0)',
