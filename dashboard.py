@@ -85,6 +85,7 @@ VARIABLE_SELECTOR_LABELS = {
 }
 FILTER_HELP_TEXTS = {
     'modo_dashboard': 'Elige entre la vista de correlación por bloque y la vista comparativa de varianza y promedio por franja horaria.',
+    'finca': 'Selecciona la finca que quieres explorar en el dashboard. Los bloques y fechas disponibles se ajustan según esa finca.',
     'modo_fechas': 'Define si quieres analizar un solo día o un rango de varios días.',
     'fecha': 'Selecciona la fecha o el rango que se usará para filtrar los registros visibles en la vista actual.',
     'bloque': 'Selecciona el bloque principal que quieres analizar en la correlación.',
@@ -120,6 +121,14 @@ LOGO_URL_SMALL = LOGO_URL_LARGE
 DASHBOARD_VIDEO_URL = "https://raw.githubusercontent.com/juandavdidtejedormedina-rgb/dashboard-invernaderos/59df2b2f7fee2b9632ae4865fedae119e81b3b79/flor%20video.mp4"
 DASHBOARD_LOCATION_QUERY = "La Ponderosa - The Elite Flower SAS CI Madrid Cundinamarca Colombia"
 LAZY_LOAD_MEDIA = True
+FINCA_OPTIONS = ['La Ponderosa', 'Marley']
+BLOCK_FARMS = {
+    '27': 'La Ponderosa',
+    '34': 'La Ponderosa',
+    '35': 'La Ponderosa',
+    '38': 'La Ponderosa',
+    'ALMACEN': 'La Ponderosa'
+}
 STREAMLIT_LOGO_WIDTH = 108
 STREAMLIT_LOGO_HEIGHT = 108
 STREAMLIT_LOGO_BORDER_RADIUS = 14
@@ -2474,18 +2483,34 @@ def _extract_block_identifier(block_name):
     return None
 
 
-def _get_block_options(df_variables_all, df_cortinas_all):
+def _get_finca_for_block(block_name):
+    normalized_key = _build_normalized_text_key(block_name)
+    if 'marley' in normalized_key:
+        return 'Marley'
+
+    block_identifier = _extract_block_identifier(block_name)
+    if block_identifier and block_identifier in BLOCK_FARMS:
+        return BLOCK_FARMS[block_identifier]
+
+    return 'La Ponderosa'
+
+
+def _get_block_options(df_variables_all, df_cortinas_all, selected_finca=None):
     variable_map = {}
     cortina_map = {}
 
     if not df_variables_all.empty and 'Bloque' in df_variables_all.columns:
         for block_name in sorted(df_variables_all['Bloque'].dropna().unique()):
+            if selected_finca and _get_finca_for_block(block_name) != selected_finca:
+                continue
             block_identifier = _extract_block_identifier(block_name)
             if block_identifier:
                 variable_map[block_identifier] = block_name
 
     if not df_cortinas_all.empty and 'Bloque' in df_cortinas_all.columns:
         for block_name in sorted(df_cortinas_all['Bloque'].dropna().unique()):
+            if selected_finca and _get_finca_for_block(block_name) != selected_finca:
+                continue
             block_identifier = _extract_block_identifier(block_name)
             if block_identifier:
                 cortina_map[block_identifier] = block_name
@@ -2734,6 +2759,22 @@ def _get_all_variable_dates(df_variables_all):
         return []
 
     fechas_variables = pd.Series(df_variables_all['Fecha_Filtro'].dropna().unique()).tolist()
+    return sorted(fechas_variables)
+
+
+def _get_all_variable_dates_for_blocks(df_variables_all, block_names=None):
+    if (
+        df_variables_all.empty or
+        'Fecha_Filtro' not in df_variables_all.columns or
+        'Bloque' not in df_variables_all.columns
+    ):
+        return []
+
+    filtered_df = df_variables_all
+    if block_names:
+        filtered_df = filtered_df[filtered_df['Bloque'].isin(block_names)]
+
+    fechas_variables = pd.Series(filtered_df['Fecha_Filtro'].dropna().unique()).tolist()
     return sorted(fechas_variables)
 
 
@@ -4386,18 +4427,36 @@ with st.sidebar.expander("Vista", expanded=True):
         help=FILTER_HELP_TEXTS['modo_dashboard']
     )
 
+with st.sidebar.expander("Finca", expanded=True):
+    _sidebar_field_label("location", "Seleccionar finca")
+    selected_finca = st.selectbox(
+        "Seleccionar finca:",
+        options=FINCA_OPTIONS,
+        key="finca_compartida",
+        help=FILTER_HELP_TEXTS['finca']
+    )
+
 if dashboard_mode == "Varianza Y Promedio":
-    analysis_block_codes, analysis_variable_map, _ = _get_block_options(_df_variables_all, _df_cortinas_all)
+    analysis_block_codes, analysis_variable_map, _ = _get_block_options(
+        _df_variables_all,
+        _df_cortinas_all,
+        selected_finca=selected_finca
+    )
     fecha_analisis = None
     analysis_block_names = []
 
     with st.sidebar.expander("Periodo", expanded=True):
         if _df_variables_all.empty:
             st.write("No hay datos de variables para habilitar el filtro de fechas.")
+        elif not analysis_variable_map:
+            st.warning(f"No hay bloques con datos disponibles para la finca {selected_finca}.")
         else:
-            fechas_disponibles = _get_all_variable_dates(_df_variables_all)
+            fechas_disponibles = _get_all_variable_dates_for_blocks(
+                _df_variables_all,
+                list(analysis_variable_map.values())
+            )
             if not fechas_disponibles:
-                st.warning("No hay fechas disponibles en variables para construir el análisis de varianza y promedio.")
+                st.warning(f"No hay fechas disponibles en variables para la finca {selected_finca}.")
             else:
                 min_fecha = min(fechas_disponibles)
                 max_fecha = max(fechas_disponibles)
@@ -4460,7 +4519,7 @@ if dashboard_mode == "Varianza Y Promedio":
         if _df_variables_all.empty:
             st.write("No se encontraron datos para habilitar la comparación de bloques.")
         elif not analysis_block_codes:
-            st.warning("No se detectaron bloques válidos dentro del archivo de variables.")
+            st.warning(f"No se detectaron bloques válidos para la finca {selected_finca}.")
         else:
             _sidebar_field_label("location", "Bloques incluidos")
             current_analysis_context = tuple(analysis_block_codes)
@@ -4491,7 +4550,7 @@ if dashboard_mode == "Varianza Y Promedio":
     elif fecha_analisis is None:
         st.warning("Selecciona el periodo del análisis en la barra lateral.")
     elif not analysis_block_names:
-        st.warning("Selecciona al menos un bloque para comparar en la nueva vista.")
+        st.warning(f"Selecciona al menos un bloque para comparar dentro de la finca {selected_finca}.")
     else:
         fecha_inicio_analisis, fecha_fin_analisis = fecha_analisis
         df_variables_analisis = _filter_variables_multi_block_range(
@@ -4518,12 +4577,18 @@ if dashboard_mode == "Varianza Y Promedio":
         )
     st.stop()
 
-block_codes, variable_block_map, cortina_block_map = _get_block_options(_df_variables_all, _df_cortinas_all)
+block_codes, variable_block_map, cortina_block_map = _get_block_options(
+    _df_variables_all,
+    _df_cortinas_all,
+    selected_finca=selected_finca
+)
 bloque_variables = None
 bloque_seleccionado = None
 selected_block_code_current = st.session_state.get("bloque_compartido")
 if not selected_block_code_current and block_codes:
     selected_block_code_current = block_codes[0]
+if selected_block_code_current and selected_block_code_current not in block_codes:
+    selected_block_code_current = block_codes[0] if block_codes else None
 if selected_block_code_current in variable_block_map:
     bloque_variables = variable_block_map.get(selected_block_code_current)
     bloque_seleccionado = cortina_block_map.get(selected_block_code_current)
@@ -4535,7 +4600,10 @@ with st.sidebar.expander("Periodo", expanded=True):
     if _df_variables_all.empty:
         st.write("No hay datos de variables para habilitar el filtro de fechas.")
     elif bloque_variables is None:
-        st.write("Selecciona primero el bloque.")
+        if block_codes:
+            st.write("Selecciona primero el bloque.")
+        else:
+            st.write(f"No hay bloques disponibles para la finca {selected_finca}.")
     else:
         fechas_disponibles = _get_available_variable_dates(_df_variables_all, bloque_variables)
 
@@ -4607,7 +4675,7 @@ with st.sidebar.expander("Bloque", expanded=True):
     if _df_variables_all.empty:
         st.write("No se encontraron datos de variables para habilitar los bloques.")
     elif not block_codes:
-        st.warning("No se detectaron bloques válidos dentro del archivo de variables.")
+        st.warning(f"No se detectaron bloques válidos para la finca {selected_finca}.")
     else:
         _sidebar_field_label("location", "Seleccionar bloque")
         selected_block_code = st.selectbox(
