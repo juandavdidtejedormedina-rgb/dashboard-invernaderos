@@ -373,7 +373,7 @@ section[data-testid="stSidebar"] > div {{
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    margin: 2.7rem 0 1.2rem 0.15rem;
+    margin: 3.4rem 0 1.45rem 0.15rem;
     color: #ffffff;
     font-family: var(--font-display);
     font-size: 1.42rem;
@@ -424,7 +424,7 @@ section[data-testid="stSidebar"] > div {{
     border-radius: 18px;
     overflow: hidden;
     box-shadow: 0 18px 34px rgba(0, 0, 0, 0.16);
-    margin-bottom: 0.78rem;
+    margin-bottom: 0.9rem;
 }}
 [data-testid="stSidebar"] .stExpander details summary {{
     background: rgba(255, 255, 255, 0.08);
