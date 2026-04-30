@@ -3383,6 +3383,8 @@ def _render_correlacion(
                 text=xaxis_title_text,
                 font=dict(size=14, family='Manrope, sans-serif', color=BRAND_COLORS['graphite'])
             ),
+            tickmode='linear' if not multi_day_view else 'auto',
+            dtick=30 * 60 * 1000 if not multi_day_view else None,
             tickformat=xaxis_tickformat,
             tickfont=dict(size=11, family='Manrope, sans-serif', color=BRAND_COLORS['graphite']),
             domain=[0, x_domain_end],
