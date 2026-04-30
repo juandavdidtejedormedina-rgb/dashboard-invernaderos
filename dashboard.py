@@ -41,6 +41,43 @@ def _google_maps_embed_url(location_query):
         return ""
     return f"https://www.google.com/maps?q={quote_plus(query)}&output=embed"
 
+def _render_autoplay_video(video_url, height=430):
+    safe_url = html.escape(str(video_url or "").strip(), quote=True)
+    if not safe_url:
+        return
+
+    components.html(
+        f"""
+        <video
+            autoplay
+            muted
+            loop
+            playsinline
+            controls
+            preload="auto"
+            style="
+                width: 100%;
+                height: {height}px;
+                object-fit: cover;
+                display: block;
+                border-radius: 18px;
+                background: #111;
+            "
+        >
+            <source src="{safe_url}" type="video/mp4">
+        </video>
+        <script>
+            const video = document.currentScript.previousElementSibling;
+            if (video) {{
+                video.muted = true;
+                video.play().catch(() => {{}});
+            }}
+        </script>
+        """,
+        height=height + 8,
+        scrolling=False
+    )
+
 SENSOR_VARIABLES = ['Temperatura', 'Humedad Relativa', 'Radiación PAR', 'Gramos de agua']
 VARIABLE_LABELS = {
     'Temperatura': 'Temperatura (°C)',
@@ -1582,7 +1619,7 @@ if DASHBOARD_VIDEO_URL.strip():
             if youtube_embed_url:
                 components.iframe(youtube_embed_url, height=430, scrolling=False)
             else:
-                st.video(DASHBOARD_VIDEO_URL)
+                _render_autoplay_video(DASHBOARD_VIDEO_URL)
         else:
             st.caption("Carga el video solo cuando lo necesites.")
 
@@ -1935,7 +1972,7 @@ def _render_dashboard_media(selected_finca):
             if youtube_embed_url:
                 components.iframe(youtube_embed_url, height=430, scrolling=False)
             else:
-                st.video(video_url)
+                _render_autoplay_video(video_url)
 
     if location_query:
         with st.expander("Ubicación", expanded=True):
