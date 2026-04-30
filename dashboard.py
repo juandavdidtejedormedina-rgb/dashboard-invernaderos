@@ -117,7 +117,7 @@ APP_DIR = Path(__file__).resolve().parent
 LOGO_PATH = APP_DIR / 'logo elite.png'
 LOGO_URL_LARGE = "https://raw.githubusercontent.com/juandavdidtejedormedina-rgb/dashboard-invernaderos/main/logo%20elite.png"
 LOGO_URL_SMALL = LOGO_URL_LARGE
-DASHBOARD_VIDEO_URL = "https://raw.githubusercontent.com/juandavdidtejedormedina-rgb/dashboard-invernaderos/59df2b2f7fee2b9632ae4865fedae119e81b3b79/flor%20video.mp4"
+DASHBOARD_VIDEO_URL = "https://raw.githubusercontent.com/juandavdidtejedormedina-rgb/dashboard-invernaderos/92e7785e8f5bd984f6ffff48ceb3153a2a2d9d36/For%20Creciendo.mp4"
 DASHBOARD_LOCATION_QUERY = "La Ponderosa - The Elite Flower SAS CI Madrid Cundinamarca Colombia"
 STREAMLIT_LOGO_WIDTH = 74
 STREAMLIT_LOGO_HEIGHT = 74
@@ -1471,11 +1471,15 @@ if DASHBOARD_LOCATION_QUERY.strip():
             scrolling=False
         )
 
-# --- Configuracion de URLs (Mover aqui para evitar NameError) ---
+# Fuentes de datos
 URL_VARIABLES = "https://raw.githubusercontent.com/juandavdidtejedormedina-rgb/dashboard-invernaderos/main/Datos_variables.xlsx"
 URL_CORTINAS = "https://raw.githubusercontent.com/juandavdidtejedormedina-rgb/dashboard-invernaderos/main/Registro_Cortinas_Final.xlsx"
+EXCLUDED_EXCEL_SHEETS = {'plantilla'}
+ANNOTATION_COLUMN_PAIRS = (
+    ('Frente A', 'Anotacion A'),
+    ('Puerta B', 'Anotacion B')
+)
 
-# Definición de la función de descarga
 @st.cache_data(show_spinner="Descargando datos desde el repositorio...")
 def descargar_desde_github(url):
     try:
@@ -1489,7 +1493,7 @@ def descargar_desde_github(url):
 archivo_variables_bytes = descargar_desde_github(URL_VARIABLES)
 archivo_cortinas_bytes = descargar_desde_github(URL_CORTINAS)
 
-# 3. Funciones de carga de datos con corrección de FECHAS
+# Funciones de carga de datos
 
 def _limpiar_columnas(df):
     df = df.copy()
@@ -1508,6 +1512,10 @@ def _leer_excel_desde_bytes(ruta_bytes, sheet_name, **kwargs):
         engine="openpyxl",
         **kwargs
     )
+
+
+def _get_excel_data_sheet_names(xls):
+    return [sheet for sheet in xls.sheet_names if sheet.lower() not in EXCLUDED_EXCEL_SHEETS]
 
 
 def _build_normalized_text_key(value):
@@ -1579,7 +1587,7 @@ def cargar_datos(ruta_bytes):
         xls = pd.ExcelFile(io.BytesIO(ruta_bytes), engine="openpyxl")
         registros = []
 
-        for sheet in [s for s in xls.sheet_names if s.lower() != 'plantilla']:
+        for sheet in _get_excel_data_sheet_names(xls):
             df_sheet = pd.DataFrame()
 
             for read_kwargs in ({}, {'skiprows': 1}):
@@ -2776,39 +2784,35 @@ def _get_daily_annotations(datos_cortinas):
     if datos_cortinas.empty:
         return []
 
-    annotation_pairs = [
-        ('Frente A', 'Anotacion A'),
-        ('Puerta B', 'Anotacion B')
-    ]
     annotations = []
 
     for _, row in datos_cortinas.iterrows():
-        for label_col, note_col in annotation_pairs:
-            note_value = row.get(note_col)
-            if pd.isna(note_value):
-                continue
-
-            note_text = str(note_value).strip()
-            if not note_text or note_text.lower() in {'nan', 'none'}:
-                continue
-
-            label_value = row.get(label_col)
-            label_text = str(label_value).strip() if pd.notna(label_value) else label_col
-            entry = f"{label_text}: {note_text}"
+        for label_col, note_col in ANNOTATION_COLUMN_PAIRS:
+            entry = _build_annotation_entry(row, label_col, note_col)
             if entry not in annotations:
                 annotations.append(entry)
 
     return annotations
 
 
+def _build_annotation_entry(row, label_col, note_col):
+    note_value = row.get(note_col)
+    if pd.isna(note_value):
+        return None
+
+    note_text = str(note_value).strip()
+    if not note_text or note_text.lower() in {'nan', 'none'}:
+        return None
+
+    label_value = row.get(label_col)
+    label_text = str(label_value).strip() if pd.notna(label_value) else label_col
+    return f"{label_text}: {note_text}"
+
+
 def _get_annotations_by_day(datos_cortinas):
     if datos_cortinas.empty or 'Fecha' not in datos_cortinas.columns:
         return []
 
-    annotation_pairs = [
-        ('Frente A', 'Anotacion A'),
-        ('Puerta B', 'Anotacion B')
-    ]
     grouped_annotations = []
     datos_ordenados = datos_cortinas.sort_values('Fecha')
 
@@ -2816,18 +2820,8 @@ def _get_annotations_by_day(datos_cortinas):
         entries = []
 
         for _, row in datos_dia.iterrows():
-            for label_col, note_col in annotation_pairs:
-                note_value = row.get(note_col)
-                if pd.isna(note_value):
-                    continue
-
-                note_text = str(note_value).strip()
-                if not note_text or note_text.lower() in {'nan', 'none'}:
-                    continue
-
-                label_value = row.get(label_col)
-                label_text = str(label_value).strip() if pd.notna(label_value) else label_col
-                entry = f"{label_text}: {note_text}"
+            for label_col, note_col in ANNOTATION_COLUMN_PAIRS:
+                entry = _build_annotation_entry(row, label_col, note_col)
                 if entry not in entries:
                     entries.append(entry)
 
@@ -2901,7 +2895,7 @@ def cargar_cortinas(ruta_bytes):
         xls = pd.ExcelFile(io.BytesIO(ruta_bytes), engine="openpyxl")
         registros = []
 
-        for sheet in [s for s in xls.sheet_names if s.lower() != 'plantilla']:
+        for sheet in _get_excel_data_sheet_names(xls):
             raw = _leer_excel_desde_bytes(ruta_bytes, sheet_name=sheet, header=None)
             if raw.shape[0] < 4:
                 continue
