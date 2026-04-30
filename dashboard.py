@@ -1596,15 +1596,6 @@ def _limpiar_columnas(df):
     return df
 
 
-def _leer_excel_desde_bytes(ruta_bytes, sheet_name, **kwargs):
-    return pd.read_excel(
-        io.BytesIO(ruta_bytes),
-        sheet_name=sheet_name,
-        engine="openpyxl",
-        **kwargs
-    )
-
-
 def _build_normalized_text_key(value):
     normalized = unicodedata.normalize('NFKD', str(value))
     normalized = ''.join(char for char in normalized if not unicodedata.combining(char))
@@ -1648,7 +1639,9 @@ def _combine_fecha_hora_columns(df):
         return df
 
     df = df.copy()
-    fecha_series = pd.to_datetime(df['Fecha'], errors='coerce', dayfirst=True)
+    with warnings.catch_warnings():
+        warnings.simplefilter('ignore', UserWarning)
+        fecha_series = pd.to_datetime(df['Fecha'], errors='coerce', dayfirst=True)
     hora_series = df['Hora'].astype(str).str.strip().replace({'NaT': '', 'nan': '', 'None': ''})
     df['DateTime'] = pd.to_datetime(
         fecha_series.dt.strftime('%Y-%m-%d') + ' ' + hora_series,
@@ -1678,7 +1671,7 @@ def cargar_datos(ruta_bytes):
             df_sheet = pd.DataFrame()
 
             for read_kwargs in ({}, {'skiprows': 1}):
-                candidate = _leer_excel_desde_bytes(ruta_bytes, sheet_name=sheet, **read_kwargs)
+                candidate = xls.parse(sheet_name=sheet, **read_kwargs)
                 candidate = _prepare_variables_sheet(candidate)
                 candidate = _limpiar_columnas(candidate)
                 if 'DateTime' in candidate.columns:
@@ -1729,6 +1722,14 @@ def _coerce_sidebar_date(value, fallback):
     if isinstance(value, date):
         return value
     return fallback
+
+
+def _clamp_sidebar_date(value, min_date, max_date):
+    if value < min_date:
+        return min_date
+    if value > max_date:
+        return max_date
+    return value
 
 
 def _sidebar_icon_svg(icon_name):
@@ -2818,14 +2819,6 @@ def _get_available_variable_dates(df_variables_all, bloque_variables):
     return sorted(fechas_variables)
 
 
-def _get_all_variable_dates(df_variables_all):
-    if df_variables_all.empty or 'Fecha_Filtro' not in df_variables_all.columns:
-        return []
-
-    fechas_variables = pd.Series(df_variables_all['Fecha_Filtro'].dropna().unique()).tolist()
-    return sorted(fechas_variables)
-
-
 def _get_all_variable_dates_for_blocks(df_variables_all, block_names=None):
     if (
         df_variables_all.empty or
@@ -3075,6 +3068,15 @@ def _build_marley_hourly_comparison(df, variable, selected_range):
     comparison.loc[valid_pct_index, 'DiffPct'] = (
         comparison.loc[valid_pct_index, 'DiffValue'] / pct_base.loc[valid_pct_index] * 100
     )
+    comparison['SignedDiffLabel'] = comparison['SignedDiff'].apply(
+        lambda value: "No disponible" if pd.isna(value) else f"{value:+.2f}"
+    )
+    comparison['DiffValueLabel'] = comparison['DiffValue'].apply(
+        lambda value: "No disponible" if pd.isna(value) else f"{value:.2f}"
+    )
+    comparison['DiffPctLabel'] = comparison['DiffPct'].apply(
+        lambda value: "No disponible" if pd.isna(value) else f"{value:.2f}%"
+    )
     return comparison
 
 
@@ -3143,7 +3145,7 @@ def _make_marley_comparison_chart(comparison, variable, selected_range):
     start_date, end_date = selected_range
 
     for source_name in MARLEY_SENSOR_NAMES:
-        source_df = comparison[['FechaHora', source_name, 'SignedDiff', 'DiffValue', 'DiffPct']].copy()
+        source_df = comparison[['FechaHora', source_name, 'SignedDiffLabel', 'DiffValueLabel', 'DiffPctLabel']].copy()
         if source_df[source_name].dropna().empty:
             continue
 
@@ -3156,17 +3158,17 @@ def _make_marley_comparison_chart(comparison, variable, selected_range):
                 line=dict(color=config['colors'][source_name], width=3),
                 marker=dict(size=6),
                 connectgaps=False,
-                customdata=source_df[['SignedDiff', 'DiffValue', 'DiffPct']],
+                customdata=source_df[['SignedDiffLabel', 'DiffValueLabel', 'DiffPctLabel']],
                 hovertemplate=(
                     "<b>%{x|%Y-%m-%d %H:%M}</b><br>"
                     + f"{source_name}: "
                     + "%{y:.2f} "
                     + config['unit']
-                    + "<br>Diferencia WIGA - ECOWITT: %{customdata[0]:+.2f} "
+                    + "<br>Diferencia WIGA - ECOWITT: %{customdata[0]} "
                     + config['unit']
-                    + "<br>Diferencia absoluta: %{customdata[1]:.2f} "
+                    + "<br>Diferencia absoluta: %{customdata[1]} "
                     + config['unit']
-                    + "<br>Diferencia % sobre promedio: %{customdata[2]:.2f}%<extra></extra>"
+                    + "<br>Diferencia % sobre promedio: %{customdata[2]}<extra></extra>"
                 ),
             )
         )
@@ -3342,7 +3344,11 @@ def _render_marley_dashboard(dashboard_mode):
                 help=FILTER_HELP_TEXTS['modo_fechas']
             )
             if modo_fechas == "Un día":
-                fecha_unica_default = _coerce_sidebar_date(st.session_state.get("marley_fecha_un_dia", max_date), max_date)
+                fecha_unica_default = _clamp_sidebar_date(
+                    _coerce_sidebar_date(st.session_state.get("marley_fecha_un_dia", max_date), max_date),
+                    min_date,
+                    max_date
+                )
                 _sidebar_field_label("calendar", "Seleccionar fecha")
                 fecha_unica = st.date_input(
                     "Seleccionar fecha:",
@@ -3716,7 +3722,7 @@ def cargar_cortinas(ruta_bytes):
         registros = []
 
         for sheet in [s for s in xls.sheet_names if s.lower() != 'plantilla']:
-            raw = _leer_excel_desde_bytes(ruta_bytes, sheet_name=sheet, header=None)
+            raw = xls.parse(sheet_name=sheet, header=None)
             if raw.shape[0] < 4:
                 continue
             raw = raw.dropna(axis=1, how='all')
@@ -5150,7 +5156,8 @@ def _render_hourly_analysis_view(df_variables, fecha_variables, selected_blocks,
                                 st.dataframe(_prepare_hourly_pivot_display(pivot_varianza), width='stretch')
 
 
-_df_variables_all, _df_cortinas_all = cargar_dashboard_completo()
+_df_variables_all = pd.DataFrame()
+_df_cortinas_all = pd.DataFrame()
 
 if 'graficar_correlacion' not in st.session_state:
     st.session_state.graficar_correlacion = False
@@ -5189,6 +5196,8 @@ with st.sidebar.expander("Finca", expanded=True):
 
 if selected_finca == 'Marley':
     _render_marley_dashboard(dashboard_mode)
+
+_df_variables_all, _df_cortinas_all = cargar_dashboard_completo()
 
 if dashboard_mode == "Varianza Y Promedio":
     analysis_block_codes, analysis_variable_map, _ = _get_block_options(
@@ -5343,6 +5352,8 @@ if not selected_block_code_current and block_codes:
     selected_block_code_current = block_codes[0]
 if selected_block_code_current and selected_block_code_current not in block_codes:
     selected_block_code_current = block_codes[0] if block_codes else None
+if selected_block_code_current is not None:
+    st.session_state["bloque_compartido"] = selected_block_code_current
 if selected_block_code_current in variable_block_map:
     bloque_variables = variable_block_map.get(selected_block_code_current)
     bloque_seleccionado = cortina_block_map.get(selected_block_code_current)
