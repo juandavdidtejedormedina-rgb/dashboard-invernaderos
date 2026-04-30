@@ -3121,7 +3121,11 @@ def _render_correlacion(
                 opacity=0.78 if var_name == 'Gramos de agua' else 1.0,
                 legendrank=order,
                 hovertemplate=(
-                    f'<b>%{{x|{hover_time_format}}}</b><br>' +
+                    (
+                        ''
+                        if multi_day_view else
+                        f'<b>%{{x|{hover_time_format}}}</b><br>'
+                    ) +
                     var_name + ': %{y:.2f} ' +
                     VARIABLE_UNITS.get(var_name, '') +
                     '<extra></extra>'
@@ -3164,7 +3168,11 @@ def _render_correlacion(
                         opacity=0.95,
                         legendrank=order + 0.5,
                         hovertemplate=(
-                            f'<b>%{{x|{hover_time_format}}}</b><br>' +
+                            (
+                                ''
+                                if multi_day_view else
+                                f'<b>%{{x|{hover_time_format}}}</b><br>'
+                            ) +
                             f'{var_name} - Estación externa: ' +
                             '%{y:.2f} ' +
                             VARIABLE_UNITS.get(var_name, '') +
@@ -3221,7 +3229,12 @@ def _render_correlacion(
                     line=dict(color=color, width=3.2, shape='hv'),
                     marker=dict(size=5, color=color),
                     hovertemplate=(
-                        f'<b>%{{x|{hover_time_format}}}</b><br>%{{customdata[0]}}<br>{hover_value_line}'
+                        (
+                            ''
+                            if multi_day_view else
+                            f'<b>%{{x|{hover_time_format}}}</b><br>'
+                        ) +
+                        f'%{{customdata[0]}}<br>{hover_value_line}'
                         + ('<br>%{customdata[2]}' if show_ideal_lines else '')
                         + '<br>%{customdata[1]}<extra></extra>'
                     ),
@@ -3484,7 +3497,10 @@ def _render_correlacion(
             spikesnap='cursor',
             spikedash='dot',
             spikecolor='rgba(45, 48, 64, 0.55)',
-            spikethickness=1
+            spikethickness=1,
+            unifiedhovertitle=dict(
+                text='%{x|%d/%m %H:%M}' if multi_day_view else '%{x|%H:%M}'
+            )
         ),
         hovermode='x unified',
         hoverdistance=30,
