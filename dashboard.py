@@ -3413,6 +3413,131 @@ def _make_marley_scatter_chart(comparison, variable):
     return fig
 
 
+def _build_marley_hourly_metric(df, variable, metric_column):
+    value_columns = {
+        source_name: f"{variable} - {source_name}"
+        for source_name in MARLEY_SENSOR_NAMES
+    }
+    available_columns = [
+        column_name
+        for column_name in value_columns.values()
+        if column_name in df.columns
+    ]
+    if df.empty or 'FechaHora' not in df.columns or not available_columns:
+        return pd.DataFrame()
+
+    records = []
+    for source_name, column_name in value_columns.items():
+        if column_name not in df.columns:
+            continue
+        source_df = df[['FechaHora', column_name]].dropna(subset=[column_name]).copy()
+        if source_df.empty:
+            continue
+        source_df['FranjaDateTime'] = source_df['FechaHora'].dt.floor(MARLEY_TIME_BUCKET)
+        source_df['FranjaMinutos'] = source_df['FranjaDateTime'].dt.hour * 60 + source_df['FranjaDateTime'].dt.minute
+        source_df['Franja'] = source_df['FranjaDateTime'].dt.strftime('%H:%M')
+
+        aggregation = 'mean' if metric_column == 'Promedio' else (
+            lambda serie: serie.var(ddof=1) if len(serie) > 1 else 0.0
+        )
+        grouped = (
+            source_df.groupby(['FranjaMinutos', 'Franja'], as_index=False)
+            .agg(Valor=(column_name, aggregation), Registros=(column_name, 'count'))
+        )
+        grouped['Sensor'] = source_name
+        records.append(grouped)
+
+    if not records:
+        return pd.DataFrame()
+
+    return (
+        pd.concat(records, ignore_index=True)
+        .sort_values(['FranjaMinutos', 'Sensor'])
+        .reset_index(drop=True)
+    )
+
+
+def _make_marley_hourly_metric_chart(grouped_df, variable, metric_column):
+    config = MARLEY_VARIABLES[variable]
+    fig = go.Figure()
+    display_slots = [
+        f'{hour:02d}:{minute:02d}'
+        for hour in range(24)
+        for minute in (0, 30)
+    ]
+
+    for source_name in MARLEY_SENSOR_NAMES:
+        source_df = grouped_df[grouped_df['Sensor'] == source_name].copy()
+        if source_df.empty:
+            continue
+        source_df = (
+            source_df.set_index('Franja')
+            .reindex(display_slots)
+            .rename_axis('Franja')
+            .reset_index()
+        )
+        source_df['Sensor'] = source_name
+
+        fig.add_trace(
+            go.Scatter(
+                x=source_df['Franja'],
+                y=source_df['Valor'],
+                name=source_name,
+                mode='lines+markers',
+                line=dict(color=config['colors'][source_name], width=3),
+                marker=dict(size=6),
+                connectgaps=False,
+                customdata=source_df[['Registros']],
+                hovertemplate=(
+                    '<b>%{x}</b><br>'
+                    + f'{source_name} - {metric_column}: '
+                    + '%{y:.2f} '
+                    + config['unit']
+                    + '<br>Registros: %{customdata[0]}<extra></extra>'
+                ),
+            )
+        )
+
+    yaxis_title = config['unit'] if metric_column == 'Promedio' else f"Varianza ({config['unit']})"
+    fig.update_layout(
+        title=dict(text=f"{metric_column} por franja horaria - {config['title'].replace('Comparativa de ', '').capitalize()}", x=0, xanchor='left'),
+        height=470,
+        margin=dict(l=28, r=28, t=74, b=75),
+        paper_bgcolor="rgba(255,255,255,0)",
+        plot_bgcolor="rgba(250,248,243,0.72)",
+        hovermode='x unified',
+        template='plotly_white',
+        legend=dict(orientation='h', yanchor='bottom', y=1.02, xanchor='left', x=0),
+        xaxis=dict(
+            title='Franja horaria',
+            type='category',
+            categoryorder='array',
+            categoryarray=display_slots,
+            tickangle=-90,
+            showgrid=True,
+            gridcolor="rgba(76, 70, 120, 0.07)",
+            zeroline=False,
+        ),
+        yaxis=dict(
+            title=yaxis_title,
+            showgrid=True,
+            gridcolor="rgba(76, 70, 120, 0.07)",
+            zeroline=False,
+        ),
+    )
+    return fig
+
+
+def _prepare_marley_hourly_metric_table(grouped_df):
+    if grouped_df.empty:
+        return grouped_df
+    table = grouped_df.pivot(index=['FranjaMinutos', 'Franja'], columns='Sensor', values='Valor')
+    table = table.reset_index().sort_values('FranjaMinutos').drop(columns=['FranjaMinutos'])
+    table = table.rename(columns={'Franja': 'Franja horaria'})
+    table.columns.name = None
+    return table.round(2)
+
+
 def _render_marley_dashboard(dashboard_mode):
     try:
         marley_df, marley_source_data = _load_marley_data()
@@ -3423,9 +3548,6 @@ def _render_marley_dashboard(dashboard_mode):
     if marley_df.empty or 'FechaHora' not in marley_df.columns:
         st.warning("No hay datos disponibles para Marley.")
         st.stop()
-
-    if dashboard_mode != "Correlación":
-        st.info("Para Marley se muestra la comparativa WIGA vs ECOWITT. La vista de Varianza y Promedio no aplica en esta finca.")
 
     min_date = marley_df['FechaHora'].min().date()
     max_date = marley_df['FechaHora'].max().date()
@@ -3504,8 +3626,8 @@ def _render_marley_dashboard(dashboard_mode):
         title_text='Periodo Marley'
     )
 
-    st.markdown("## Comparativa Marley")
-    st.caption("Comparación entre los sensores WIGA y ECOWITT con promedios por bloque de 30 minutos.")
+    st.markdown(f"## Marley - {dashboard_mode}")
+    st.caption("Lectura comparativa entre los sensores WIGA y ECOWITT con datos consolidados en franjas de 30 minutos.")
 
     selected_variable = st.segmented_control(
         "Variable Marley",
@@ -3516,6 +3638,22 @@ def _render_marley_dashboard(dashboard_mode):
     )
     comparison = _build_marley_hourly_comparison(filtered_df, selected_variable, selected_range)
     overlap = comparison.dropna(subset=list(MARLEY_SENSOR_NAMES)).copy()
+
+    if dashboard_mode in ("Promedio", "Varianza"):
+        grouped_metric = _build_marley_hourly_metric(filtered_df, selected_variable, dashboard_mode)
+        if grouped_metric.empty:
+            st.warning("No hay datos suficientes para construir esta vista de Marley en el periodo seleccionado.")
+            st.stop()
+
+        st.caption(
+            "Esta vista resume cada sensor por franja horaria. En varios días, cada punto combina las lecturas de esa misma hora a lo largo del periodo."
+            if dashboard_mode == "Promedio" else
+            "Esta vista muestra qué tanto cambió cada sensor en la misma franja horaria dentro del periodo seleccionado."
+        )
+        st.plotly_chart(_make_marley_hourly_metric_chart(grouped_metric, selected_variable, dashboard_mode), width="stretch")
+        with st.expander(f"Ver tabla dinámica de {dashboard_mode.lower()}", expanded=False):
+            st.dataframe(_prepare_marley_hourly_metric_table(grouped_metric), width="stretch", hide_index=True)
+        st.stop()
 
     avg_abs_diff = overlap['DiffValue'].mean() if not overlap.empty else None
     avg_signed_diff = overlap['SignedDiff'].mean() if not overlap.empty else None
@@ -5293,15 +5431,6 @@ st.sidebar.markdown(
     unsafe_allow_html=True
 )
 
-with st.sidebar.expander("Vista", expanded=True):
-    _sidebar_field_label("filter", "Seleccionar vista")
-    dashboard_mode = st.radio(
-        "Seleccionar vista:",
-        options=["Correlación", "Varianza Y Promedio"],
-        key="modo_dashboard",
-        help=FILTER_HELP_TEXTS['modo_dashboard']
-    )
-
 with st.sidebar.expander("Finca", expanded=True):
     _sidebar_field_label("location", "Seleccionar finca")
     selected_finca = st.selectbox(
@@ -5309,6 +5438,30 @@ with st.sidebar.expander("Finca", expanded=True):
         options=FINCA_OPTIONS,
         key="finca_compartida",
         help=FILTER_HELP_TEXTS['finca']
+    )
+
+dashboard_view_options = (
+    ["Comparativa", "Promedio", "Varianza"]
+    if selected_finca == 'Marley' else
+    ["Correlación", "Varianza Y Promedio"]
+)
+if st.session_state.get("modo_dashboard") not in dashboard_view_options:
+    st.session_state["modo_dashboard"] = dashboard_view_options[0]
+
+with st.sidebar.expander("Vista", expanded=True):
+    _sidebar_field_label(
+        "filter",
+        "Seleccionar análisis" if selected_finca == 'Marley' else "Seleccionar vista"
+    )
+    dashboard_mode = st.radio(
+        "Seleccionar análisis:" if selected_finca == 'Marley' else "Seleccionar vista:",
+        options=dashboard_view_options,
+        key="modo_dashboard",
+        help=(
+            "Elige cómo quieres analizar los sensores WIGA y ECOWITT de Marley."
+            if selected_finca == 'Marley' else
+            FILTER_HELP_TEXTS['modo_dashboard']
+        )
     )
 
 if selected_finca == 'Marley':
