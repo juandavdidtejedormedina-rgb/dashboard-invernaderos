@@ -310,7 +310,7 @@ section[data-testid="stSidebar"] > div {{
     width: 300px !important;
 }}
 [data-testid="stSidebar"] .block-container {{
-    padding: 3.1rem 0.7rem 1rem 0.7rem;
+    padding: 4.2rem 0.7rem 1rem 0.7rem;
 }}
 [data-testid="stSidebar"] {{
     background:
@@ -323,8 +323,8 @@ section[data-testid="stSidebar"] > div {{
     color: #f7f7fb;
 }}
 [data-testid="stSidebarHeader"] {{
-    padding-top: 2.1rem !important;
-    padding-bottom: 0.6rem !important;
+    padding-top: 3rem !important;
+    padding-bottom: 1rem !important;
     overflow: visible !important;
     position: relative !important;
 }}
@@ -337,14 +337,14 @@ section[data-testid="stSidebar"] > div {{
 }}
 [data-testid="stSidebarCollapseButton"] {{
     position: absolute !important;
-    top: 1.35rem !important;
+    top: 2rem !important;
     right: 0.45rem !important;
     left: auto !important;
     z-index: 20 !important;
 }}
 [data-testid="stSidebarHeader"] button {{
     position: absolute !important;
-    top: 1.35rem !important;
+    top: 2rem !important;
     right: 0.45rem !important;
     left: auto !important;
     z-index: 20 !important;
@@ -353,13 +353,13 @@ section[data-testid="stSidebar"] > div {{
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    margin: 1.1rem auto 1rem auto !important;
+    margin: 2rem auto 1.25rem auto !important;
     padding: 0.28rem;
     border: 1px solid rgba(255, 255, 255, 0.42);
     border-radius: calc(var(--streamlit-logo-radius) + 6px);
     background: linear-gradient(180deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.03) 100%);
     box-shadow: 0 10px 22px rgba(16, 18, 32, 0.16);
-    transform: translateY(10px);
+    transform: translateY(18px);
 }}
 [data-testid="stSidebarHeader"] img,
 [data-testid="stSidebarHeader"] [data-testid="stLogo"] img {{
@@ -373,7 +373,7 @@ section[data-testid="stSidebar"] > div {{
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    margin: 1.65rem 0 1.2rem 0.15rem;
+    margin: 2.7rem 0 1.2rem 0.15rem;
     color: #ffffff;
     font-family: var(--font-display);
     font-size: 1.42rem;
