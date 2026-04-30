@@ -135,6 +135,8 @@ WATER_FOCUS_CHART_ENABLED = True
 WATER_FOCUS_CHART_TITLE = 'Gramos de agua del bloque'
 FOCUS_CHARTS_INTERNAL_HEADING = 'Variables del bloque seleccionado'
 FOCUS_CHARTS_EXTERNAL_HEADING = 'Variables de la estación externa'
+MOTOR_FOCUS_CHART_ENABLED = True
+MOTOR_FOCUS_CHART_TITLE = 'Motores del bloque'
 CORR_AXIS_TITLES = {
     'Temperatura': 'Temp.',
     'Humedad Relativa': 'Humedad',
@@ -3614,24 +3616,142 @@ def _render_focus_chart_grid(df_variables, fecha_variables, block_label=None, he
         st.plotly_chart(fig_temp, width='stretch')
 
 
-def _render_temperature_focus_chart(df_variables, fecha_variables, block_label=None, df_external=None):
+def _build_motor_focus_chart(datos_cortinas_sel, fecha_variables, block_label=None):
+    if not MOTOR_FOCUS_CHART_ENABLED or datos_cortinas_sel.empty:
+        return None
+
+    fecha_inicio, fecha_fin = fecha_variables
+    multi_day_view = fecha_inicio != fecha_fin
+    hover_time_format = '%d/%m %H:%M' if multi_day_view else '%H:%M'
+    xaxis_tickformat = '%d/%m' if multi_day_view else '%H:%M'
+    xaxis_title = 'Fecha' if multi_day_view else 'Hora del día'
+
+    fig_motor = go.Figure()
+    profile_times = []
+
+    for motor_name in MOTOR_VARIABLES:
+        df_state = pd.DataFrame()
+        for config in SIDE_CONFIGS.values():
+            if config['element_col'] not in datos_cortinas_sel.columns:
+                continue
+            df_state = _build_cortina_apertura_profile(datos_cortinas_sel, motor_name, config)
+            if not df_state.empty:
+                break
+        if df_state.empty:
+            continue
+
+        profile_times.extend(pd.to_datetime(df_state['Hora'], errors='coerce').dropna().tolist())
+        color = CORTINA_COLORS.get(motor_name, BRAND_COLORS['hero'])
+        fig_motor.add_trace(
+            go.Scatter(
+                x=df_state['Hora'],
+                y=df_state['Apertura'],
+                name=motor_name,
+                mode='lines+markers',
+                line=dict(color=color, width=2.4, shape='hv'),
+                marker=dict(size=4, color=color),
+                hovertemplate=(
+                    f'<b>%{{x|{hover_time_format}}}</b><br>'
+                    f'{motor_name}: %{{y:.0f}}% abierto'
+                    '<extra></extra>'
+                )
+            )
+        )
+
+    if not fig_motor.data:
+        return None
+
+    xaxis_range = None
+    if not multi_day_view and profile_times:
+        min_time = pd.Timestamp(min(profile_times)).floor('30min').to_pydatetime()
+        max_time = pd.Timestamp(max(profile_times)).ceil('30min').to_pydatetime()
+        xaxis_range = [min_time, max_time]
+
+    resolved_title = MOTOR_FOCUS_CHART_TITLE if not block_label else f'{MOTOR_FOCUS_CHART_TITLE} | {block_label}'
+    fig_motor.update_layout(
+        title=dict(
+            text=resolved_title,
+            x=0,
+            xanchor='left',
+            font=dict(size=16, color=BRAND_COLORS['graphite'], family='Manrope, sans-serif')
+        ),
+        xaxis=dict(
+            title=xaxis_title,
+            tickformat=xaxis_tickformat,
+            tickmode='linear' if not multi_day_view else 'auto',
+            dtick=30 * 60 * 1000 if not multi_day_view else None,
+            range=xaxis_range,
+            showgrid=True,
+            gridcolor='rgba(76, 70, 120, 0.07)',
+            zeroline=False,
+            tickfont=dict(size=10, family='Manrope, sans-serif', color=BRAND_COLORS['graphite'])
+        ),
+        yaxis=dict(
+            title='Apertura (%)',
+            range=[0, 100],
+            showgrid=True,
+            gridcolor='rgba(76, 70, 120, 0.07)',
+            zeroline=False,
+            tickfont=dict(size=10, family='Manrope, sans-serif', color=BRAND_COLORS['graphite'])
+        ),
+        template='plotly_white',
+        paper_bgcolor='rgba(255,255,255,0)',
+        plot_bgcolor='rgba(250,248,243,0.65)',
+        hovermode='x unified',
+        height=TEMP_FOCUS_CHART_HEIGHT + 20,
+        margin=dict(l=52, r=24, t=58, b=44),
+        font=dict(family='Manrope, sans-serif', color=BRAND_COLORS['graphite']),
+        legend=dict(
+            orientation='h',
+            yanchor='bottom',
+            y=1.02,
+            xanchor='left',
+            x=0,
+            font=dict(size=11, family='Manrope, sans-serif', color=BRAND_COLORS['graphite'])
+        )
+    )
+    return fig_motor
+
+
+def _render_temperature_focus_chart(df_variables, fecha_variables, block_label=None, df_external=None, datos_cortinas_sel=None):
     if not TEMP_FOCUS_CHART_ENABLED:
         return
 
-    _render_focus_chart_grid(
-        df_variables,
-        fecha_variables,
-        block_label=block_label,
-        heading=FOCUS_CHARTS_INTERNAL_HEADING
-    )
+    internal_available = isinstance(df_variables, pd.DataFrame) and not df_variables.empty
+    external_available = isinstance(df_external, pd.DataFrame) and not df_external.empty
+    motor_fig = _build_motor_focus_chart(datos_cortinas_sel, fecha_variables, block_label=block_label)
 
-    if isinstance(df_external, pd.DataFrame) and not df_external.empty:
-        _render_focus_chart_grid(
-            df_external,
-            fecha_variables,
-            block_label='Estación externa',
-            heading=FOCUS_CHARTS_EXTERNAL_HEADING
-        )
+    tab_specs = []
+    if internal_available:
+        tab_specs.append(('Internas', 'internal'))
+    if external_available:
+        tab_specs.append(('Estación externa', 'external'))
+    if motor_fig is not None:
+        tab_specs.append(('Motores', 'motors'))
+
+    if not tab_specs:
+        return
+
+    tabs = st.tabs([label for label, _ in tab_specs])
+    for tab, (_, key) in zip(tabs, tab_specs):
+        with tab:
+            if key == 'internal':
+                _render_focus_chart_grid(
+                    df_variables,
+                    fecha_variables,
+                    block_label=block_label,
+                    heading=FOCUS_CHARTS_INTERNAL_HEADING
+                )
+            elif key == 'external':
+                _render_focus_chart_grid(
+                    df_external,
+                    fecha_variables,
+                    block_label='Estación externa',
+                    heading=FOCUS_CHARTS_EXTERNAL_HEADING
+                )
+            elif key == 'motors' and motor_fig is not None:
+                st.markdown(f"#### {MOTOR_FOCUS_CHART_TITLE}")
+                st.plotly_chart(motor_fig, width='stretch')
 
 # 4. Datos cargados en memoria para evitar recálculos repetidos
 def _sort_block_names(block_names):
@@ -4663,7 +4783,8 @@ with tab_correlacion:
                         df_variables_corr,
                         fecha_variables,
                         block_label=block_label,
-                        df_external=df_variables_almacen_corr
+                        df_external=df_variables_almacen_corr,
+                        datos_cortinas_sel=datos_cortinas_sel
                     )
 
         with tab_corr_regs:
