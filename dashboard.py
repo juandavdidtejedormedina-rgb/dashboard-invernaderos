@@ -1740,6 +1740,11 @@ def _format_selected_period_label(fecha_inicio, fecha_fin):
     return f"{fecha_inicio.strftime('%d/%m/%Y')} a {fecha_fin.strftime('%d/%m/%Y')}"
 
 
+def _shift_selected_period_day(navigation_state_key, current_date, delta_days, min_fecha, max_fecha):
+    shifted_date = current_date + timedelta(days=delta_days)
+    st.session_state[navigation_state_key] = _clamp_sidebar_date(shifted_date, min_fecha, max_fecha)
+
+
 def _render_selected_period_banner(
     fecha_periodo,
     min_fecha=None,
@@ -1813,14 +1818,24 @@ def _render_selected_period_banner(
     next_disabled = (not can_navigate) or fecha_inicio >= max_fecha
 
     with col_prev:
-        if st.button("◀", key=f"{navigation_state_key}_prev" if navigation_state_key else "period_prev_disabled", disabled=prev_disabled, width="stretch"):
-            st.session_state[navigation_state_key] = fecha_inicio - timedelta(days=1)
-            st.rerun()
+        st.button(
+            "◀",
+            key=f"{navigation_state_key}_prev" if navigation_state_key else "period_prev_disabled",
+            disabled=prev_disabled,
+            width="stretch",
+            on_click=_shift_selected_period_day if can_navigate else None,
+            args=(navigation_state_key, fecha_inicio, -1, min_fecha, max_fecha) if can_navigate else None
+        )
 
     with col_next:
-        if st.button("▶", key=f"{navigation_state_key}_next" if navigation_state_key else "period_next_disabled", disabled=next_disabled, width="stretch"):
-            st.session_state[navigation_state_key] = fecha_inicio + timedelta(days=1)
-            st.rerun()
+        st.button(
+            "▶",
+            key=f"{navigation_state_key}_next" if navigation_state_key else "period_next_disabled",
+            disabled=next_disabled,
+            width="stretch",
+            on_click=_shift_selected_period_day if can_navigate else None,
+            args=(navigation_state_key, fecha_inicio, 1, min_fecha, max_fecha) if can_navigate else None
+        )
 
 
 def _sidebar_icon_svg(icon_name):
