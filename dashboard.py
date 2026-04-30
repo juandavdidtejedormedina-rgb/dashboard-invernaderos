@@ -133,6 +133,8 @@ PAR_FOCUS_CHART_ENABLED = True
 PAR_FOCUS_CHART_TITLE = 'Radiación PAR del bloque'
 WATER_FOCUS_CHART_ENABLED = True
 WATER_FOCUS_CHART_TITLE = 'Gramos de agua del bloque'
+FOCUS_CHARTS_INTERNAL_HEADING = 'Variables del bloque seleccionado'
+FOCUS_CHARTS_EXTERNAL_HEADING = 'Variables de la estación externa'
 CORR_AXIS_TITLES = {
     'Temperatura': 'Temp.',
     'Humedad Relativa': 'Humedad',
@@ -3536,9 +3538,10 @@ def _build_focus_variable_chart(df_variables, fecha_variables, variable_name, ch
     return fig
 
 
-def _render_temperature_focus_chart(df_variables, fecha_variables, block_label=None):
-    if not TEMP_FOCUS_CHART_ENABLED:
+def _render_focus_chart_grid(df_variables, fecha_variables, block_label=None, heading=None):
+    if df_variables.empty:
         return
+
     fig_temp = _build_focus_variable_chart(
         df_variables,
         fecha_variables,
@@ -3580,6 +3583,9 @@ def _render_temperature_focus_chart(df_variables, fecha_variables, block_label=N
     if fig_temp is None and fig_humidity is None and fig_par is None and fig_water is None:
         return
 
+    if heading:
+        st.markdown(f"#### {heading}")
+
     if TEMP_FOCUS_CHART_PLACEMENT == 'below':
         top_left, top_right = st.columns(TEMP_FOCUS_CHART_COLUMN_LAYOUT)
         with top_left:
@@ -3606,6 +3612,26 @@ def _render_temperature_focus_chart(df_variables, fecha_variables, block_label=N
             st.plotly_chart(fig_temp, width='stretch')
     elif fig_temp is not None:
         st.plotly_chart(fig_temp, width='stretch')
+
+
+def _render_temperature_focus_chart(df_variables, fecha_variables, block_label=None, df_external=None):
+    if not TEMP_FOCUS_CHART_ENABLED:
+        return
+
+    _render_focus_chart_grid(
+        df_variables,
+        fecha_variables,
+        block_label=block_label,
+        heading=FOCUS_CHARTS_INTERNAL_HEADING
+    )
+
+    if isinstance(df_external, pd.DataFrame) and not df_external.empty:
+        _render_focus_chart_grid(
+            df_external,
+            fecha_variables,
+            block_label='Estación externa',
+            heading=FOCUS_CHARTS_EXTERNAL_HEADING
+        )
 
 # 4. Datos cargados en memoria para evitar recálculos repetidos
 def _sort_block_names(block_names):
@@ -4636,7 +4662,8 @@ with tab_correlacion:
                     _render_temperature_focus_chart(
                         df_variables_corr,
                         fecha_variables,
-                        block_label=block_label
+                        block_label=block_label,
+                        df_external=df_variables_almacen_corr
                     )
 
         with tab_corr_regs:
