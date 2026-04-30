@@ -3394,14 +3394,151 @@ def _render_marley_dashboard(dashboard_mode):
     comparison = _build_marley_hourly_comparison(filtered_df, selected_variable, selected_range)
     overlap = comparison.dropna(subset=list(MARLEY_SENSOR_NAMES)).copy()
 
-    metric_cols = st.columns(3)
     avg_abs_diff = overlap['DiffValue'].mean() if not overlap.empty else None
     avg_signed_diff = overlap['SignedDiff'].mean() if not overlap.empty else None
     std_diff = overlap['SignedDiff'].std() if not overlap.empty else None
     unit = MARLEY_VARIABLES[selected_variable]['unit']
-    metric_cols[0].metric("Dif. absoluta media", f"{avg_abs_diff:.2f} {unit}" if pd.notna(avg_abs_diff) else "Sin datos")
-    metric_cols[1].metric("Dif. media WIGA - ECOWITT", f"{avg_signed_diff:+.2f} {unit}" if pd.notna(avg_signed_diff) else "Sin datos")
-    metric_cols[2].metric("Desv. estándar", f"{std_diff:.2f} {unit}" if pd.notna(std_diff) else "Sin datos")
+
+    if pd.isna(avg_signed_diff):
+        signed_interpretation = "No hay suficientes lecturas simultáneas para identificar cuál sensor quedó por encima."
+    elif avg_signed_diff > 0:
+        signed_interpretation = "En promedio, WIGA estuvo por encima de ECOWITT en esta variable."
+    elif avg_signed_diff < 0:
+        signed_interpretation = "En promedio, ECOWITT estuvo por encima de WIGA en esta variable."
+    else:
+        signed_interpretation = "En promedio, ambos sensores quedaron prácticamente alineados."
+
+    if pd.isna(std_diff):
+        std_interpretation = "No hay suficientes lecturas comparables para evaluar estabilidad."
+    elif std_diff <= 0.3:
+        std_interpretation = "La diferencia entre sensores fue bastante estable a lo largo del tiempo."
+    elif std_diff <= 0.8:
+        std_interpretation = "La diferencia entre sensores tuvo una variación moderada entre franjas."
+    else:
+        std_interpretation = "La diferencia entre sensores cambió bastante entre bloques de 30 minutos."
+
+    marley_metric_cards = [
+        {
+            'title': 'Diferencia absoluta media',
+            'value': f"{avg_abs_diff:.2f} {unit}" if pd.notna(avg_abs_diff) else "Sin datos",
+            'accent': MARLEY_VARIABLES[selected_variable]['colors']['WIGA'],
+            'description': "Mide qué tan separados estuvieron WIGA y ECOWITT en promedio, sin importar cuál quedó por encima.",
+            'insight': (
+                "Mientras más bajo sea este valor, más parecidas fueron las lecturas entre ambos sensores."
+                if pd.notna(avg_abs_diff) else
+                "Necesitamos más datos simultáneos para medir qué tan separados estuvieron ambos sensores."
+            ),
+        },
+        {
+            'title': 'Diferencia media WIGA - ECOWITT',
+            'value': f"{avg_signed_diff:+.2f} {unit}" if pd.notna(avg_signed_diff) else "Sin datos",
+            'accent': MARLEY_VARIABLES[selected_variable]['colors']['ECOWITT'],
+            'description': "Conserva el signo de la diferencia. Nos dice si uno de los sensores tiende a leer más alto que el otro.",
+            'insight': signed_interpretation,
+        },
+        {
+            'title': 'Desviación estándar',
+            'value': f"{std_diff:.2f} {unit}" if pd.notna(std_diff) else "Sin datos",
+            'accent': MARLEY_VARIABLES[selected_variable]['accent'],
+            'description': "Muestra qué tan estable fue la diferencia entre ambos sensores a lo largo del tiempo.",
+            'insight': std_interpretation,
+        },
+    ]
+
+    metric_cols = st.columns(3)
+    for idx, metric in enumerate(marley_metric_cards):
+        with metric_cols[idx]:
+            st.markdown(
+                f"""
+                <div style="
+                    background: linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(247,244,238,0.96) 100%);
+                    border: 1px solid rgba(84, 83, 134, 0.10);
+                    border-top: 4px solid {metric['accent']};
+                    border-radius: 24px;
+                    padding: 1.15rem 1.1rem 1rem 1.1rem;
+                    box-shadow: 0 18px 36px rgba(44, 46, 42, 0.08);
+                    min-height: 255px;
+                ">
+                    <div style="
+                        font-family: 'Manrope', sans-serif;
+                        font-size: 0.82rem;
+                        font-weight: 800;
+                        letter-spacing: 0.03em;
+                        text-transform: uppercase;
+                        color: {metric['accent']};
+                        margin-bottom: 0.7rem;
+                    ">
+                        {html.escape(metric['title'])}
+                    </div>
+                    <div style="
+                        font-family: 'Manrope', sans-serif;
+                        font-size: 2.6rem;
+                        line-height: 1;
+                        font-weight: 800;
+                        color: {BRAND_COLORS['graphite']};
+                        margin-bottom: 0.95rem;
+                    ">
+                        {html.escape(metric['value'])}
+                    </div>
+                    <div style="
+                        font-family: 'Manrope', sans-serif;
+                        font-size: 0.94rem;
+                        line-height: 1.55;
+                        color: rgba(56, 58, 53, 0.82);
+                        margin-bottom: 0.85rem;
+                    ">
+                        {html.escape(metric['description'])}
+                    </div>
+                    <div style="
+                        background: rgba(84, 83, 134, 0.05);
+                        border: 1px solid rgba(84, 83, 134, 0.08);
+                        border-radius: 16px;
+                        padding: 0.8rem 0.85rem;
+                    ">
+                        <div style="
+                            font-family: 'Manrope', sans-serif;
+                            font-size: 0.76rem;
+                            font-weight: 800;
+                            letter-spacing: 0.04em;
+                            text-transform: uppercase;
+                            color: {BRAND_COLORS['hero']};
+                            margin-bottom: 0.35rem;
+                        ">
+                            Cómo leerlo
+                        </div>
+                        <div style="
+                            font-family: 'Manrope', sans-serif;
+                            font-size: 0.9rem;
+                            line-height: 1.55;
+                            color: {BRAND_COLORS['ink']};
+                        ">
+                            {html.escape(metric['insight'])}
+                        </div>
+                    </div>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+
+    st.markdown(
+        """
+        <div style="
+            margin: 0.95rem 0 0.65rem 0;
+            padding: 0.95rem 1rem;
+            border-radius: 18px;
+            background: linear-gradient(135deg, rgba(194,223,234,0.20) 0%, rgba(244,199,206,0.12) 100%);
+            border: 1px solid rgba(84, 83, 134, 0.08);
+            color: rgba(56, 58, 53, 0.88);
+            font-family: 'Manrope', sans-serif;
+            font-size: 0.94rem;
+            line-height: 1.6;
+        ">
+            <strong>Lectura rápida:</strong> estos indicadores ayudan a ver si ambos sensores se parecen,
+            si alguno suele medir más alto y si esa diferencia se mantiene estable o cambia mucho durante el día.
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
 
     st.plotly_chart(_make_marley_comparison_chart(comparison, selected_variable, selected_range), width="stretch")
 
