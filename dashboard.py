@@ -3031,6 +3031,7 @@ def _render_correlacion(
         xaxis_nticks = None
     default_marker_size = CORRELATION_MARKER_SIZE_MULTI_DAY if multi_day_view else CORRELATION_MARKER_SIZE_DEFAULT
     par_marker_size = CORRELATION_MARKER_SIZE_MULTI_DAY if multi_day_view else CORRELATION_MARKER_SIZE_PAR
+    sensor_trace_class = go.Scatter if multi_day_view else go.Scattergl
 
     sensor_vars = _get_available_sensor_vars(df_variables)
     almacen_sensor_vars = _get_available_sensor_vars(df_variables_almacen) if isinstance(df_variables_almacen, pd.DataFrame) else []
@@ -3334,7 +3335,7 @@ def _render_correlacion(
         axis_name = sensor_axis_names[idx] if idx < len(sensor_axis_names) else f'y{idx + 2}'
         sensor_axis_map[var_name] = axis_name
         trace['yaxis'] = None if axis_name == 'y' else axis_name
-        fig_corr.add_trace(go.Scattergl(**trace))
+        fig_corr.add_trace(sensor_trace_class(**trace))
 
         axis_var_name = var_name.replace('_almacen', '')
         series_for_axis = []
@@ -3405,7 +3406,7 @@ def _render_correlacion(
         base_var_name = var_name.replace('_almacen', '')
         axis_name = sensor_axis_map.get(base_var_name, 'y')
         trace['yaxis'] = None if axis_name == 'y' else axis_name
-        fig_corr.add_trace(go.Scattergl(**trace))
+        fig_corr.add_trace(sensor_trace_class(**trace))
 
     if cortina_traces:
         for var_name, trace, color in cortina_traces:
