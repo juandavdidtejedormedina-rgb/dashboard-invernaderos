@@ -1655,7 +1655,7 @@ def _coerce_sidebar_date(value, fallback):
     return fallback
 
 
-def _resample_sensor_series_30min(df_series, value_column):
+def _resample_sensor_series_30min(df_series, value_column, fecha_inicio=None, fecha_fin=None, keep_full_range=False):
     required_cols = {'DateTime', value_column}
     if df_series.empty or not required_cols.issubset(df_series.columns):
         return pd.DataFrame(columns=['DateTime', value_column])
@@ -1669,13 +1669,25 @@ def _resample_sensor_series_30min(df_series, value_column):
     if series.empty:
         return pd.DataFrame(columns=['DateTime', value_column])
 
-    return (
+    resampled = (
         series.set_index('DateTime')[[value_column]]
         .resample('30min')
         .mean()
-        .dropna(how='all')
         .reset_index()
     )
+    if keep_full_range and fecha_inicio is not None and fecha_fin is not None:
+        start_dt = pd.Timestamp(datetime.combine(fecha_inicio, datetime.min.time()))
+        end_dt = pd.Timestamp(datetime.combine(fecha_fin, datetime.max.time())).floor('30min')
+        full_index = pd.date_range(start=start_dt, end=end_dt, freq='30min')
+        resampled = (
+            resampled.set_index('DateTime')
+            .reindex(full_index)
+            .rename_axis('DateTime')
+            .reset_index()
+        )
+    else:
+        resampled = resampled.dropna(how='all', subset=[value_column])
+    return resampled
 
 
 def _get_correlation_xaxis_dtick(fecha_inicio, fecha_fin):
@@ -3102,10 +3114,16 @@ def _render_correlacion(
             if serie.empty:
                 continue
             if multi_day_view:
-                serie = _resample_sensor_series_30min(serie, var_name)
+                serie = _resample_sensor_series_30min(
+                    serie,
+                    var_name,
+                    fecha_inicio=fecha_inicio,
+                    fecha_fin=fecha_fin,
+                    keep_full_range=True
+                )
                 if serie.empty:
                     continue
-            serie_plot = _add_day_breaks_to_series(serie, var_name) if multi_day_view else serie
+            serie_plot = serie if multi_day_view else serie
             trace = dict(
                 x=serie_plot['DateTime'],
                 y=serie_plot[var_name],
@@ -3147,10 +3165,16 @@ def _render_correlacion(
                 serie_almacen = df_plot_almacen[['DateTime', var_name]].dropna(subset=[var_name]).copy()
                 if not serie_almacen.empty:
                     if multi_day_view:
-                        serie_almacen = _resample_sensor_series_30min(serie_almacen, var_name)
+                        serie_almacen = _resample_sensor_series_30min(
+                            serie_almacen,
+                            var_name,
+                            fecha_inicio=fecha_inicio,
+                            fecha_fin=fecha_fin,
+                            keep_full_range=True
+                        )
                     if serie_almacen.empty:
                         continue
-                    serie_almacen_plot = _add_day_breaks_to_series(serie_almacen, var_name) if multi_day_view else serie_almacen
+                    serie_almacen_plot = serie_almacen if multi_day_view else serie_almacen
                     almacen_trace = dict(
                         x=serie_almacen_plot['DateTime'],
                         y=serie_almacen_plot[var_name],
@@ -3341,12 +3365,26 @@ def _render_correlacion(
         series_for_axis = []
         serie = df_plot[[axis_var_name]].dropna(subset=[axis_var_name]).copy()
         if not serie.empty:
+            if multi_day_view:
+                serie = _resample_sensor_series_30min(
+                    serie,
+                    axis_var_name,
+                    fecha_inicio=fecha_inicio,
+                    fecha_fin=fecha_fin,
+                    keep_full_range=False
+                )
             series_for_axis.append(serie[axis_var_name])
         if axis_var_name in compare_sensor_vars and not df_plot_almacen.empty and axis_var_name in df_plot_almacen.columns:
             serie_almacen_axis = df_plot_almacen[[axis_var_name]].dropna(subset=[axis_var_name]).copy()
             if not serie_almacen_axis.empty:
                 if multi_day_view:
-                    serie_almacen_axis = _resample_sensor_series_30min(serie_almacen_axis, axis_var_name)
+                    serie_almacen_axis = _resample_sensor_series_30min(
+                        serie_almacen_axis,
+                        axis_var_name,
+                        fecha_inicio=fecha_inicio,
+                        fecha_fin=fecha_fin,
+                        keep_full_range=False
+                    )
                 series_for_axis.append(serie_almacen_axis[axis_var_name])
         serie_combinada = pd.concat(series_for_axis, ignore_index=True) if series_for_axis else pd.Series(dtype=float)
         if serie_combinada.empty:
