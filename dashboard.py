@@ -3222,44 +3222,44 @@ def _render_correlacion(
 
     if has_cortina_axis:
         if num_axes >= 4:
-            x_domain_end = 0.80
-            axis_start = 0.855
-            axis_end = 0.945
-            cortina_axis_position = 0.982
-            right_margin = 215
+            x_domain_end = 0.77
+            axis_start = 0.825
+            axis_end = 0.925
+            cortina_axis_position = 0.975
+            right_margin = 275
         elif num_axes == 3:
-            x_domain_end = 0.83
-            axis_start = 0.88
-            axis_end = 0.95
-            cortina_axis_position = 0.984
-            right_margin = 198
+            x_domain_end = 0.80
+            axis_start = 0.85
+            axis_end = 0.925
+            cortina_axis_position = 0.975
+            right_margin = 245
         else:
-            x_domain_end = 0.87
-            axis_start = 0.91
-            axis_end = 0.96
-            cortina_axis_position = 0.986
-            right_margin = 172
+            x_domain_end = 0.84
+            axis_start = 0.89
+            axis_end = 0.935
+            cortina_axis_position = 0.975
+            right_margin = 215
     else:
         if num_axes >= 4:
-            x_domain_end = 0.83
-            axis_start = 0.89
-            axis_end = 0.975
-            right_margin = 220
+            x_domain_end = 0.80
+            axis_start = 0.86
+            axis_end = 0.95
+            right_margin = 250
         elif num_axes == 3:
-            x_domain_end = 0.88
-            axis_start = 0.93
-            axis_end = 0.98
-            right_margin = 175
+            x_domain_end = 0.85
+            axis_start = 0.90
+            axis_end = 0.955
+            right_margin = 205
         elif num_axes == 2:
-            x_domain_end = 0.91
-            axis_start = 0.95
-            axis_end = 0.985
-            right_margin = 152
+            x_domain_end = 0.89
+            axis_start = 0.93
+            axis_end = 0.965
+            right_margin = 175
         else:
-            x_domain_end = 0.94
-            axis_start = 0.97
-            axis_end = 0.99
-            right_margin = 126
+            x_domain_end = 0.93
+            axis_start = 0.955
+            axis_end = 0.98
+            right_margin = 145
         cortina_axis_position = None
 
     right_positions = [axis_start + i * ((axis_end - axis_start) / max(1, num_axes - 1)) for i in range(num_axes)]
@@ -3317,8 +3317,8 @@ def _render_correlacion(
             ticks='',
             zeroline=False,
             tickmode='auto',
-            automargin=True,
-            title_standoff=10
+            automargin=False,
+            title_standoff=18
         )
 
         if axis_name == 'y':
@@ -3374,8 +3374,8 @@ def _render_correlacion(
                 tickmode='linear',
                 tick0=0,
                 dtick=cortina_dtick,
-                automargin=True,
-                title_standoff=10
+                automargin=False,
+                title_standoff=18
             )
         else:
             axis_configs['y2'] = dict(
@@ -3399,8 +3399,8 @@ def _render_correlacion(
                 tickmode='array',
                 tickvals=[0, 25, 50, 75, 100],
                 ticksuffix='%',
-                automargin=True,
-                title_standoff=10
+                automargin=False,
+                title_standoff=18
             )
 
     fig_corr.update_layout(
