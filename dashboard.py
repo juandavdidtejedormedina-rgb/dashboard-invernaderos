@@ -461,11 +461,16 @@ section[data-testid="stSidebar"] > div {{
     align-items: center;
     justify-content: center;
     margin: 2rem auto 1.25rem auto !important;
-    padding: 0.28rem;
-    border: 1px solid rgba(255, 255, 255, 0.42);
-    border-radius: calc(var(--streamlit-logo-radius) + 6px);
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.03) 100%);
-    box-shadow: 0 10px 22px rgba(16, 18, 32, 0.16);
+    padding: 0.42rem;
+    border: 1px solid rgba(255, 255, 255, 0.58);
+    border-radius: calc(var(--streamlit-logo-radius) + 10px);
+    background:
+        radial-gradient(circle at 50% 18%, rgba(255, 255, 255, 0.34), rgba(255, 255, 255, 0.06) 54%),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.24) 0%, rgba(247, 244, 238, 0.13) 100%);
+    box-shadow:
+        0 18px 34px rgba(18, 20, 38, 0.26),
+        inset 0 1px 0 rgba(255, 255, 255, 0.42);
+    backdrop-filter: blur(12px);
     transform: translateY(18px);
 }}
 [data-testid="stSidebarHeader"] img,
