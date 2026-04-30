@@ -698,11 +698,12 @@ section[data-testid="stSidebar"] > div {{
     align-items: center;
     padding: 0.24rem 0.62rem;
     border-radius: 999px;
-    background: var(--summary-accent-soft);
-    color: var(--summary-accent);
+    background: color-mix(in srgb, var(--summary-accent) 14%, white 86%);
+    color: color-mix(in srgb, var(--summary-accent) 72%, #2c2e2a 28%);
     font-size: 0.74rem;
-    font-weight: 700;
+    font-weight: 800;
     letter-spacing: 0.02em;
+    border: 1px solid color-mix(in srgb, var(--summary-accent) 18%, white 82%);
 }}
 .summary-card-period {{
     color: #6a6d76;
@@ -917,12 +918,12 @@ section[data-testid="stSidebar"] > div {{
     align-items: center;
     padding: 0.28rem 0.64rem;
     border-radius: 999px;
-    background: var(--info-accent-soft);
-    color: var(--info-accent);
-    border: 1px solid rgba(76, 70, 120, 0.08);
-    box-shadow: inset 0 1px 0 rgba(255,255,255,0.62);
+    background: color-mix(in srgb, var(--info-accent) 14%, white 86%);
+    color: color-mix(in srgb, var(--info-accent) 76%, #2c2e2a 24%);
+    border: 1px solid color-mix(in srgb, var(--info-accent) 20%, white 80%);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.68);
     font-size: 0.68rem;
-    font-weight: 800;
+    font-weight: 900;
     letter-spacing: 0.05em;
     white-space: nowrap;
     text-transform: uppercase;
@@ -1036,10 +1037,11 @@ section[data-testid="stSidebar"] > div {{
     align-items: center;
     padding: 0.22rem 0.56rem;
     border-radius: 999px;
-    background: rgba(76, 70, 120, 0.08);
-    color: var(--elite-hero);
+    background: rgba(84, 83, 134, 0.14);
+    color: color-mix(in srgb, var(--elite-hero) 78%, #2c2e2a 22%);
+    border: 1px solid rgba(84, 83, 134, 0.16);
     font-size: 0.68rem;
-    font-weight: 700;
+    font-weight: 800;
     white-space: nowrap;
 }}
 .info-panel-day-lines {{
@@ -1099,8 +1101,9 @@ section[data-testid="stSidebar"] > div {{
     padding: 0.34rem 0.78rem;
     border-radius: 999px;
     font-size: 0.82rem;
-    font-weight: 700;
+    font-weight: 800;
     letter-spacing: 0.01em;
+    border: 1px solid rgba(56, 58, 53, 0.10);
 }}
 .info-panel-state-text {{
     color: var(--elite-graphite);
