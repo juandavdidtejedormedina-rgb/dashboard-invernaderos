@@ -3468,6 +3468,12 @@ def _render_temperature_focus_chart(df_variables, fecha_variables, block_label=N
     xaxis_tickformat = '%d/%m' if multi_day_view else '%H:%M'
     xaxis_title = 'Fecha' if multi_day_view else 'Hora del día'
     chart_title = TEMP_FOCUS_CHART_TITLE if not block_label else f'{TEMP_FOCUS_CHART_TITLE} | {block_label}'
+    mini_chart_xaxis_range = None
+
+    if not multi_day_view:
+        min_time = pd.Timestamp(chart_df['DateTime'].min()).floor('30min').to_pydatetime()
+        max_time = pd.Timestamp(chart_df['DateTime'].max()).ceil('30min').to_pydatetime()
+        mini_chart_xaxis_range = [min_time, max_time]
 
     fig_temp = go.Figure()
     fig_temp.add_trace(
@@ -3497,6 +3503,7 @@ def _render_temperature_focus_chart(df_variables, fecha_variables, block_label=N
             tickformat=xaxis_tickformat,
             tickmode='linear' if not multi_day_view else 'auto',
             dtick=30 * 60 * 1000 if not multi_day_view else None,
+            range=mini_chart_xaxis_range,
             showgrid=True,
             gridcolor='rgba(76, 70, 120, 0.07)',
             zeroline=False,
