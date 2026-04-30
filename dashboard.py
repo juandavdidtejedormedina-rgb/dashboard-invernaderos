@@ -3222,44 +3222,44 @@ def _render_correlacion(
 
     if has_cortina_axis:
         if num_axes >= 4:
-            x_domain_end = 0.81
-            axis_start = 0.845
-            axis_end = 0.93
-            cortina_axis_position = 0.968
-            right_margin = 205
-        elif num_axes == 3:
-            x_domain_end = 0.84
-            axis_start = 0.87
-            axis_end = 0.94
-            cortina_axis_position = 0.973
-            right_margin = 190
-        else:
-            x_domain_end = 0.88
-            axis_start = 0.90
-            axis_end = 0.95
+            x_domain_end = 0.80
+            axis_start = 0.855
+            axis_end = 0.945
             cortina_axis_position = 0.982
-            right_margin = 165
+            right_margin = 215
+        elif num_axes == 3:
+            x_domain_end = 0.83
+            axis_start = 0.88
+            axis_end = 0.95
+            cortina_axis_position = 0.984
+            right_margin = 198
+        else:
+            x_domain_end = 0.87
+            axis_start = 0.91
+            axis_end = 0.96
+            cortina_axis_position = 0.986
+            right_margin = 172
     else:
         if num_axes >= 4:
-            x_domain_end = 0.84
-            axis_start = 0.88
-            axis_end = 0.97
-            right_margin = 210
+            x_domain_end = 0.83
+            axis_start = 0.89
+            axis_end = 0.975
+            right_margin = 220
         elif num_axes == 3:
-            x_domain_end = 0.89
-            axis_start = 0.92
-            axis_end = 0.97
-            right_margin = 165
-        elif num_axes == 2:
-            x_domain_end = 0.92
-            axis_start = 0.945
+            x_domain_end = 0.88
+            axis_start = 0.93
             axis_end = 0.98
-            right_margin = 145
-        else:
-            x_domain_end = 0.95
-            axis_start = 0.965
+            right_margin = 175
+        elif num_axes == 2:
+            x_domain_end = 0.91
+            axis_start = 0.95
             axis_end = 0.985
-            right_margin = 120
+            right_margin = 152
+        else:
+            x_domain_end = 0.94
+            axis_start = 0.97
+            axis_end = 0.99
+            right_margin = 126
         cortina_axis_position = None
 
     right_positions = [axis_start + i * ((axis_end - axis_start) / max(1, num_axes - 1)) for i in range(num_axes)]
