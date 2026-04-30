@@ -3478,9 +3478,17 @@ def _render_correlacion(
             showgrid=True,
             gridcolor='rgba(76, 70, 120, 0.07)',
             zeroline=False,
-            ticklabelmode='period' if multi_day_view else 'instant'
+            ticklabelmode='period' if multi_day_view else 'instant',
+            showspikes=multi_day_view,
+            spikemode='across',
+            spikesnap='cursor',
+            spikedash='dot',
+            spikecolor='rgba(45, 48, 64, 0.55)',
+            spikethickness=1
         ),
         hovermode='x unified',
+        hoverdistance=30,
+        spikedistance=30,
         template='plotly_white',
         font=dict(family='Manrope, sans-serif', color=BRAND_COLORS['graphite']),
         paper_bgcolor='rgba(255,255,255,0)',
