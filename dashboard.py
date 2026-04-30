@@ -1457,19 +1457,25 @@ st.markdown(
 
 if DASHBOARD_VIDEO_URL.strip():
     with st.expander("Video introductorio", expanded=False):
-        youtube_embed_url = _youtube_embed_url(DASHBOARD_VIDEO_URL)
-        if youtube_embed_url:
-            components.iframe(youtube_embed_url, height=430, scrolling=False)
+        if st.checkbox("Cargar video", key="cargar_video_dashboard"):
+            youtube_embed_url = _youtube_embed_url(DASHBOARD_VIDEO_URL)
+            if youtube_embed_url:
+                components.iframe(youtube_embed_url, height=430, scrolling=False)
+            else:
+                st.video(DASHBOARD_VIDEO_URL)
         else:
-            st.video(DASHBOARD_VIDEO_URL)
+            st.caption("Carga el video solo cuando lo necesites para evitar recargas pesadas.")
 
 if DASHBOARD_LOCATION_QUERY.strip():
     with st.expander("Ubicación", expanded=False):
-        components.iframe(
-            _google_maps_embed_url(DASHBOARD_LOCATION_QUERY),
-            height=430,
-            scrolling=False
-        )
+        if st.checkbox("Cargar mapa", key="cargar_mapa_dashboard"):
+            components.iframe(
+                _google_maps_embed_url(DASHBOARD_LOCATION_QUERY),
+                height=430,
+                scrolling=False
+            )
+        else:
+            st.caption("Carga el mapa solo cuando lo necesites para mantener la página más fluida.")
 
 # Fuentes de datos
 URL_VARIABLES = "https://raw.githubusercontent.com/juandavdidtejedormedina-rgb/dashboard-invernaderos/main/Datos_variables.xlsx"
@@ -1479,6 +1485,9 @@ ANNOTATION_COLUMN_PAIRS = (
     ('Frente A', 'Anotacion A'),
     ('Puerta B', 'Anotacion B')
 )
+CORRELATION_MARKER_SIZE_DEFAULT = 5
+CORRELATION_MARKER_SIZE_PAR = 7
+CORRELATION_MARKER_SIZE_MULTI_DAY = 0
 
 @st.cache_data(show_spinner="Descargando datos desde el repositorio...")
 def descargar_desde_github(url):
@@ -1505,9 +1514,11 @@ def _limpiar_columnas(df):
     return df
 
 
-def _leer_excel_desde_bytes(ruta_bytes, sheet_name, **kwargs):
+def _leer_excel_desde_bytes(excel_source, sheet_name, **kwargs):
+    if isinstance(excel_source, pd.ExcelFile):
+        return excel_source.parse(sheet_name=sheet_name, **kwargs)
     return pd.read_excel(
-        io.BytesIO(ruta_bytes),
+        io.BytesIO(excel_source),
         sheet_name=sheet_name,
         engine="openpyxl",
         **kwargs
@@ -1591,7 +1602,7 @@ def cargar_datos(ruta_bytes):
             df_sheet = pd.DataFrame()
 
             for read_kwargs in ({}, {'skiprows': 1}):
-                candidate = _leer_excel_desde_bytes(ruta_bytes, sheet_name=sheet, **read_kwargs)
+                candidate = _leer_excel_desde_bytes(xls, sheet_name=sheet, **read_kwargs)
                 candidate = _prepare_variables_sheet(candidate)
                 candidate = _limpiar_columnas(candidate)
                 if 'DateTime' in candidate.columns:
@@ -2896,7 +2907,7 @@ def cargar_cortinas(ruta_bytes):
         registros = []
 
         for sheet in _get_excel_data_sheet_names(xls):
-            raw = _leer_excel_desde_bytes(ruta_bytes, sheet_name=sheet, header=None)
+            raw = _leer_excel_desde_bytes(xls, sheet_name=sheet, header=None)
             if raw.shape[0] < 4:
                 continue
             raw = raw.dropna(axis=1, how='all')
@@ -2949,6 +2960,8 @@ def _render_correlacion(
     hover_time_format = '%d/%m %H:%M' if multi_day_view else '%H:%M'
     xaxis_tickformat = '%H:%M\n%d/%m' if multi_day_view else '%H:%M'
     xaxis_title_text = '<b>Fecha y hora</b>' if multi_day_view else '<b>Hora del Día</b>'
+    default_marker_size = CORRELATION_MARKER_SIZE_MULTI_DAY if multi_day_view else CORRELATION_MARKER_SIZE_DEFAULT
+    par_marker_size = CORRELATION_MARKER_SIZE_MULTI_DAY if multi_day_view else CORRELATION_MARKER_SIZE_PAR
 
     sensor_vars = _get_available_sensor_vars(df_variables)
     almacen_sensor_vars = _get_available_sensor_vars(df_variables_almacen) if isinstance(df_variables_almacen, pd.DataFrame) else []
@@ -3029,7 +3042,7 @@ def _render_correlacion(
                     width=3 if var_name == 'Radiación PAR' else 2
                 ),
                 marker=dict(
-                    size=7 if var_name == 'Radiación PAR' else 5,
+                    size=par_marker_size if var_name == 'Radiación PAR' else default_marker_size,
                     color=VARIABLE_COLORS.get(var_name, palette[order % len(palette)])
                 ),
                 opacity=0.78 if var_name == 'Gramos de agua' else 1.0,
@@ -3231,7 +3244,7 @@ def _render_correlacion(
         axis_name = sensor_axis_names[idx] if idx < len(sensor_axis_names) else f'y{idx + 2}'
         sensor_axis_map[var_name] = axis_name
         trace['yaxis'] = None if axis_name == 'y' else axis_name
-        fig_corr.add_trace(go.Scatter(**trace))
+        fig_corr.add_trace(go.Scattergl(**trace))
 
         axis_var_name = var_name.replace('_almacen', '')
         series_for_axis = []
@@ -3300,7 +3313,7 @@ def _render_correlacion(
         base_var_name = var_name.replace('_almacen', '')
         axis_name = sensor_axis_map.get(base_var_name, 'y')
         trace['yaxis'] = None if axis_name == 'y' else axis_name
-        fig_corr.add_trace(go.Scatter(**trace))
+        fig_corr.add_trace(go.Scattergl(**trace))
 
     if cortina_traces:
         for var_name, trace, color in cortina_traces:
