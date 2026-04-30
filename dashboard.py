@@ -3721,37 +3721,28 @@ def _render_temperature_focus_chart(df_variables, fecha_variables, block_label=N
     external_available = isinstance(df_external, pd.DataFrame) and not df_external.empty
     motor_fig = _build_motor_focus_chart(datos_cortinas_sel, fecha_variables, block_label=block_label)
 
-    tab_specs = []
-    if internal_available:
-        tab_specs.append(('Internas', 'internal'))
-    if external_available:
-        tab_specs.append(('Estación externa', 'external'))
-    if motor_fig is not None:
-        tab_specs.append(('Motores', 'motors'))
-
-    if not tab_specs:
+    if not internal_available and not external_available and motor_fig is None:
         return
 
-    tabs = st.tabs([label for label, _ in tab_specs])
-    for tab, (_, key) in zip(tabs, tab_specs):
-        with tab:
-            if key == 'internal':
-                _render_focus_chart_grid(
-                    df_variables,
-                    fecha_variables,
-                    block_label=block_label,
-                    heading=FOCUS_CHARTS_INTERNAL_HEADING
-                )
-            elif key == 'external':
-                _render_focus_chart_grid(
-                    df_external,
-                    fecha_variables,
-                    block_label='Estación externa',
-                    heading=FOCUS_CHARTS_EXTERNAL_HEADING
-                )
-            elif key == 'motors' and motor_fig is not None:
-                st.markdown(f"#### {MOTOR_FOCUS_CHART_TITLE}")
-                st.plotly_chart(motor_fig, width='stretch')
+    if internal_available:
+        _render_focus_chart_grid(
+            df_variables,
+            fecha_variables,
+            block_label=block_label,
+            heading=FOCUS_CHARTS_INTERNAL_HEADING
+        )
+
+    if external_available:
+        _render_focus_chart_grid(
+            df_external,
+            fecha_variables,
+            block_label='Estación externa',
+            heading=FOCUS_CHARTS_EXTERNAL_HEADING
+        )
+
+    if motor_fig is not None:
+        st.markdown(f"#### {MOTOR_FOCUS_CHART_TITLE}")
+        st.plotly_chart(motor_fig, width='stretch')
 
 # 4. Datos cargados en memoria para evitar recálculos repetidos
 def _sort_block_names(block_names):
