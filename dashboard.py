@@ -2959,6 +2959,7 @@ def _render_correlacion(
         datetime.combine(fecha_inicio, datetime.min.time()),
         datetime.combine(fecha_inicio, datetime.min.time()) + timedelta(hours=23, minutes=30)
     ]
+    single_day_trace_times = []
 
     sensor_vars = _get_available_sensor_vars(df_variables)
     almacen_sensor_vars = _get_available_sensor_vars(df_variables_almacen) if isinstance(df_variables_almacen, pd.DataFrame) else []
@@ -3029,6 +3030,8 @@ def _render_correlacion(
             if serie.empty:
                 continue
             serie_plot = _add_day_breaks_to_series(serie, var_name) if multi_day_view else serie
+            if not multi_day_view:
+                single_day_trace_times.extend(pd.to_datetime(serie_plot['DateTime'], errors='coerce').dropna().tolist())
             trace = dict(
                 x=serie_plot['DateTime'],
                 y=serie_plot[var_name],
@@ -3066,6 +3069,8 @@ def _render_correlacion(
                 serie_almacen = df_plot_almacen[['DateTime', var_name]].dropna(subset=[var_name]).copy()
                 if not serie_almacen.empty:
                     serie_almacen_plot = _add_day_breaks_to_series(serie_almacen, var_name) if multi_day_view else serie_almacen
+                    if not multi_day_view:
+                        single_day_trace_times.extend(pd.to_datetime(serie_almacen_plot['DateTime'], errors='coerce').dropna().tolist())
                     almacen_trace = dict(
                         x=serie_almacen_plot['DateTime'],
                         y=serie_almacen_plot[var_name],
@@ -3133,6 +3138,8 @@ def _render_correlacion(
                         cortina_axis_max = max(cortina_axis_max, float(serie_area.max()))
 
                 color = CORTINA_COLORS.get(str(var_name).upper(), palette[order % len(palette)])
+                if not multi_day_view:
+                    single_day_trace_times.extend(pd.to_datetime(df_state['Hora'], errors='coerce').dropna().tolist())
                 trace = dict(
                     x=df_state['Hora'],
                     y=df_state[y_col],
@@ -3173,6 +3180,12 @@ def _render_correlacion(
                     )
                     cortina_traces.append((f'{var_name}_ideal', trace_ideal, color))
                 break
+
+    if not multi_day_view and single_day_trace_times:
+        trace_times = pd.Series(single_day_trace_times).dropna().sort_values()
+        min_time = pd.Timestamp(trace_times.iloc[0]).floor('30min').to_pydatetime()
+        max_time = pd.Timestamp(trace_times.iloc[-1]).ceil('30min').to_pydatetime()
+        single_day_xaxis_range = [min_time, max_time]
 
     if not selected_sensors and selected_cortinas and not cortina_traces:
         st.warning('No hay información de motores para el rango seleccionado.')
