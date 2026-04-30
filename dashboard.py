@@ -2955,6 +2955,10 @@ def _render_correlacion(
     hover_time_format = '%d/%m %H:%M' if multi_day_view else '%H:%M'
     xaxis_tickformat = '%H:%M\n%d/%m' if multi_day_view else '%H:%M'
     xaxis_title_text = '<b>Fecha y hora</b>' if multi_day_view else '<b>Hora del Día</b>'
+    single_day_xaxis_range = None if multi_day_view else [
+        datetime.combine(fecha_inicio, datetime.min.time()),
+        datetime.combine(fecha_inicio, datetime.min.time()) + timedelta(hours=23, minutes=30)
+    ]
 
     sensor_vars = _get_available_sensor_vars(df_variables)
     almacen_sensor_vars = _get_available_sensor_vars(df_variables_almacen) if isinstance(df_variables_almacen, pd.DataFrame) else []
@@ -3386,6 +3390,7 @@ def _render_correlacion(
             tickmode='linear' if not multi_day_view else 'auto',
             dtick=30 * 60 * 1000 if not multi_day_view else None,
             tickformat=xaxis_tickformat,
+            range=single_day_xaxis_range,
             tickfont=dict(size=11, family='Manrope, sans-serif', color=BRAND_COLORS['graphite']),
             domain=[0, x_domain_end],
             showgrid=True,
