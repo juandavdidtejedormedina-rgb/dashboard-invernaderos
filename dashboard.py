@@ -119,6 +119,7 @@ LOGO_URL_LARGE = "https://raw.githubusercontent.com/juandavdidtejedormedina-rgb/
 LOGO_URL_SMALL = LOGO_URL_LARGE
 DASHBOARD_VIDEO_URL = "https://raw.githubusercontent.com/juandavdidtejedormedina-rgb/dashboard-invernaderos/59df2b2f7fee2b9632ae4865fedae119e81b3b79/flor%20video.mp4"
 DASHBOARD_LOCATION_QUERY = "La Ponderosa - The Elite Flower SAS CI Madrid Cundinamarca Colombia"
+LAZY_LOAD_MEDIA = True
 STREAMLIT_LOGO_WIDTH = 108
 STREAMLIT_LOGO_HEIGHT = 108
 STREAMLIT_LOGO_BORDER_RADIUS = 14
@@ -1475,19 +1476,25 @@ st.markdown(
 
 if DASHBOARD_VIDEO_URL.strip():
     with st.expander("Video introductorio", expanded=False):
-        youtube_embed_url = _youtube_embed_url(DASHBOARD_VIDEO_URL)
-        if youtube_embed_url:
-            components.iframe(youtube_embed_url, height=430, scrolling=False)
+        if not LAZY_LOAD_MEDIA or st.checkbox("Cargar video", key="cargar_video_dashboard"):
+            youtube_embed_url = _youtube_embed_url(DASHBOARD_VIDEO_URL)
+            if youtube_embed_url:
+                components.iframe(youtube_embed_url, height=430, scrolling=False)
+            else:
+                st.video(DASHBOARD_VIDEO_URL)
         else:
-            st.video(DASHBOARD_VIDEO_URL)
+            st.caption("Carga el video solo cuando lo necesites.")
 
 if DASHBOARD_LOCATION_QUERY.strip():
     with st.expander("Ubicación", expanded=False):
-        components.iframe(
-            _google_maps_embed_url(DASHBOARD_LOCATION_QUERY),
-            height=430,
-            scrolling=False
-        )
+        if not LAZY_LOAD_MEDIA or st.checkbox("Cargar mapa", key="cargar_mapa_dashboard"):
+            components.iframe(
+                _google_maps_embed_url(DASHBOARD_LOCATION_QUERY),
+                height=430,
+                scrolling=False
+            )
+        else:
+            st.caption("Carga el mapa solo cuando lo necesites.")
 
 # --- Configuracion de URLs (Mover aqui para evitar NameError) ---
 URL_VARIABLES = "https://raw.githubusercontent.com/juandavdidtejedormedina-rgb/dashboard-invernaderos/main/Datos_variables.xlsx"
@@ -1503,9 +1510,6 @@ def descargar_desde_github(url):
     except Exception as e:
         st.error(f"Error al conectar con GitHub: {e}")
         return None
-
-archivo_variables_bytes = descargar_desde_github(URL_VARIABLES)
-archivo_cortinas_bytes = descargar_desde_github(URL_CORTINAS)
 
 # 3. Funciones de carga de datos con corrección de FECHAS
 
@@ -2958,6 +2962,16 @@ def cargar_cortinas(ruta_bytes):
         return pd.DataFrame()
 
 
+@st.cache_data(show_spinner="Cargando dashboard y preparando datos...")
+def cargar_dashboard_completo():
+    archivo_variables_bytes = descargar_desde_github(URL_VARIABLES)
+    archivo_cortinas_bytes = descargar_desde_github(URL_CORTINAS)
+
+    df_variables = cargar_datos(archivo_variables_bytes) if archivo_variables_bytes else pd.DataFrame()
+    df_cortinas = cargar_cortinas(archivo_cortinas_bytes) if archivo_cortinas_bytes else pd.DataFrame()
+    return df_variables, df_cortinas
+
+
 def _render_correlacion(
     df_variables,
     datos_cortinas_sel,
@@ -4344,8 +4358,7 @@ def _render_hourly_analysis_view(df_variables, fecha_variables, selected_blocks,
                                 st.dataframe(_prepare_hourly_pivot_display(pivot_varianza), width='stretch')
 
 
-_df_variables_all = cargar_datos(archivo_variables_bytes) if archivo_variables_bytes else pd.DataFrame()
-_df_cortinas_all = cargar_cortinas(archivo_cortinas_bytes) if archivo_cortinas_bytes else pd.DataFrame()
+_df_variables_all, _df_cortinas_all = cargar_dashboard_completo()
 
 if 'graficar_correlacion' not in st.session_state:
     st.session_state.graficar_correlacion = False
