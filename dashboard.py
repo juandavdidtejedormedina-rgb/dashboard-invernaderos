@@ -125,8 +125,10 @@ STREAMLIT_LOGO_BORDER_RADIUS = 14
 TEMP_FOCUS_CHART_ENABLED = True
 TEMP_FOCUS_CHART_PLACEMENT = 'below'  # Opciones: 'below', 'left', 'right'
 TEMP_FOCUS_CHART_HEIGHT = 260
-TEMP_FOCUS_CHART_COLUMN_LAYOUT = (1.15, 0.85)
+TEMP_FOCUS_CHART_COLUMN_LAYOUT = (1, 1)
 TEMP_FOCUS_CHART_TITLE = 'Temperatura del bloque'
+HUMIDITY_FOCUS_CHART_ENABLED = True
+HUMIDITY_FOCUS_CHART_TITLE = 'Humedad del bloque'
 CORR_AXIS_TITLES = {
     'Temperatura': 'Temp.',
     'Humedad Relativa': 'Humedad',
@@ -3452,22 +3454,20 @@ def _render_correlacion(
         st.info('No hay información de motores para el periodo seleccionado. Se muestran únicamente las variables ambientales.')
 
 
-def _render_temperature_focus_chart(df_variables, fecha_variables, block_label=None):
-    if not TEMP_FOCUS_CHART_ENABLED:
-        return
-    if df_variables.empty or 'DateTime' not in df_variables.columns or 'Temperatura' not in df_variables.columns:
-        return
+def _build_focus_variable_chart(df_variables, fecha_variables, variable_name, chart_title, block_label=None):
+    if df_variables.empty or 'DateTime' not in df_variables.columns or variable_name not in df_variables.columns:
+        return None
 
-    chart_df = df_variables[['DateTime', 'Temperatura']].dropna(subset=['DateTime', 'Temperatura']).copy()
+    chart_df = df_variables[['DateTime', variable_name]].dropna(subset=['DateTime', variable_name]).copy()
     if chart_df.empty:
-        return
+        return None
 
     fecha_inicio, fecha_fin = fecha_variables
     multi_day_view = fecha_inicio != fecha_fin
     hover_time_format = '%d/%m %H:%M' if multi_day_view else '%H:%M'
     xaxis_tickformat = '%d/%m' if multi_day_view else '%H:%M'
     xaxis_title = 'Fecha' if multi_day_view else 'Hora del día'
-    chart_title = TEMP_FOCUS_CHART_TITLE if not block_label else f'{TEMP_FOCUS_CHART_TITLE} | {block_label}'
+    resolved_title = chart_title if not block_label else f'{chart_title} | {block_label}'
     mini_chart_xaxis_range = None
 
     if not multi_day_view:
@@ -3475,25 +3475,29 @@ def _render_temperature_focus_chart(df_variables, fecha_variables, block_label=N
         max_time = pd.Timestamp(chart_df['DateTime'].max()).ceil('30min').to_pydatetime()
         mini_chart_xaxis_range = [min_time, max_time]
 
-    fig_temp = go.Figure()
-    fig_temp.add_trace(
+    unit_label = VARIABLE_UNITS.get(variable_name, '')
+    yaxis_title = VARIABLE_LABELS.get(variable_name, variable_name)
+    color = VARIABLE_COLORS.get(variable_name, BRAND_COLORS['hero'])
+
+    fig = go.Figure()
+    fig.add_trace(
         go.Scatter(
             x=chart_df['DateTime'],
-            y=chart_df['Temperatura'],
-            name='Temperatura',
+            y=chart_df[variable_name],
+            name=variable_name,
             mode='lines+markers',
-            line=dict(color=VARIABLE_COLORS['Temperatura'], width=2.5),
-            marker=dict(size=5, color=VARIABLE_COLORS['Temperatura']),
+            line=dict(color=color, width=2.5),
+            marker=dict(size=5, color=color),
             hovertemplate=(
                 f'<b>%{{x|{hover_time_format}}}</b><br>'
-                'Temperatura: %{y:.2f} °C'
+                f'{variable_name}: %{{y:.2f}} {unit_label}'
                 '<extra></extra>'
             )
         )
     )
-    fig_temp.update_layout(
+    fig.update_layout(
         title=dict(
-            text=chart_title,
+            text=resolved_title,
             x=0,
             xanchor='left',
             font=dict(size=16, color=BRAND_COLORS['graphite'], family='Manrope, sans-serif')
@@ -3510,7 +3514,7 @@ def _render_temperature_focus_chart(df_variables, fecha_variables, block_label=N
             tickfont=dict(size=10, family='Manrope, sans-serif', color=BRAND_COLORS['graphite'])
         ),
         yaxis=dict(
-            title='Temperatura (°C)',
+            title=yaxis_title,
             showgrid=True,
             gridcolor='rgba(76, 70, 120, 0.07)',
             zeroline=False,
@@ -3525,16 +3529,48 @@ def _render_temperature_focus_chart(df_variables, fecha_variables, block_label=N
         margin=dict(l=52, r=24, t=58, b=44),
         font=dict(family='Manrope, sans-serif', color=BRAND_COLORS['graphite'])
     )
+    return fig
 
-    if TEMP_FOCUS_CHART_PLACEMENT == 'left':
+
+def _render_temperature_focus_chart(df_variables, fecha_variables, block_label=None):
+    if not TEMP_FOCUS_CHART_ENABLED:
+        return
+    fig_temp = _build_focus_variable_chart(
+        df_variables,
+        fecha_variables,
+        'Temperatura',
+        TEMP_FOCUS_CHART_TITLE,
+        block_label=block_label
+    )
+    fig_humidity = (
+        _build_focus_variable_chart(
+            df_variables,
+            fecha_variables,
+            'Humedad Relativa',
+            HUMIDITY_FOCUS_CHART_TITLE,
+            block_label=block_label
+        )
+        if HUMIDITY_FOCUS_CHART_ENABLED else None
+    )
+
+    if fig_temp is None and fig_humidity is None:
+        return
+
+    if TEMP_FOCUS_CHART_PLACEMENT == 'below' and fig_temp is not None and fig_humidity is not None:
         left_col, right_col = st.columns(TEMP_FOCUS_CHART_COLUMN_LAYOUT)
         with left_col:
             st.plotly_chart(fig_temp, width='stretch')
-    elif TEMP_FOCUS_CHART_PLACEMENT == 'right':
+        with right_col:
+            st.plotly_chart(fig_humidity, width='stretch')
+    elif TEMP_FOCUS_CHART_PLACEMENT == 'left' and fig_temp is not None:
+        left_col, right_col = st.columns(TEMP_FOCUS_CHART_COLUMN_LAYOUT)
+        with left_col:
+            st.plotly_chart(fig_temp, width='stretch')
+    elif TEMP_FOCUS_CHART_PLACEMENT == 'right' and fig_temp is not None:
         left_col, right_col = st.columns(TEMP_FOCUS_CHART_COLUMN_LAYOUT)
         with right_col:
             st.plotly_chart(fig_temp, width='stretch')
-    else:
+    elif fig_temp is not None:
         st.plotly_chart(fig_temp, width='stretch')
 
 # 4. Datos cargados en memoria para evitar recálculos repetidos
