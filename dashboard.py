@@ -2789,7 +2789,7 @@ def _get_daily_annotations(datos_cortinas):
     for _, row in datos_cortinas.iterrows():
         for label_col, note_col in ANNOTATION_COLUMN_PAIRS:
             entry = _build_annotation_entry(row, label_col, note_col)
-            if entry not in annotations:
+            if entry is not None and entry not in annotations:
                 annotations.append(entry)
 
     return annotations
@@ -2822,7 +2822,7 @@ def _get_annotations_by_day(datos_cortinas):
         for _, row in datos_dia.iterrows():
             for label_col, note_col in ANNOTATION_COLUMN_PAIRS:
                 entry = _build_annotation_entry(row, label_col, note_col)
-                if entry not in entries:
+                if entry is not None and entry not in entries:
                     entries.append(entry)
 
         grouped_annotations.append({
@@ -3377,6 +3377,8 @@ def _render_correlacion(
                 text=xaxis_title_text,
                 font=dict(size=14, family='Manrope, sans-serif', color=BRAND_COLORS['graphite'])
             ),
+            tickmode='linear',
+            dtick=30 * 60 * 1000,
             tickformat=xaxis_tickformat,
             tickfont=dict(size=11, family='Manrope, sans-serif', color=BRAND_COLORS['graphite']),
             domain=[0, x_domain_end],
