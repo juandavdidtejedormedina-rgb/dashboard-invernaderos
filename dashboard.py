@@ -129,6 +129,10 @@ TEMP_FOCUS_CHART_COLUMN_LAYOUT = (1, 1)
 TEMP_FOCUS_CHART_TITLE = 'Temperatura del bloque'
 HUMIDITY_FOCUS_CHART_ENABLED = True
 HUMIDITY_FOCUS_CHART_TITLE = 'Humedad del bloque'
+PAR_FOCUS_CHART_ENABLED = True
+PAR_FOCUS_CHART_TITLE = 'Radiación PAR del bloque'
+WATER_FOCUS_CHART_ENABLED = True
+WATER_FOCUS_CHART_TITLE = 'Gramos de agua del bloque'
 CORR_AXIS_TITLES = {
     'Temperatura': 'Temp.',
     'Humedad Relativa': 'Humedad',
@@ -3552,16 +3556,46 @@ def _render_temperature_focus_chart(df_variables, fecha_variables, block_label=N
         )
         if HUMIDITY_FOCUS_CHART_ENABLED else None
     )
+    fig_par = (
+        _build_focus_variable_chart(
+            df_variables,
+            fecha_variables,
+            'Radiación PAR',
+            PAR_FOCUS_CHART_TITLE,
+            block_label=block_label
+        )
+        if PAR_FOCUS_CHART_ENABLED else None
+    )
+    fig_water = (
+        _build_focus_variable_chart(
+            df_variables,
+            fecha_variables,
+            'Gramos de agua',
+            WATER_FOCUS_CHART_TITLE,
+            block_label=block_label
+        )
+        if WATER_FOCUS_CHART_ENABLED else None
+    )
 
-    if fig_temp is None and fig_humidity is None:
+    if fig_temp is None and fig_humidity is None and fig_par is None and fig_water is None:
         return
 
-    if TEMP_FOCUS_CHART_PLACEMENT == 'below' and fig_temp is not None and fig_humidity is not None:
-        left_col, right_col = st.columns(TEMP_FOCUS_CHART_COLUMN_LAYOUT)
-        with left_col:
-            st.plotly_chart(fig_temp, width='stretch')
-        with right_col:
-            st.plotly_chart(fig_humidity, width='stretch')
+    if TEMP_FOCUS_CHART_PLACEMENT == 'below':
+        top_left, top_right = st.columns(TEMP_FOCUS_CHART_COLUMN_LAYOUT)
+        with top_left:
+            if fig_temp is not None:
+                st.plotly_chart(fig_temp, width='stretch')
+        with top_right:
+            if fig_humidity is not None:
+                st.plotly_chart(fig_humidity, width='stretch')
+
+        bottom_left, bottom_right = st.columns(TEMP_FOCUS_CHART_COLUMN_LAYOUT)
+        with bottom_left:
+            if fig_par is not None:
+                st.plotly_chart(fig_par, width='stretch')
+        with bottom_right:
+            if fig_water is not None:
+                st.plotly_chart(fig_water, width='stretch')
     elif TEMP_FOCUS_CHART_PLACEMENT == 'left' and fig_temp is not None:
         left_col, right_col = st.columns(TEMP_FOCUS_CHART_COLUMN_LAYOUT)
         with left_col:
