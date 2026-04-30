@@ -397,7 +397,7 @@ st.logo(
 logo_base64 = _image_to_base64(LOGO_PATH)
 logo_html = (
     f'<img src="data:image/png;base64,{logo_base64}" alt="The Elite Flower" class="hero-logo-image">'
-    if logo_base64 else '<div class="hero-logo-fallback">THE ELITE FLOWER</div>'
+    if logo_base64 else f'<img src="{LOGO_URL_LARGE}" alt="The Elite Flower" class="hero-logo-image">'
 )
 
 st.markdown(f"""
