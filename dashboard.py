@@ -3222,44 +3222,44 @@ def _render_correlacion(
 
     if has_cortina_axis:
         if num_axes >= 4:
-            x_domain_end = 0.77
-            axis_start = 0.825
-            axis_end = 0.925
-            cortina_axis_position = 0.975
-            right_margin = 275
-        elif num_axes == 3:
-            x_domain_end = 0.80
-            axis_start = 0.85
-            axis_end = 0.925
-            cortina_axis_position = 0.975
-            right_margin = 245
-        else:
-            x_domain_end = 0.84
-            axis_start = 0.89
-            axis_end = 0.935
-            cortina_axis_position = 0.975
-            right_margin = 215
-    else:
-        if num_axes >= 4:
-            x_domain_end = 0.80
-            axis_start = 0.86
-            axis_end = 0.95
+            x_domain_end = 0.76
+            axis_start = 0.80
+            axis_end = 0.92
+            cortina_axis_position = 0.965
             right_margin = 250
         elif num_axes == 3:
-            x_domain_end = 0.85
+            x_domain_end = 0.80
+            axis_start = 0.84
+            axis_end = 0.93
+            cortina_axis_position = 0.97
+            right_margin = 220
+        else:
+            x_domain_end = 0.84
+            axis_start = 0.87
+            axis_end = 0.94
+            cortina_axis_position = 0.98
+            right_margin = 190
+    else:
+        if num_axes >= 4:
+            x_domain_end = 0.79
+            axis_start = 0.84
+            axis_end = 0.98
+            right_margin = 255
+        elif num_axes == 3:
+            x_domain_end = 0.86
             axis_start = 0.90
-            axis_end = 0.955
-            right_margin = 205
+            axis_end = 0.96
+            right_margin = 190
         elif num_axes == 2:
-            x_domain_end = 0.89
+            x_domain_end = 0.90
             axis_start = 0.93
-            axis_end = 0.965
-            right_margin = 175
+            axis_end = 0.97
+            right_margin = 160
         else:
             x_domain_end = 0.93
-            axis_start = 0.955
+            axis_start = 0.95
             axis_end = 0.98
-            right_margin = 145
+            right_margin = 130
         cortina_axis_position = None
 
     right_positions = [axis_start + i * ((axis_end - axis_start) / max(1, num_axes - 1)) for i in range(num_axes)]
@@ -3303,9 +3303,9 @@ def _render_correlacion(
         axis_kwargs = dict(
             title=dict(
                 text=CORR_AXIS_TITLES.get(axis_var_name, axis_var_name),
-                font=dict(color=color, size=10, family='Manrope, sans-serif')
+                font=dict(color=color, size=11, family='Manrope, sans-serif')
             ),
-            tickfont=dict(color=color, size=9, family='Manrope, sans-serif'),
+            tickfont=dict(color=color, size=10, family='Manrope, sans-serif'),
             tickcolor=color,
             range=axis_range,
             autorange=False,
@@ -3317,8 +3317,8 @@ def _render_correlacion(
             ticks='',
             zeroline=False,
             tickmode='auto',
-            automargin=False,
-            title_standoff=18
+            automargin=True,
+            title_standoff=16
         )
 
         if axis_name == 'y':
@@ -3356,9 +3356,9 @@ def _render_correlacion(
             axis_configs['y2'] = dict(
                 title=dict(
                     text='Frentes / Puertas (m2)',
-                    font=dict(color=cortina_color, size=10, family='Manrope, sans-serif')
+                    font=dict(color=cortina_color, size=11, family='Manrope, sans-serif')
                 ),
-                tickfont=dict(color=cortina_color, size=9, family='Manrope, sans-serif'),
+                tickfont=dict(color=cortina_color, size=10, family='Manrope, sans-serif'),
                 tickcolor=cortina_color,
                 range=[axis_range_min, axis_range_max],
                 autorange=False,
@@ -3374,16 +3374,16 @@ def _render_correlacion(
                 tickmode='linear',
                 tick0=0,
                 dtick=cortina_dtick,
-                automargin=False,
+                automargin=True,
                 title_standoff=18
             )
         else:
             axis_configs['y2'] = dict(
                 title=dict(
                     text=CORR_AXIS_TITLES['% Apertura Cortinas'],
-                    font=dict(color=cortina_color, size=10, family='Manrope, sans-serif')
+                    font=dict(color=cortina_color, size=11, family='Manrope, sans-serif')
                 ),
-                tickfont=dict(color=cortina_color, size=9, family='Manrope, sans-serif'),
+                tickfont=dict(color=cortina_color, size=10, family='Manrope, sans-serif'),
                 tickcolor=cortina_color,
                 range=[-4, 100],
                 autorange=False,
@@ -3399,7 +3399,7 @@ def _render_correlacion(
                 tickmode='array',
                 tickvals=[0, 25, 50, 75, 100],
                 ticksuffix='%',
-                automargin=False,
+                automargin=True,
                 title_standoff=18
             )
 
@@ -3452,7 +3452,7 @@ def _render_correlacion(
             bordercolor='rgba(76, 70, 120, 0.08)',
             borderwidth=1
         ),
-        margin=dict(l=42, r=right_margin, t=142, b=55),
+        margin=dict(l=50, r=right_margin, t=142, b=55),
         **{f'yaxis{axis_name[1:]}': config for axis_name, config in axis_configs.items()}
     )
 
