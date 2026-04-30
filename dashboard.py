@@ -3639,17 +3639,17 @@ def _render_marley_dashboard(dashboard_mode):
     comparison = _build_marley_hourly_comparison(filtered_df, selected_variable, selected_range)
     overlap = comparison.dropna(subset=list(MARLEY_SENSOR_NAMES)).copy()
 
-    if dashboard_mode in ("Promedio", "Varianza"):
+    if dashboard_mode == "Varianza":
+        if selected_range[0] == selected_range[1]:
+            st.warning("Para ver la varianza en Marley selecciona un rango de al menos 2 días.")
+            st.stop()
+
         grouped_metric = _build_marley_hourly_metric(filtered_df, selected_variable, dashboard_mode)
         if grouped_metric.empty:
             st.warning("No hay datos suficientes para construir esta vista de Marley en el periodo seleccionado.")
             st.stop()
 
-        st.caption(
-            "Esta vista resume cada sensor por franja horaria. En varios días, cada punto combina las lecturas de esa misma hora a lo largo del periodo."
-            if dashboard_mode == "Promedio" else
-            "Esta vista muestra qué tanto cambió cada sensor en la misma franja horaria dentro del periodo seleccionado."
-        )
+        st.caption("Esta vista muestra qué tanto cambió cada sensor en la misma franja horaria dentro del periodo seleccionado.")
         st.plotly_chart(_make_marley_hourly_metric_chart(grouped_metric, selected_variable, dashboard_mode), width="stretch")
         with st.expander(f"Ver tabla dinámica de {dashboard_mode.lower()}", expanded=False):
             st.dataframe(_prepare_marley_hourly_metric_table(grouped_metric), width="stretch", hide_index=True)
@@ -5441,7 +5441,7 @@ with st.sidebar.expander("Finca", expanded=True):
     )
 
 dashboard_view_options = (
-    ["Comparativa", "Promedio", "Varianza"]
+    ["Comparativa", "Varianza"]
     if selected_finca == 'Marley' else
     ["Correlación", "Varianza Y Promedio"]
 )
