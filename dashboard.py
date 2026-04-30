@@ -55,16 +55,16 @@ VARIABLE_UNITS = {
     'Gramos de agua': 'g'
 }
 VARIABLE_COLORS = {
-    'Temperatura': '#6E8FB6',
-    'Humedad Relativa': '#4F5F5B',
-    'Radiación PAR': '#7BAE6A',
-    'Gramos de agua': '#C89B5C'
+    'Temperatura': '#545386',
+    'Humedad Relativa': '#383A35',
+    'Radiación PAR': '#7FA8B8',
+    'Gramos de agua': '#C78F9B'
 }
 CORTINA_COLORS = {
-    'FRENTE 1': '#3E6257',
-    'FRENTE 2': '#6D8A7C',
-    'PUERTA 1': '#9C6F78',
-    'PUERTA 2': '#D8B7B4'
+    'FRENTE 1': '#545386',
+    'FRENTE 2': '#8A88B3',
+    'PUERTA 1': '#A97884',
+    'PUERTA 2': '#D9BBC1'
 }
 MOTOR_VARIABLES = list(CORTINA_COLORS.keys())
 MOTOR_AREA_REFERENCE = {
@@ -104,13 +104,13 @@ VARIABLE_FILTER_HELP = {
     'PUERTA 2': 'Muestra la apertura de la Puerta 2.'
 }
 BRAND_COLORS = {
-    'hero': '#325448',
-    'sky': '#DCE9E1',
-    'rose': '#E8D6D3',
-    'beige': '#E6DCCB',
-    'graphite': '#2A342F',
-    'ink': '#18211D',
-    'paper': '#F8F5EF',
+    'hero': '#545386',
+    'sky': '#C2DFEA',
+    'rose': '#F4C7CE',
+    'beige': '#D8D2C4',
+    'graphite': '#383A35',
+    'ink': '#2C2E2A',
+    'paper': '#F7F4EE',
     'white': '#FFFFFF'
 }
 APP_DIR = Path(__file__).resolve().parent
@@ -176,11 +176,11 @@ BLOCK_VENTILATION_DATA = {
     ]
 }
 BLOCK_ANALYSIS_COLORS = {
-    '27': '#6D8A7C',
-    '34': '#6E8FB6',
-    '35': '#7BAE6A',
-    '38': '#C89B5C',
-    'ALMACEN': '#B37B84'
+    '27': '#8A88B3',
+    '34': '#545386',
+    '35': '#7FA8B8',
+    '38': '#C78F9B',
+    'ALMACEN': '#8F8A7D'
 }
 SPECIAL_BLOCK_LABELS = {
     'ALMACEN': 'Estación externa'
@@ -255,9 +255,9 @@ st.markdown(f"""
     --elite-white: {BRAND_COLORS['white']};
     --control-idle: rgba(255, 255, 255, 0.10);
     --control-idle-strong: rgba(255, 255, 255, 0.15);
-    --control-active: #4E7B68;
-    --control-active-deep: #325448;
-    --control-hover: rgba(220, 233, 225, 0.22);
+    --control-active: #6C6AA0;
+    --control-active-deep: #545386;
+    --control-hover: rgba(194, 223, 234, 0.22);
     --font-display: 'Manrope', sans-serif;
     --font-body: 'Manrope', sans-serif;
     --font-brand: 'Cormorant Garamond', serif;
@@ -268,9 +268,9 @@ st.markdown(f"""
 
 .stApp {{
     background:
-        radial-gradient(circle at 12% 18%, rgba(230, 220, 203, 0.24), transparent 22%),
-        radial-gradient(circle at 88% 10%, rgba(220, 233, 225, 0.34), transparent 28%),
-        linear-gradient(180deg, #fcfaf6 0%, var(--elite-paper) 58%, #f1ece3 100%);
+        radial-gradient(circle at 12% 18%, rgba(244, 199, 206, 0.18), transparent 22%),
+        radial-gradient(circle at 88% 10%, rgba(194, 223, 234, 0.28), transparent 28%),
+        linear-gradient(180deg, #fcfaf7 0%, var(--elite-paper) 58%, #f1ede5 100%);
     color: var(--elite-ink);
     font-family: var(--font-body);
 }}
@@ -314,8 +314,8 @@ section[data-testid="stSidebar"] > div {{
 }}
 [data-testid="stSidebar"] {{
     background:
-        radial-gradient(circle at top left, rgba(232, 214, 211, 0.20), transparent 24%),
-        linear-gradient(180deg, rgba(50, 84, 72, 0.99) 0%, rgba(24, 33, 29, 0.99) 100%);
+        radial-gradient(circle at top left, rgba(244, 199, 206, 0.16), transparent 24%),
+        linear-gradient(180deg, rgba(84, 83, 134, 0.99) 0%, rgba(56, 58, 53, 0.99) 100%);
     border-right: 1px solid rgba(255, 255, 255, 0.08);
     box-shadow: 18px 0 42px rgba(31, 36, 48, 0.18);
 }}
@@ -454,9 +454,9 @@ section[data-testid="stSidebar"] > div {{
     transform: translateX(2px);
 }}
 [data-testid="stSidebar"] [data-testid="stCheckbox"] label:has([aria-checked="true"]) {{
-    border-color: rgba(220, 233, 225, 0.58);
-    background: linear-gradient(135deg, rgba(78, 123, 104, 0.95), rgba(50, 84, 72, 0.98));
-    box-shadow: inset 0 1px 0 rgba(255,255,255,0.18), 0 14px 28px rgba(31, 58, 49, 0.26);
+    border-color: rgba(194, 223, 234, 0.58);
+    background: linear-gradient(135deg, rgba(108, 106, 160, 0.95), rgba(84, 83, 134, 0.98));
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.18), 0 14px 28px rgba(53, 52, 88, 0.26);
 }}
 [data-testid="stSidebar"] [data-testid="stCheckbox"] p {{
     font-size: 0.9rem;
@@ -484,7 +484,7 @@ section[data-testid="stSidebar"] > div {{
 }}
 [data-testid="stSidebar"] div.stButton > button:hover {{
     border-color: rgba(214, 229, 236, 0.42);
-    background: linear-gradient(135deg, #5F8C78 0%, #3D6757 100%);
+    background: linear-gradient(135deg, #7A78AF 0%, #5C5A8E 100%);
     color: var(--elite-white);
     transform: translateY(-1px);
 }}
@@ -500,7 +500,7 @@ section[data-testid="stSidebar"] > div {{
     border-radius: 30px;
     background:
         radial-gradient(circle at 18% 18%, rgba(255,255,255,0.16), transparent 18%),
-        linear-gradient(135deg, #5F8C78 0%, #325448 42%, #18211D 100%);
+        linear-gradient(135deg, #7A78AF 0%, #545386 42%, #383A35 100%);
     box-shadow: 0 28px 68px rgba(35, 30, 58, 0.22);
     overflow: hidden;
 }}
@@ -720,8 +720,8 @@ section[data-testid="stSidebar"] > div {{
     margin-top: 0.52rem;
     padding: 0.26rem 0.58rem;
     border-radius: 999px;
-    background: rgba(78, 123, 104, 0.10);
-    color: #325448;
+    background: rgba(84, 83, 134, 0.10);
+    color: #545386;
     font-size: 0.7rem;
     font-weight: 750;
     letter-spacing: 0.01em;
@@ -1118,18 +1118,18 @@ section[data-testid="stSidebar"] > div {{
 div.stButton > button {{
     border-radius: 999px;
     border: 1px solid rgba(76, 70, 120, 0.18);
-    background: linear-gradient(135deg, #4E7B68 0%, #325448 100%);
+    background: linear-gradient(135deg, #6C6AA0 0%, #545386 100%);
     color: var(--elite-white);
     font-family: var(--font-display);
     font-weight: 800;
     padding: 0.56rem 1.1rem;
     letter-spacing: 0.01em;
-    box-shadow: 0 14px 30px rgba(40, 67, 57, 0.24);
+    box-shadow: 0 14px 30px rgba(60, 58, 102, 0.24);
 }}
 div.stButton > button:hover {{
     border-color: rgba(76, 70, 120, 0.30);
     color: var(--elite-white);
-    background: linear-gradient(135deg, #5F8C78 0%, #3A6253 100%);
+    background: linear-gradient(135deg, #7A78AF 0%, #5C5A8E 100%);
     transform: translateY(-1px);
 }}
 div[data-testid="stTabs"] [data-baseweb="tab-list"] {{
@@ -1150,9 +1150,9 @@ button[data-baseweb="tab"]:hover {{
 }}
 button[data-baseweb="tab"][aria-selected="true"] {{
     color: var(--elite-white) !important;
-    background: linear-gradient(135deg, #4E7B68 0%, #325448 100%);
+    background: linear-gradient(135deg, #6C6AA0 0%, #545386 100%);
     border-color: rgba(76, 70, 120, 0.18) !important;
-    box-shadow: 0 16px 30px rgba(40, 67, 57, 0.18);
+    box-shadow: 0 16px 30px rgba(60, 58, 102, 0.18);
 }}
 div[data-testid="stTabs"] [data-baseweb="tab-highlight"] {{
     display: none !important;
@@ -1200,7 +1200,7 @@ div[data-testid="stDataFrame"] {{
     position: absolute;
     inset: 0 0 auto 0;
     height: 5px;
-    background: linear-gradient(90deg, var(--elite-hero), rgba(220, 233, 225, 0.82));
+    background: linear-gradient(90deg, var(--elite-hero), rgba(194, 223, 234, 0.82));
 }}
 .analysis-hero-header {{
     position: relative;
@@ -1346,8 +1346,8 @@ div[data-testid="stDataFrame"] {{
 }}
 [data-testid="stSidebar"] [data-testid="stRadio"] div[role="radiogroup"] > label:has(input:checked) {{
     border-color: rgba(214, 229, 236, 0.58);
-    background: linear-gradient(135deg, rgba(78, 123, 104, 0.95), rgba(50, 84, 72, 0.98));
-    box-shadow: inset 0 1px 0 rgba(255,255,255,0.18), 0 14px 28px rgba(31, 58, 49, 0.26);
+    background: linear-gradient(135deg, rgba(108, 106, 160, 0.95), rgba(84, 83, 134, 0.98));
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.18), 0 14px 28px rgba(53, 52, 88, 0.26);
 }}
 [data-testid="stSidebar"] [data-testid="stRadio"] div[role="radiogroup"] > label p {{
     font-size: 0.92rem;
