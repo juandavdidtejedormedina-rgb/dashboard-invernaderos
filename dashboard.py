@@ -42,16 +42,22 @@ def _google_maps_embed_url(location_query):
     return f"https://www.google.com/maps?q={quote_plus(query)}&output=embed"
 
 def _render_autoplay_video(video_url, height=430):
-    safe_url = html.escape(str(video_url or "").strip(), quote=True)
-    if not safe_url:
+    video_urls = video_url if isinstance(video_url, (list, tuple)) else [video_url]
+    safe_urls = [
+        html.escape(str(url or "").strip(), quote=True)
+        for url in video_urls
+        if str(url or "").strip()
+    ]
+    if not safe_urls:
         return
+    first_url = safe_urls[0]
+    playlist_js = "[" + ",".join(f'"{url}"' for url in safe_urls) + "]"
 
     components.html(
         f"""
         <video
             autoplay
             muted
-            loop
             playsinline
             controls
             preload="auto"
@@ -64,12 +70,20 @@ def _render_autoplay_video(video_url, height=430):
                 background: #111;
             "
         >
-            <source src="{safe_url}" type="video/mp4">
+            <source src="{first_url}" type="video/mp4">
         </video>
         <script>
             const video = document.currentScript.previousElementSibling;
+            const playlist = {playlist_js};
+            let currentIndex = 0;
             if (video) {{
                 video.muted = true;
+                video.addEventListener("ended", () => {{
+                    currentIndex = (currentIndex + 1) % playlist.length;
+                    video.src = playlist[currentIndex];
+                    video.load();
+                    video.play().catch(() => {{}});
+                }});
                 video.play().catch(() => {{}});
             }}
         </script>
@@ -230,12 +244,14 @@ DASHBOARD_MEDIA = {
         'location_query': "La Ponderosa - The Elite Flower SAS CI Madrid Cundinamarca Colombia",
     },
     'Marley': {
-        'video_url': (
-            "https://raw.githubusercontent.com/"
-            "juandavdidtejedormedina-rgb/dashboard-invernaderos/"
-            "e76cf06c6e38078aaad9813524879996d8710f1d/"
-            "Flor%20Marley.mp4"
-        ),
+        'video_urls': [
+            "https://raw.githubusercontent.com/juandavdidtejedormedina-rgb/dashboard-invernaderos/277ebb73478df2c61271154170df491f8375f103/video%201.mp4",
+            "https://raw.githubusercontent.com/juandavdidtejedormedina-rgb/dashboard-invernaderos/277ebb73478df2c61271154170df491f8375f103/video%202.mp4",
+            "https://raw.githubusercontent.com/juandavdidtejedormedina-rgb/dashboard-invernaderos/277ebb73478df2c61271154170df491f8375f103/video%203.mp4",
+            "https://raw.githubusercontent.com/juandavdidtejedormedina-rgb/dashboard-invernaderos/277ebb73478df2c61271154170df491f8375f103/video%204.mp4",
+            "https://raw.githubusercontent.com/juandavdidtejedormedina-rgb/dashboard-invernaderos/277ebb73478df2c61271154170df491f8375f103/video%205.mp4",
+            "https://raw.githubusercontent.com/juandavdidtejedormedina-rgb/dashboard-invernaderos/277ebb73478df2c61271154170df491f8375f103/video%206.mp4",
+        ],
         'location_query': "Finca Marly - The Elite Flower SAS CI Madrid Road Facatativa Cundinamarca Colombia",
     }
 }
@@ -1609,13 +1625,14 @@ st.markdown(
 
 selected_finca_media = st.session_state.get('finca_compartida', 'La Ponderosa')
 _current_dashboard_media = DASHBOARD_MEDIA.get(selected_finca_media, DASHBOARD_MEDIA['La Ponderosa'])
-DASHBOARD_VIDEO_URL = _current_dashboard_media.get('video_url', '')
+DASHBOARD_VIDEO_URL = _current_dashboard_media.get('video_urls') or _current_dashboard_media.get('video_url', '')
 DASHBOARD_LOCATION_QUERY = _current_dashboard_media.get('location_query', '')
 
-if DASHBOARD_VIDEO_URL.strip():
+if DASHBOARD_VIDEO_URL:
     with st.expander("Video introductorio", expanded=True):
         if not LAZY_LOAD_MEDIA or st.checkbox("Cargar video", key="cargar_video_dashboard"):
-            youtube_embed_url = _youtube_embed_url(DASHBOARD_VIDEO_URL)
+            youtube_source_url = DASHBOARD_VIDEO_URL[0] if isinstance(DASHBOARD_VIDEO_URL, (list, tuple)) else DASHBOARD_VIDEO_URL
+            youtube_embed_url = _youtube_embed_url(youtube_source_url)
             if youtube_embed_url:
                 components.iframe(youtube_embed_url, height=430, scrolling=False)
             else:
@@ -1963,12 +1980,13 @@ def _get_dashboard_media_config(selected_finca):
 
 def _render_dashboard_media(selected_finca):
     media_config = _get_dashboard_media_config(selected_finca)
-    video_url = str(media_config.get('video_url', '')).strip()
+    video_url = media_config.get('video_urls') or str(media_config.get('video_url', '')).strip()
     location_query = str(media_config.get('location_query', '')).strip()
 
     if video_url:
         with st.expander("Video introductorio", expanded=True):
-            youtube_embed_url = _youtube_embed_url(video_url)
+            youtube_source_url = video_url[0] if isinstance(video_url, (list, tuple)) else video_url
+            youtube_embed_url = _youtube_embed_url(youtube_source_url)
             if youtube_embed_url:
                 components.iframe(youtube_embed_url, height=430, scrolling=False)
             else:
