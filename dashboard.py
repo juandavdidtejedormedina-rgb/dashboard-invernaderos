@@ -1838,6 +1838,60 @@ def _render_selected_period_banner(
         )
 
 
+def _render_chart_explanation(title, description, accent=None, kicker='Guía de lectura'):
+    if not description:
+        return
+
+    accent_color = accent or BRAND_COLORS['hero']
+    st.markdown(
+        f"""
+        <div style="
+            position: relative;
+            overflow: hidden;
+            margin: 0.35rem 0 0.8rem 0;
+            padding: 0.86rem 1rem 0.84rem 1.05rem;
+            border-radius: 18px;
+            border: 1px solid rgba(84, 83, 134, 0.09);
+            border-left: 4px solid {accent_color};
+            background:
+                radial-gradient(circle at top right, rgba(194,223,234,0.18), rgba(255,255,255,0) 42%),
+                linear-gradient(135deg, rgba(255,255,255,0.94) 0%, rgba(247,244,238,0.90) 100%);
+            box-shadow: 0 14px 32px rgba(45, 48, 64, 0.055);
+        ">
+            <div style="
+                font-family: 'Manrope', sans-serif;
+                font-size: 0.70rem;
+                font-weight: 800;
+                letter-spacing: 0.10em;
+                text-transform: uppercase;
+                color: {accent_color};
+                margin-bottom: 0.26rem;
+            ">
+                {html.escape(kicker)}
+            </div>
+            <div style="
+                font-family: 'Manrope', sans-serif;
+                font-size: 1rem;
+                font-weight: 800;
+                color: {BRAND_COLORS['ink']};
+                margin-bottom: 0.22rem;
+            ">
+                {html.escape(title)}
+            </div>
+            <div style="
+                font-family: 'Manrope', sans-serif;
+                font-size: 0.91rem;
+                line-height: 1.55;
+                color: rgba(56, 58, 53, 0.82);
+            ">
+                {html.escape(description)}
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+
 def _sidebar_icon_svg(icon_name):
     icons = {
         'filter': (
@@ -2230,6 +2284,12 @@ def _render_reference_summary_cards(df_reference, fecha_variables, summary_mode,
 
 
 def _render_summary_cards_selector(df_variables, fecha_variables, df_reference=None, reference_label='Estación externa', base_label='Bloque seleccionado'):
+    _render_chart_explanation(
+        'Resumen rápido del periodo',
+        'Estas tarjetas condensan las variables ambientales del periodo filtrado. Cambia entre promedio, máximo y mínimo para entender el comportamiento general antes de revisar las gráficas.',
+        accent=BRAND_COLORS['hero'],
+        kicker='Resumen del análisis'
+    )
     tab_promedio, tab_maximo, tab_minimo = st.tabs(["Promedio", "Máximo", "Mínimo"])
 
     with tab_promedio:
@@ -3622,7 +3682,11 @@ def _render_marley_individual_variable_charts(filtered_df, selected_range):
         return
 
     st.markdown("### Variables individuales Marley")
-    st.caption("Cada grafica muestra una variable de un solo sensor, en bloques de 30 minutos, para revisar el comportamiento puntual sin mezclarla con las demas.")
+    _render_chart_explanation(
+        'Lectura individual por sensor',
+        'Cada gráfica muestra una sola variable de un solo equipo. Sirve para revisar patrones puntuales de WIGA y ECOWITT sin mezclar las líneas en una misma visual.',
+        accent=BRAND_COLORS['hero']
+    )
 
     for start in range(0, len(rendered_charts), 2):
         cols = st.columns(2)
@@ -3721,6 +3785,12 @@ def _render_marley_dashboard(dashboard_mode):
 
     st.markdown(f"## Marley - {dashboard_mode}")
     st.caption("Lectura comparativa entre los sensores WIGA y ECOWITT con datos consolidados en franjas de 30 minutos.")
+    _render_chart_explanation(
+        'Cómo usar el análisis Marley',
+        'Elige una variable para comparar ambos sensores. Las tarjetas explican la diferencia general y las gráficas muestran cuándo se parecen, cuándo se separan y qué sensor mide más alto.',
+        accent=BRAND_COLORS['hero'],
+        kicker='Orientación'
+    )
 
     selected_variable = st.segmented_control(
         "Variable Marley",
@@ -3742,7 +3812,11 @@ def _render_marley_dashboard(dashboard_mode):
             st.warning("No hay datos suficientes para construir esta vista de Marley en el periodo seleccionado.")
             st.stop()
 
-        st.caption("Esta vista muestra qué tanto cambió cada sensor en la misma franja horaria dentro del periodo seleccionado.")
+        _render_chart_explanation(
+            'Varianza por franja horaria',
+            'Esta gráfica muestra qué tanto cambió cada sensor dentro de una misma hora del día durante el rango seleccionado. Valores bajos indican lecturas más estables; valores altos indican mayor fluctuación.',
+            accent=MARLEY_VARIABLES[selected_variable]['accent']
+        )
         st.plotly_chart(_make_marley_hourly_metric_chart(grouped_metric, selected_variable, dashboard_mode), width="stretch")
         with st.expander(f"Ver tabla dinámica de {dashboard_mode.lower()}", expanded=False):
             st.dataframe(_prepare_marley_hourly_metric_table(grouped_metric), width="stretch", hide_index=True)
@@ -3895,14 +3969,29 @@ def _render_marley_dashboard(dashboard_mode):
         unsafe_allow_html=True
     )
 
+    _render_chart_explanation(
+        'Comparación directa WIGA vs ECOWITT',
+        'Aquí se superponen ambos sensores para la variable elegida. Si las líneas viajan cerca, las lecturas son similares; si se separan, hay diferencia entre equipos en esa franja de 30 minutos.',
+        accent=MARLEY_VARIABLES[selected_variable]['accent']
+    )
     st.plotly_chart(_make_marley_comparison_chart(comparison, selected_variable, selected_range), width="stretch")
 
     difference_chart = _make_marley_difference_chart(comparison, selected_variable, selected_range)
     if difference_chart is not None:
+        _render_chart_explanation(
+            'Diferencia WIGA - ECOWITT',
+            'Esta gráfica convierte la comparación en una sola línea. Valores sobre cero significan que WIGA midió más alto; valores bajo cero significan que ECOWITT midió más alto.',
+            accent=MARLEY_VARIABLES[selected_variable]['colors']['ECOWITT']
+        )
         st.plotly_chart(difference_chart, width="stretch")
 
     scatter_chart = _make_marley_scatter_chart(comparison, selected_variable)
     if scatter_chart is not None:
+        _render_chart_explanation(
+            'Dispersión entre sensores',
+            'Cada punto cruza una lectura simultánea de WIGA y ECOWITT. Mientras más cerca esté de la línea diagonal, más parecidos fueron ambos sensores en ese momento.',
+            accent=MARLEY_VARIABLES[selected_variable]['colors']['WIGA']
+        )
         st.plotly_chart(scatter_chart, width="stretch")
     else:
         st.info("No hay suficientes datos simultáneos entre WIGA y ECOWITT para construir la dispersión.")
@@ -4619,6 +4708,16 @@ def _render_correlacion(
         **{f'yaxis{axis_name[1:]}': config for axis_name, config in axis_configs.items()}
     )
 
+    cortina_help = (
+        ' Cuando hay frentes o puertas activos, esas líneas muestran la apertura de motores y permiten relacionar el movimiento de cortinas con los cambios ambientales.'
+        if selected_cortinas else
+        ''
+    )
+    _render_chart_explanation(
+        'Correlación entre variables y cortinas',
+        'Esta gráfica pone todas las variables seleccionadas sobre la misma línea de tiempo. Cada color tiene su propia escala a la derecha; pasa el cursor por la gráfica para ver la hora exacta y el valor de cada serie.' + cortina_help,
+        accent=BRAND_COLORS['hero']
+    )
     st.plotly_chart(fig_corr, width='stretch')
 
     if selected_cortinas and not cortina_traces and selected_sensors:
@@ -4750,6 +4849,16 @@ def _render_focus_chart_grid(df_variables, fecha_variables, block_label=None, he
 
     if heading:
         st.markdown(f"#### {heading}")
+        focus_description = (
+            'Estas gráficas separan las variables del bloque seleccionado para ver cada comportamiento sin mezclar escalas. Úsalas para detectar picos, caídas o franjas del día con cambios fuertes.'
+            if 'externa' not in str(heading).lower() else
+            'Estas gráficas muestran las mismas variables medidas por la estación externa. Sirven como referencia para comparar si el bloque se comportó diferente al ambiente exterior.'
+        )
+        _render_chart_explanation(
+            'Variables ambientales individuales',
+            focus_description,
+            accent=BRAND_COLORS['hero']
+        )
 
     if TEMP_FOCUS_CHART_PLACEMENT == 'below':
         top_left, top_right = st.columns(TEMP_FOCUS_CHART_COLUMN_LAYOUT)
@@ -4905,6 +5014,11 @@ def _render_temperature_focus_chart(df_variables, fecha_variables, block_label=N
 
     if motor_fig is not None:
         st.markdown(f"#### {MOTOR_FOCUS_CHART_TITLE}")
+        _render_chart_explanation(
+            'Apertura de frentes y puertas',
+            'Esta gráfica muestra cuándo y cuánto se abrieron los motores del bloque. Ayuda a explicar cambios de temperatura, humedad o radiación después de movimientos de ventilación.',
+            accent=BRAND_COLORS['hero']
+        )
         st.plotly_chart(motor_fig, width='stretch')
 
 # 4. Datos cargados en memoria para evitar recálculos repetidos
@@ -5108,6 +5222,16 @@ def _render_hourly_metric_chart(grouped_df, variable_name, metric_column):
         )
     )
 
+    metric_description = (
+        'Cada punto resume el valor promedio de una variable en una franja horaria. Úsalo para comparar el comportamiento típico entre bloques y ubicar las horas de mayor o menor intensidad.'
+        if metric_column == 'Promedio' else
+        'Cada punto muestra qué tanto variaron las mediciones dentro de esa franja horaria durante el periodo. Valores cercanos a cero indican estabilidad; valores altos indican cambios más fuertes.'
+    )
+    _render_chart_explanation(
+        f'{metric_title} - {metric_label}',
+        metric_description,
+        accent=VARIABLE_COLORS.get(variable_name, BRAND_COLORS['hero'])
+    )
     st.plotly_chart(
         fig,
         width='stretch',
@@ -5467,14 +5591,34 @@ def _render_hourly_analysis_view(df_variables, fecha_variables, selected_blocks,
             )
 
             if len(selected_blocks) == 1 and tab_label == "Promedio":
-                st.markdown('<p class="analysis-note">Este resumen muestra el promedio consolidado del bloque seleccionado dentro del periodo filtrado y los extremos observados para cada variable.</p>', unsafe_allow_html=True)
+                _render_chart_explanation(
+                    'Promedio general del bloque',
+                    'Este resumen muestra el promedio consolidado del bloque seleccionado dentro del periodo filtrado y los extremos observados para cada variable.',
+                    accent=BRAND_COLORS['hero'],
+                    kicker='Cómo leer este análisis'
+                )
             elif len(selected_blocks) == 1 and tab_label == "Varianza":
-                st.markdown('<p class="analysis-note">La varianza resume qué tanto cambian las mediciones dentro del periodo. Con un solo día no hay dispersión temporal suficiente para una varianza útil por franja.</p>', unsafe_allow_html=True)
+                _render_chart_explanation(
+                    'Varianza general del bloque',
+                    'La varianza resume qué tanto cambian las mediciones dentro del periodo. Con un solo día no hay dispersión temporal suficiente para una varianza útil por franja.',
+                    accent=BRAND_COLORS['hero'],
+                    kicker='Cómo leer este análisis'
+                )
             else:
                 if tab_label == "Promedio":
-                    st.markdown('<p class="analysis-note">Explora cada variable para ver el valor promedio por franja horaria y comparar el comportamiento típico de los bloques seleccionados.</p>', unsafe_allow_html=True)
+                    _render_chart_explanation(
+                        'Promedio comparativo entre bloques',
+                        'Explora cada variable para ver el valor promedio por franja horaria y comparar el comportamiento típico de los bloques seleccionados.',
+                        accent=BRAND_COLORS['hero'],
+                        kicker='Cómo leer este análisis'
+                    )
                 else:
-                    st.markdown('<p class="analysis-note">Explora cada variable para ver qué tanto fluctúa cada bloque por franja horaria. Valores más altos indican mayor variabilidad dentro del periodo analizado.</p>', unsafe_allow_html=True)
+                    _render_chart_explanation(
+                        'Varianza comparativa entre bloques',
+                        'Explora cada variable para ver qué tanto fluctúa cada bloque por franja horaria. Valores más altos indican mayor variabilidad dentro del periodo analizado.',
+                        accent=BRAND_COLORS['hero'],
+                        kicker='Cómo leer este análisis'
+                    )
 
             # Mostrar tabs de variables dentro del tab de métrica seleccionado
             variable_tabs = st.tabs([
@@ -5490,13 +5634,16 @@ def _render_hourly_analysis_view(df_variables, fecha_variables, selected_blocks,
                         continue
 
                     if tab_label == "Promedio":
-                        st.caption('Cada punto resume el promedio de todas las mediciones disponibles en la misma franja horaria para cada bloque. Úsalo para comparar el comportamiento típico entre bloques.')
                         _render_hourly_metric_chart(grouped_df, variable_name, 'Promedio')
                         with st.expander('Ver tabla dinámica de promedio', expanded=False):
                             st.dataframe(_prepare_hourly_pivot_display(pivot_promedio), width='stretch')
                     else:  # Varianza
-                        st.caption('La varianza muestra qué tanto fluctúa cada bloque dentro de la misma franja horaria a lo largo del periodo filtrado. Valores cercanos a 0 indican un comportamiento más estable.')
                         if single_day_analysis:
+                            _render_chart_explanation(
+                                f'Varianza por franja horaria - {VARIABLE_SELECTOR_LABELS.get(variable_name, variable_name)}',
+                                'La varianza necesita al menos dos días para comparar la misma franja horaria entre días. Con un solo día se muestra la aclaración, pero no se grafica una variación representativa.',
+                                accent=VARIABLE_COLORS.get(variable_name, BRAND_COLORS['hero'])
+                            )
                             st.info(
                                 f'Varianza de un solo día para {VARIABLE_SELECTOR_LABELS.get(variable_name, variable_name)}: '
                                 'se muestra en 0 porque con un único día no hay suficiente repetición por franja horaria para calcular una dispersión representativa.'
