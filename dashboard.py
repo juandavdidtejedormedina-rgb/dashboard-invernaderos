@@ -116,6 +116,70 @@ BRAND_COLORS = {
 }
 APP_DIR = Path(__file__).resolve().parent
 LOGO_PATH = APP_DIR / 'logo elite.png'
+MARLEY_LOCAL_EXCEL_PATHS = [
+    APP_DIR / 'Datos Final marley.xlsx',
+    APP_DIR / 'Datos Final marley (2).xlsx'
+]
+MARLEY_REMOTE_EXCEL_URLS = [
+    (
+        "https://raw.githubusercontent.com/"
+        "juandavdidtejedormedina-rgb/dashboard-invernaderos/"
+        "89ab929cbeba025053c07941988fc5366e9727bd/"
+        "Datos%20Final%20marley.xlsx"
+    )
+]
+MARLEY_SENSOR_NAMES = ("WIGA", "ECOWITT")
+MARLEY_TIME_BUCKET = "30min"
+MARLEY_SERIES_END_OFFSET = pd.Timedelta(hours=23, minutes=30)
+MARLEY_AXIS_END_OFFSET = pd.Timedelta(hours=23, minutes=59)
+MARLEY_SHEETS = {
+    "WIGA": ["WIGGA MONTAÑA", "WIGA MARLEY"],
+    "ECOWITT": ["ECOWITT MONTAÑA", "ECOWIT MARLEY"],
+}
+MARLEY_VARIABLES = {
+    "Gramos de agua (g)": {
+        "title": "Comparativa de gramos de agua",
+        "unit": "g",
+        "colors": {"WIGA": "#4E8D7C", "ECOWITT": "#5AA6A6"},
+        "accent": "#4E8D7C",
+    },
+    "Humedad Relativa (%)": {
+        "title": "Comparativa de humedad relativa",
+        "unit": "%",
+        "colors": {"WIGA": "#4A4A4A", "ECOWITT": "#7DB7FF"},
+        "accent": "#8077AE",
+    },
+    "Temperatura (°C)": {
+        "title": "Comparativa de temperatura",
+        "unit": "°C",
+        "colors": {"WIGA": "#F2A04B", "ECOWITT": "#C06C84"},
+        "accent": "#D39A58",
+    },
+    "Radiación PAR (µmol m-2 s-1)": {
+        "title": "Comparativa de radiación PAR",
+        "unit": "µmol m-2 s-1",
+        "colors": {"WIGA": "#6BEA5B", "ECOWITT": "#524B82"},
+        "accent": "#6BEA5B",
+    },
+}
+MARLEY_CANONICAL_COLUMNS = {
+    "fecha": "Fecha",
+    "hora": "Hora",
+    "fecha hora": "FechaHora",
+    "fechahora": "FechaHora",
+    "tiempo de lectura": "FechaHora",
+    "gramos de agua g": "Gramos de agua (g)",
+    "gramos de agua": "Gramos de agua (g)",
+    "humedad relativa": "Humedad Relativa (%)",
+    "humedad relativa %": "Humedad Relativa (%)",
+    "humedad relativa (%)": "Humedad Relativa (%)",
+    "temperatura c": "Temperatura (°C)",
+    "temperatura": "Temperatura (°C)",
+    "temperatura montana c": "Temperatura (°C)",
+    "radiacion par mol m 2 s 1": "Radiación PAR (µmol m-2 s-1)",
+    "radiacion par umol m 2 s 1": "Radiación PAR (µmol m-2 s-1)",
+    "radiacion par": "Radiación PAR (µmol m-2 s-1)",
+}
 LOGO_URL_LARGE = "https://raw.githubusercontent.com/juandavdidtejedormedina-rgb/dashboard-invernaderos/main/logo%20elite.png"
 LOGO_URL_SMALL = LOGO_URL_LARGE
 DASHBOARD_VIDEO_URL = "https://raw.githubusercontent.com/juandavdidtejedormedina-rgb/dashboard-invernaderos/59df2b2f7fee2b9632ae4865fedae119e81b3b79/flor%20video.mp4"
@@ -2817,6 +2881,556 @@ def _filter_variables_multi_block_range(df_variables_all, fecha_inicio, fecha_fi
     return df_variables_all[mask].copy()
 
 
+def _resolve_marley_sheet_name(sheet_names, aliases, source_name):
+    for alias in aliases:
+        if alias in sheet_names:
+            return alias
+
+    normalized_lookup = {_build_normalized_text_key(name): name for name in sheet_names}
+    for alias in aliases:
+        match = normalized_lookup.get(_build_normalized_text_key(alias))
+        if match:
+            return match
+
+    raise ValueError(
+        f"No se encontró una hoja válida para {source_name}. "
+        f"Hojas disponibles: {', '.join(sheet_names)}"
+    )
+
+
+def _standardize_marley_columns(df):
+    renamed = {}
+    for column in df.columns:
+        normalized = _build_normalized_text_key(column)
+        if normalized in MARLEY_CANONICAL_COLUMNS:
+            renamed[column] = MARLEY_CANONICAL_COLUMNS[normalized]
+    return df.rename(columns=renamed)
+
+
+def _ensure_marley_expected_columns(df):
+    for column in ["Fecha", "Hora", *MARLEY_VARIABLES.keys()]:
+        if column not in df.columns:
+            df[column] = pd.NA
+    return df
+
+
+def _coerce_marley_measurement_columns(df):
+    for column in MARLEY_VARIABLES:
+        if column in df.columns:
+            df[column] = pd.to_numeric(df[column], errors='coerce')
+    return df
+
+
+def _load_marley_wiga_sheet(workbook, sheet_name):
+    df = workbook.parse(sheet_name=sheet_name)
+    df = _standardize_marley_columns(df)
+    df = _ensure_marley_expected_columns(df)
+    df = _coerce_marley_measurement_columns(df)
+    return df
+
+
+def _load_marley_ecowitt_sheet(workbook, sheet_name):
+    df = workbook.parse(sheet_name=sheet_name)
+    df = _standardize_marley_columns(df)
+
+    if 'FechaHora' not in df.columns:
+        raw = workbook.parse(sheet_name=sheet_name, header=None)
+        raw = raw.iloc[:, :5].copy()
+        if raw.shape[1] >= 5:
+            raw.columns = [
+                'FechaHora',
+                'Gramos de agua (g)',
+                'Humedad Relativa (%)',
+                'Radiación PAR (µmol m-2 s-1)',
+                'Temperatura (°C)',
+            ]
+        else:
+            raw = raw.iloc[:, :4].copy()
+            raw.columns = [
+                'FechaHora',
+                'Humedad Relativa (%)',
+                'Radiación PAR (µmol m-2 s-1)',
+                'Temperatura (°C)',
+            ]
+        df = raw
+
+    df['FechaHora'] = pd.to_datetime(df['FechaHora'], errors='coerce', dayfirst=True)
+    df = _ensure_marley_expected_columns(df)
+    df = _coerce_marley_measurement_columns(df)
+    df = df.dropna(subset=['FechaHora'])
+    df['Fecha'] = df['FechaHora'].dt.strftime('%Y-%m-%d')
+    df['Hora'] = df['FechaHora'].dt.strftime('%H:%M:%S')
+    return df[['Fecha', 'Hora', *MARLEY_VARIABLES.keys()]]
+
+
+def _resolve_marley_excel_sources():
+    sources = []
+    for candidate in MARLEY_LOCAL_EXCEL_PATHS:
+        if candidate.exists():
+            sources.append(candidate)
+    sources.extend(MARLEY_REMOTE_EXCEL_URLS)
+    return sources
+
+
+def _build_marley_source_signature(excel_source):
+    if isinstance(excel_source, Path):
+        stat = excel_source.stat()
+        return f"{excel_source}|{stat.st_mtime_ns}|{stat.st_size}"
+    return str(excel_source)
+
+
+def _open_marley_workbook(excel_source):
+    if isinstance(excel_source, Path):
+        return pd.ExcelFile(excel_source)
+
+    response = requests.get(excel_source, timeout=45)
+    response.raise_for_status()
+    return pd.ExcelFile(io.BytesIO(response.content))
+
+
+@st.cache_data(show_spinner="Cargando datos de Marley...")
+def _load_marley_data_from_source(excel_source, source_signature):
+    _ = source_signature
+    workbook = _open_marley_workbook(excel_source)
+    source_frames = {}
+
+    for source_name, aliases in MARLEY_SHEETS.items():
+        sheet_name = _resolve_marley_sheet_name(workbook.sheet_names, aliases, source_name)
+        if source_name == 'WIGA':
+            df = _load_marley_wiga_sheet(workbook, sheet_name)
+        else:
+            df = _load_marley_ecowitt_sheet(workbook, sheet_name)
+
+        df['FechaHora'] = pd.to_datetime(
+            df['Fecha'].astype(str) + ' ' + df['Hora'].astype(str),
+            errors='coerce'
+        )
+        df = df.dropna(subset=['FechaHora']).sort_values('FechaHora')
+        df = df[['FechaHora', *MARLEY_VARIABLES.keys()]].copy()
+
+        for variable in MARLEY_VARIABLES:
+            df.rename(columns={variable: f"{variable} - {source_name}"}, inplace=True)
+        source_frames[source_name] = df
+
+    merged = None
+    for frame in source_frames.values():
+        merged = frame if merged is None else merged.merge(frame, on='FechaHora', how='outer')
+
+    if merged is None:
+        raise ValueError("No fue posible construir la tabla consolidada de Marley.")
+
+    merged = merged.sort_values('FechaHora').reset_index(drop=True)
+    return merged, source_frames
+
+
+def _load_marley_data():
+    errors = []
+    for excel_source in _resolve_marley_excel_sources():
+        try:
+            return _load_marley_data_from_source(excel_source, _build_marley_source_signature(excel_source))
+        except Exception as error:
+            errors.append(f"{excel_source}: {error}")
+
+    raise ValueError("No fue posible cargar los datos de Marley.\n" + "\n".join(errors))
+
+
+def _build_marley_full_time_index(selected_range):
+    start_date, end_date = selected_range
+    return pd.date_range(
+        start=pd.Timestamp(start_date),
+        end=pd.Timestamp(end_date) + MARLEY_SERIES_END_OFFSET,
+        freq=MARLEY_TIME_BUCKET,
+    )
+
+
+def _build_marley_hourly_series(df, column_name, selected_range):
+    source_df = df[['FechaHora', column_name]].dropna(subset=[column_name]).copy()
+    if source_df.empty:
+        return source_df
+
+    source_df['FechaHora'] = source_df['FechaHora'].dt.floor(MARLEY_TIME_BUCKET)
+    source_df = source_df.groupby('FechaHora', as_index=False)[column_name].mean()
+    full_index = _build_marley_full_time_index(selected_range)
+    source_df = source_df.set_index('FechaHora').reindex(full_index).rename_axis('FechaHora').reset_index()
+    return source_df
+
+
+def _build_marley_hourly_comparison(df, variable, selected_range):
+    wiga_col = f"{variable} - WIGA"
+    ecowitt_col = f"{variable} - ECOWITT"
+
+    hourly_wiga = _build_marley_hourly_series(df, wiga_col, selected_range).rename(columns={wiga_col: 'WIGA'})
+    hourly_eco = _build_marley_hourly_series(df, ecowitt_col, selected_range).rename(columns={ecowitt_col: 'ECOWITT'})
+    comparison = hourly_wiga.merge(hourly_eco, on='FechaHora', how='outer')
+    comparison['DiffPct'] = pd.NA
+    comparison['DiffValue'] = pd.NA
+    comparison['SignedDiff'] = pd.NA
+
+    valid_mask = comparison['WIGA'].notna() & comparison['ECOWITT'].notna()
+    comparison.loc[valid_mask, 'SignedDiff'] = comparison.loc[valid_mask, 'WIGA'] - comparison.loc[valid_mask, 'ECOWITT']
+    comparison.loc[valid_mask, 'DiffValue'] = comparison.loc[valid_mask, 'SignedDiff'].abs()
+
+    pct_base = (comparison.loc[valid_mask, 'WIGA'].abs() + comparison.loc[valid_mask, 'ECOWITT'].abs()) / 2
+    valid_pct_index = pct_base[pct_base != 0].index
+    comparison.loc[valid_pct_index, 'DiffPct'] = (
+        comparison.loc[valid_pct_index, 'DiffValue'] / pct_base.loc[valid_pct_index] * 100
+    )
+    return comparison
+
+
+def _get_marley_time_axis_config(df):
+    min_time = df['FechaHora'].min()
+    max_time = df['FechaHora'].max()
+    span = max_time - min_time
+    total_days = max(span.total_seconds() / 86400, 0)
+
+    if total_days <= 1.1:
+        return {'tickformat': '%H:%M', 'dtick': 60 * 60 * 1000, 'title': 'Hora del día'}
+    if total_days <= 3:
+        return {'tickformat': '%d/%m\n%H:%M', 'dtick': 6 * 60 * 60 * 1000, 'title': 'Fecha y hora'}
+    if total_days <= 10:
+        return {'tickformat': '%d/%m\n%H:%M', 'dtick': 12 * 60 * 60 * 1000, 'title': 'Fecha y hora'}
+    return {'tickformat': '%d/%m/%Y', 'dtick': 24 * 60 * 60 * 1000, 'title': 'Fecha'}
+
+
+def _get_marley_y_axis_config(df, variable):
+    series = []
+    for source_name in MARLEY_SENSOR_NAMES:
+        column_name = f"{variable} - {source_name}"
+        if column_name in df.columns:
+            clean = pd.to_numeric(df[column_name], errors='coerce').dropna()
+            if not clean.empty:
+                series.append(clean)
+
+    if not series:
+        return {'title': MARLEY_VARIABLES[variable]['unit']}
+
+    values = pd.concat(series, ignore_index=True)
+    vmin = float(values.min())
+    vmax = float(values.max())
+
+    if variable == 'Gramos de agua (g)':
+        axis_min = round(max(0, vmin - 0.5), 2)
+        axis_max = round(vmax + 0.5, 2)
+        spread = max(axis_max - axis_min, 0.1)
+        dtick = 0.2 if spread <= 2 else 0.5 if spread <= 5 else 1
+        return {'title': 'Gramos de agua (g)', 'range': [axis_min, axis_max], 'dtick': dtick}
+
+    if variable == 'Humedad Relativa (%)':
+        axis_min = max(0, min(100, (int(vmin // 5) * 5) - 5))
+        axis_max = min(100, (int(vmax // 5) * 5) + 5)
+        if axis_max <= axis_min:
+            axis_max = min(100, axis_min + 5)
+        return {'title': 'Humedad relativa (%)', 'range': [axis_min, axis_max], 'dtick': 5, 'ticksuffix': '%'}
+
+    if variable == 'Temperatura (°C)':
+        return {'title': 'Temperatura (°C)', 'range': [round(vmin - 1.5, 1), round(vmax + 1.5, 1)], 'dtick': 2}
+
+    axis_max = int(vmax * 1.05) if vmax > 0 else 10
+    spread = max(axis_max, 1)
+    dtick = 10 if spread <= 100 else 25 if spread <= 300 else 50 if spread <= 800 else 100
+    return {'title': 'Radiación PAR (µmol m-2 s-1)', 'range': [-25, axis_max], 'dtick': dtick}
+
+
+def _make_marley_comparison_chart(comparison, variable, selected_range):
+    config = MARLEY_VARIABLES[variable]
+    fig = go.Figure()
+    time_axis = _get_marley_time_axis_config(comparison)
+    y_axis = _get_marley_y_axis_config(
+        comparison.rename(columns={name: f"{variable} - {name}" for name in MARLEY_SENSOR_NAMES}),
+        variable
+    )
+    start_date, end_date = selected_range
+
+    for source_name in MARLEY_SENSOR_NAMES:
+        source_df = comparison[['FechaHora', source_name, 'SignedDiff', 'DiffValue', 'DiffPct']].copy()
+        if source_df[source_name].dropna().empty:
+            continue
+
+        fig.add_trace(
+            go.Scatter(
+                x=source_df['FechaHora'],
+                y=source_df[source_name],
+                name=source_name,
+                mode='lines+markers',
+                line=dict(color=config['colors'][source_name], width=3),
+                marker=dict(size=6),
+                connectgaps=False,
+                customdata=source_df[['SignedDiff', 'DiffValue', 'DiffPct']],
+                hovertemplate=(
+                    "<b>%{x|%Y-%m-%d %H:%M}</b><br>"
+                    + f"{source_name}: "
+                    + "%{y:.2f} "
+                    + config['unit']
+                    + "<br>Diferencia WIGA - ECOWITT: %{customdata[0]:+.2f} "
+                    + config['unit']
+                    + "<br>Diferencia absoluta: %{customdata[1]:.2f} "
+                    + config['unit']
+                    + "<br>Diferencia % sobre promedio: %{customdata[2]:.2f}%<extra></extra>"
+                ),
+            )
+        )
+
+    fig.update_layout(
+        title=dict(text=config['title'], x=0, xanchor='left'),
+        height=470,
+        margin=dict(l=28, r=28, t=74, b=28),
+        paper_bgcolor="rgba(255,255,255,0)",
+        plot_bgcolor="rgba(250,248,243,0.72)",
+        hovermode='x unified',
+        template='plotly_white',
+        legend=dict(orientation='h', yanchor='bottom', y=1.02, xanchor='left', x=0),
+        xaxis=dict(
+            title=time_axis['title'],
+            showgrid=True,
+            gridcolor="rgba(76, 70, 120, 0.07)",
+            zeroline=False,
+            tickformat=time_axis['tickformat'],
+            dtick=time_axis['dtick'],
+            ticklabelmode='period',
+            range=[
+                pd.Timestamp(start_date),
+                pd.Timestamp(end_date) + MARLEY_AXIS_END_OFFSET
+            ],
+        ),
+        yaxis=dict(
+            title=y_axis['title'],
+            showgrid=True,
+            gridcolor="rgba(76, 70, 120, 0.07)",
+            zeroline=False,
+            range=y_axis.get('range'),
+            dtick=y_axis.get('dtick'),
+            ticksuffix=y_axis.get('ticksuffix', ''),
+        ),
+    )
+    return fig
+
+
+def _make_marley_difference_chart(comparison, variable, selected_range):
+    diff_df = comparison[['FechaHora', 'SignedDiff']].dropna().copy()
+    if diff_df.empty:
+        return None
+
+    config = MARLEY_VARIABLES[variable]
+    time_axis = _get_marley_time_axis_config(comparison)
+    start_date, end_date = selected_range
+    max_abs_diff = float(diff_df['SignedDiff'].abs().max())
+    axis_limit = max(round(max_abs_diff * 1.15, 2), 0.5)
+
+    fig = go.Figure()
+    fig.add_trace(
+        go.Scatter(
+            x=diff_df['FechaHora'],
+            y=diff_df['SignedDiff'],
+            name='WIGA - ECOWITT',
+            mode='lines+markers',
+            line=dict(color=config['accent'], width=3),
+            marker=dict(size=6),
+            hovertemplate="<b>%{x|%Y-%m-%d %H:%M}</b><br>Diferencia: %{y:+.2f} " + config['unit'] + "<extra></extra>",
+        )
+    )
+    fig.add_hline(y=0, line_width=1.4, line_dash='dash', line_color="rgba(45, 48, 64, 0.45)")
+    fig.update_layout(
+        title=dict(text="Diferencia entre sensores por bloque de 30 minutos", x=0, xanchor='left'),
+        height=340,
+        margin=dict(l=28, r=28, t=72, b=28),
+        paper_bgcolor="rgba(255,255,255,0)",
+        plot_bgcolor="rgba(250,248,243,0.72)",
+        template='plotly_white',
+        xaxis=dict(
+            title=time_axis['title'],
+            showgrid=True,
+            gridcolor="rgba(76, 70, 120, 0.07)",
+            zeroline=False,
+            tickformat=time_axis['tickformat'],
+            dtick=time_axis['dtick'],
+            range=[pd.Timestamp(start_date), pd.Timestamp(end_date) + MARLEY_AXIS_END_OFFSET],
+        ),
+        yaxis=dict(
+            title=f"Diferencia ({config['unit']})",
+            range=[-axis_limit, axis_limit],
+            showgrid=True,
+            gridcolor="rgba(76, 70, 120, 0.07)",
+            zeroline=False,
+        ),
+    )
+    return fig
+
+
+def _make_marley_scatter_chart(comparison, variable):
+    hourly = comparison.dropna(subset=list(MARLEY_SENSOR_NAMES)).copy()
+    if hourly.empty:
+        return None
+
+    config = MARLEY_VARIABLES[variable]
+    axis_min = float(min(hourly['WIGA'].min(), hourly['ECOWITT'].min()))
+    axis_max = float(max(hourly['WIGA'].max(), hourly['ECOWITT'].max()))
+    padding = max((axis_max - axis_min) * 0.08, 0.5)
+    axis_min -= padding
+    axis_max += padding
+
+    fig = go.Figure()
+    fig.add_trace(
+        go.Scatter(
+            x=hourly['WIGA'],
+            y=hourly['ECOWITT'],
+            mode='markers',
+            name='Lecturas simultáneas',
+            marker=dict(size=8, color=config['accent'], opacity=0.72),
+            text=hourly['FechaHora'].dt.strftime('%Y-%m-%d %H:%M'),
+            hovertemplate="<b>%{text}</b><br>WIGA: %{x:.2f} " + config['unit'] + "<br>ECOWITT: %{y:.2f} " + config['unit'] + "<extra></extra>",
+        )
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=[axis_min, axis_max],
+            y=[axis_min, axis_max],
+            mode='lines',
+            name='Referencia y = x',
+            line=dict(color="#D39A58", width=2, dash='dash'),
+            hoverinfo='skip',
+        )
+    )
+    fig.update_layout(
+        title=dict(text="Dispersión entre sensores", x=0, xanchor='left'),
+        height=420,
+        margin=dict(l=28, r=28, t=72, b=28),
+        paper_bgcolor="rgba(255,255,255,0)",
+        plot_bgcolor="rgba(250,248,243,0.72)",
+        template='plotly_white',
+        legend=dict(orientation='h', yanchor='bottom', y=1.02, xanchor='left', x=0),
+        xaxis=dict(title=f"WIGA ({config['unit']})", range=[axis_min, axis_max], showgrid=True, zeroline=False),
+        yaxis=dict(title=f"ECOWITT ({config['unit']})", range=[axis_min, axis_max], showgrid=True, zeroline=False, scaleanchor='x', scaleratio=1),
+    )
+    return fig
+
+
+def _render_marley_dashboard(dashboard_mode):
+    try:
+        marley_df, marley_source_data = _load_marley_data()
+    except Exception as error:
+        st.error(f"No fue posible cargar los datos de Marley. Detalle: {error}")
+        st.stop()
+
+    if marley_df.empty or 'FechaHora' not in marley_df.columns:
+        st.warning("No hay datos disponibles para Marley.")
+        st.stop()
+
+    if dashboard_mode != "Correlación":
+        st.info("Para Marley se muestra la comparativa WIGA vs ECOWITT. La vista de Varianza y Promedio no aplica en esta finca.")
+
+    min_date = marley_df['FechaHora'].min().date()
+    max_date = marley_df['FechaHora'].max().date()
+
+    with st.sidebar.expander("Periodo", expanded=True):
+        if min_date == max_date:
+            fecha_unica = st.date_input(
+                "Seleccionar fecha:",
+                value=max_date,
+                key="marley_fecha_unica",
+                min_value=min_date,
+                max_value=max_date,
+                help=FILTER_HELP_TEXTS['fecha']
+            )
+            selected_range = (fecha_unica, fecha_unica)
+        else:
+            modo_fechas = st.radio(
+                "Modo de fechas:",
+                options=["Un día", "Varios días"],
+                horizontal=True,
+                key="marley_modo_fechas",
+                help=FILTER_HELP_TEXTS['modo_fechas']
+            )
+            if modo_fechas == "Un día":
+                fecha_unica_default = _coerce_sidebar_date(st.session_state.get("marley_fecha_un_dia", max_date), max_date)
+                _sidebar_field_label("calendar", "Seleccionar fecha")
+                fecha_unica = st.date_input(
+                    "Seleccionar fecha:",
+                    value=fecha_unica_default,
+                    key="marley_fecha_un_dia",
+                    min_value=min_date,
+                    max_value=max_date,
+                    help=FILTER_HELP_TEXTS['fecha']
+                )
+                selected_range = (fecha_unica, fecha_unica)
+            else:
+                _sidebar_field_label("calendar", "Fecha inicio")
+                fecha_inicio = st.date_input(
+                    "Fecha inicio:",
+                    value=min_date,
+                    key="marley_fecha_inicio",
+                    min_value=min_date,
+                    max_value=max_date,
+                    help=FILTER_HELP_TEXTS['fecha']
+                )
+                _sidebar_field_label("calendar", "Fecha fin")
+                fecha_fin = st.date_input(
+                    "Fecha fin:",
+                    value=max_date,
+                    key="marley_fecha_fin",
+                    min_value=min_date,
+                    max_value=max_date,
+                    help=FILTER_HELP_TEXTS['fecha']
+                )
+                if fecha_fin < fecha_inicio:
+                    fecha_inicio, fecha_fin = fecha_fin, fecha_inicio
+                selected_range = (fecha_inicio, fecha_fin)
+
+    filtered_df = marley_df[marley_df['FechaHora'].dt.date.between(*selected_range)].copy()
+    if filtered_df.empty:
+        st.warning("No hay datos disponibles para Marley en el rango seleccionado.")
+        st.stop()
+
+    st.markdown("## Comparativa Marley")
+    st.caption("Comparación entre los sensores WIGA y ECOWITT con promedios por bloque de 30 minutos.")
+
+    selected_variable = st.segmented_control(
+        "Variable Marley",
+        options=list(MARLEY_VARIABLES.keys()),
+        format_func=lambda value: MARLEY_VARIABLES[value]['title'].replace("Comparativa de ", "").capitalize(),
+        default=list(MARLEY_VARIABLES.keys())[0],
+        key="marley_variable",
+    )
+    comparison = _build_marley_hourly_comparison(filtered_df, selected_variable, selected_range)
+    overlap = comparison.dropna(subset=list(MARLEY_SENSOR_NAMES)).copy()
+
+    metric_cols = st.columns(3)
+    avg_abs_diff = overlap['DiffValue'].mean() if not overlap.empty else None
+    avg_signed_diff = overlap['SignedDiff'].mean() if not overlap.empty else None
+    std_diff = overlap['SignedDiff'].std() if not overlap.empty else None
+    unit = MARLEY_VARIABLES[selected_variable]['unit']
+    metric_cols[0].metric("Dif. absoluta media", f"{avg_abs_diff:.2f} {unit}" if pd.notna(avg_abs_diff) else "Sin datos")
+    metric_cols[1].metric("Dif. media WIGA - ECOWITT", f"{avg_signed_diff:+.2f} {unit}" if pd.notna(avg_signed_diff) else "Sin datos")
+    metric_cols[2].metric("Desv. estándar", f"{std_diff:.2f} {unit}" if pd.notna(std_diff) else "Sin datos")
+
+    st.plotly_chart(_make_marley_comparison_chart(comparison, selected_variable, selected_range), width="stretch")
+
+    difference_chart = _make_marley_difference_chart(comparison, selected_variable, selected_range)
+    if difference_chart is not None:
+        st.plotly_chart(difference_chart, width="stretch")
+
+    scatter_chart = _make_marley_scatter_chart(comparison, selected_variable)
+    if scatter_chart is not None:
+        st.plotly_chart(scatter_chart, width="stretch")
+    else:
+        st.info("No hay suficientes datos simultáneos entre WIGA y ECOWITT para construir la dispersión.")
+
+    with st.expander("Ver registros consolidados de Marley", expanded=False):
+        st.dataframe(filtered_df, width="stretch", hide_index=True)
+        summary_rows = []
+        for source_name, source_df in marley_source_data.items():
+            current = source_df[source_df['FechaHora'].dt.date.between(*selected_range)].copy()
+            summary_rows.append({
+                'Equipo': source_name,
+                'Registros': len(current),
+                'Inicio': current['FechaHora'].min().strftime('%Y-%m-%d %H:%M') if not current.empty else '-',
+                'Fin': current['FechaHora'].max().strftime('%Y-%m-%d %H:%M') if not current.empty else '-',
+            })
+        st.dataframe(pd.DataFrame(summary_rows), width="stretch", hide_index=True)
+
+    st.stop()
+
+
 def _filter_cortinas_range(df_cortinas_all, bloque_seleccionado, fecha_inicio, fecha_fin):
     if (
         df_cortinas_all.empty or
@@ -4435,6 +5049,9 @@ with st.sidebar.expander("Finca", expanded=True):
         key="finca_compartida",
         help=FILTER_HELP_TEXTS['finca']
     )
+
+if selected_finca == 'Marley':
+    _render_marley_dashboard(dashboard_mode)
 
 if dashboard_mode == "Varianza Y Promedio":
     analysis_block_codes, analysis_variable_map, _ = _get_block_options(
