@@ -55,16 +55,16 @@ VARIABLE_UNITS = {
     'Gramos de agua': 'g'
 }
 VARIABLE_COLORS = {
-    'Temperatura': '#545386',
-    'Humedad Relativa': '#383A35',
-    'Radiación PAR': '#7FA8B8',
-    'Gramos de agua': '#C78F9B'
+    'Temperatura': '#7DB7FF',
+    'Humedad Relativa': '#4A4A4A',
+    'Radiación PAR': '#6BEA5B',
+    'Gramos de agua': '#F2A04B'
 }
 CORTINA_COLORS = {
-    'FRENTE 1': '#545386',
-    'FRENTE 2': '#8A88B3',
-    'PUERTA 1': '#A97884',
-    'PUERTA 2': '#D9BBC1'
+    'FRENTE 1': '#5E5AAE',
+    'FRENTE 2': '#9089D8',
+    'PUERTA 1': '#B67895',
+    'PUERTA 2': '#D8AFC3'
 }
 MOTOR_VARIABLES = list(CORTINA_COLORS.keys())
 MOTOR_AREA_REFERENCE = {
