@@ -1566,7 +1566,7 @@ st.markdown(
 )
 
 selected_finca_media = st.session_state.get('finca_compartida', 'La Ponderosa')
-_current_dashboard_media = _get_dashboard_media_config(selected_finca_media)
+_current_dashboard_media = DASHBOARD_MEDIA.get(selected_finca_media, DASHBOARD_MEDIA['La Ponderosa'])
 DASHBOARD_VIDEO_URL = _current_dashboard_media.get('video_url', '')
 DASHBOARD_LOCATION_QUERY = _current_dashboard_media.get('location_query', '')
 
