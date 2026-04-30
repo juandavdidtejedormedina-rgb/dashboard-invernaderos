@@ -196,8 +196,8 @@ DASHBOARD_MEDIA = {
         'video_url': (
             "https://raw.githubusercontent.com/"
             "juandavdidtejedormedina-rgb/dashboard-invernaderos/"
-            "b54cbf5bc4f0a201231f54f5ddbdb12807c1a510/"
-            "For%20Creciendo.mp4"
+            "e76cf06c6e38078aaad9813524879996d8710f1d/"
+            "Flor%20Marley.mp4"
         ),
         'location_query': "Finca Marly - The Elite Flower SAS CI Madrid Road Facatativa Cundinamarca Colombia",
     }
