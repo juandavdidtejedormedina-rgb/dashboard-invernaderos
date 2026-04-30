@@ -1655,6 +1655,42 @@ def _coerce_sidebar_date(value, fallback):
     return fallback
 
 
+def _resample_sensor_series_30min(df_series, value_column):
+    required_cols = {'DateTime', value_column}
+    if df_series.empty or not required_cols.issubset(df_series.columns):
+        return pd.DataFrame(columns=['DateTime', value_column])
+
+    series = df_series[['DateTime', value_column]].dropna(subset=['DateTime', value_column]).copy()
+    if series.empty:
+        return pd.DataFrame(columns=['DateTime', value_column])
+
+    series['DateTime'] = pd.to_datetime(series['DateTime'], errors='coerce')
+    series = series.dropna(subset=['DateTime']).sort_values('DateTime')
+    if series.empty:
+        return pd.DataFrame(columns=['DateTime', value_column])
+
+    return (
+        series.set_index('DateTime')[[value_column]]
+        .resample('30min')
+        .mean()
+        .dropna(how='all')
+        .reset_index()
+    )
+
+
+def _get_correlation_xaxis_dtick(fecha_inicio, fecha_fin):
+    total_days = max(1, (fecha_fin - fecha_inicio).days + 1)
+    if total_days <= 2:
+        return 30 * 60 * 1000
+    if total_days <= 5:
+        return 60 * 60 * 1000
+    if total_days <= 10:
+        return 2 * 60 * 60 * 1000
+    if total_days <= 20:
+        return 4 * 60 * 60 * 1000
+    return 6 * 60 * 60 * 1000
+
+
 def _sidebar_icon_svg(icon_name):
     icons = {
         'filter': (
@@ -2962,6 +2998,7 @@ def _render_correlacion(
     xaxis_title_text = '<b>Fecha y hora</b>' if multi_day_view else '<b>Hora del Día</b>'
     default_marker_size = CORRELATION_MARKER_SIZE_MULTI_DAY if multi_day_view else CORRELATION_MARKER_SIZE_DEFAULT
     par_marker_size = CORRELATION_MARKER_SIZE_MULTI_DAY if multi_day_view else CORRELATION_MARKER_SIZE_PAR
+    xaxis_dtick = _get_correlation_xaxis_dtick(fecha_inicio, fecha_fin)
 
     sensor_vars = _get_available_sensor_vars(df_variables)
     almacen_sensor_vars = _get_available_sensor_vars(df_variables_almacen) if isinstance(df_variables_almacen, pd.DataFrame) else []
@@ -3031,6 +3068,10 @@ def _render_correlacion(
             serie = df_plot[['DateTime', var_name]].dropna(subset=[var_name]).copy()
             if serie.empty:
                 continue
+            if multi_day_view:
+                serie = _resample_sensor_series_30min(serie, var_name)
+                if serie.empty:
+                    continue
             serie_plot = _add_day_breaks_to_series(serie, var_name) if multi_day_view else serie
             trace = dict(
                 x=serie_plot['DateTime'],
@@ -3068,6 +3109,10 @@ def _render_correlacion(
             if var_name in compare_sensor_vars and not df_plot_almacen.empty:
                 serie_almacen = df_plot_almacen[['DateTime', var_name]].dropna(subset=[var_name]).copy()
                 if not serie_almacen.empty:
+                    if multi_day_view:
+                        serie_almacen = _resample_sensor_series_30min(serie_almacen, var_name)
+                    if serie_almacen.empty:
+                        continue
                     serie_almacen_plot = _add_day_breaks_to_series(serie_almacen, var_name) if multi_day_view else serie_almacen
                     almacen_trace = dict(
                         x=serie_almacen_plot['DateTime'],
@@ -3254,6 +3299,8 @@ def _render_correlacion(
         if axis_var_name in compare_sensor_vars and not df_plot_almacen.empty and axis_var_name in df_plot_almacen.columns:
             serie_almacen_axis = df_plot_almacen[[axis_var_name]].dropna(subset=[axis_var_name]).copy()
             if not serie_almacen_axis.empty:
+                if multi_day_view:
+                    serie_almacen_axis = _resample_sensor_series_30min(serie_almacen_axis, axis_var_name)
                 series_for_axis.append(serie_almacen_axis[axis_var_name])
         serie_combinada = pd.concat(series_for_axis, ignore_index=True) if series_for_axis else pd.Series(dtype=float)
         if serie_combinada.empty:
@@ -3391,7 +3438,7 @@ def _render_correlacion(
                 font=dict(size=14, family='Manrope, sans-serif', color=BRAND_COLORS['graphite'])
             ),
             tickmode='linear',
-            dtick=30 * 60 * 1000,
+            dtick=xaxis_dtick,
             tickformat=xaxis_tickformat,
             tickfont=dict(size=11, family='Manrope, sans-serif', color=BRAND_COLORS['graphite']),
             domain=[0, x_domain_end],
