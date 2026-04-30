@@ -1691,6 +1691,30 @@ def _get_correlation_xaxis_dtick(fecha_inicio, fecha_fin):
     return 6 * 60 * 60 * 1000
 
 
+def _get_correlation_multiday_axis_config(fecha_inicio, fecha_fin):
+    total_days = max(1, (fecha_fin - fecha_inicio).days + 1)
+    if total_days <= 7:
+        return {
+            'dtick': 24 * 60 * 60 * 1000,
+            'tickformat': '%d/%m',
+            'title': '<b>Fecha</b>',
+            'nticks': min(8, total_days + 1)
+        }
+    if total_days <= 21:
+        return {
+            'dtick': 2 * 24 * 60 * 60 * 1000,
+            'tickformat': '%d/%m',
+            'title': '<b>Fecha</b>',
+            'nticks': 10
+        }
+    return {
+        'dtick': 3 * 24 * 60 * 60 * 1000,
+        'tickformat': '%d/%m',
+        'title': '<b>Fecha</b>',
+        'nticks': 12
+    }
+
+
 def _sidebar_icon_svg(icon_name):
     icons = {
         'filter': (
@@ -2994,11 +3018,19 @@ def _render_correlacion(
     fecha_inicio, fecha_fin = fecha_variables
     multi_day_view = fecha_inicio != fecha_fin
     hover_time_format = '%d/%m %H:%M' if multi_day_view else '%H:%M'
-    xaxis_tickformat = '%H:%M\n%d/%m' if multi_day_view else '%H:%M'
-    xaxis_title_text = '<b>Fecha y hora</b>' if multi_day_view else '<b>Hora del Día</b>'
+    if multi_day_view:
+        multiday_axis_config = _get_correlation_multiday_axis_config(fecha_inicio, fecha_fin)
+        xaxis_tickformat = multiday_axis_config['tickformat']
+        xaxis_title_text = multiday_axis_config['title']
+        xaxis_dtick = multiday_axis_config['dtick']
+        xaxis_nticks = multiday_axis_config['nticks']
+    else:
+        xaxis_tickformat = '%H:%M'
+        xaxis_title_text = '<b>Hora del Día</b>'
+        xaxis_dtick = 30 * 60 * 1000
+        xaxis_nticks = None
     default_marker_size = CORRELATION_MARKER_SIZE_MULTI_DAY if multi_day_view else CORRELATION_MARKER_SIZE_DEFAULT
     par_marker_size = CORRELATION_MARKER_SIZE_MULTI_DAY if multi_day_view else CORRELATION_MARKER_SIZE_PAR
-    xaxis_dtick = _get_correlation_xaxis_dtick(fecha_inicio, fecha_fin)
 
     sensor_vars = _get_available_sensor_vars(df_variables)
     almacen_sensor_vars = _get_available_sensor_vars(df_variables_almacen) if isinstance(df_variables_almacen, pd.DataFrame) else []
@@ -3440,11 +3472,13 @@ def _render_correlacion(
             tickmode='linear',
             dtick=xaxis_dtick,
             tickformat=xaxis_tickformat,
+            nticks=xaxis_nticks,
             tickfont=dict(size=11, family='Manrope, sans-serif', color=BRAND_COLORS['graphite']),
             domain=[0, x_domain_end],
             showgrid=True,
             gridcolor='rgba(76, 70, 120, 0.07)',
-            zeroline=False
+            zeroline=False,
+            ticklabelmode='period' if multi_day_view else 'instant'
         ),
         hovermode='x unified',
         template='plotly_white',
