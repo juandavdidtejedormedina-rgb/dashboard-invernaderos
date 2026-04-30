@@ -182,9 +182,27 @@ MARLEY_CANONICAL_COLUMNS = {
 }
 LOGO_URL_LARGE = "https://raw.githubusercontent.com/juandavdidtejedormedina-rgb/dashboard-invernaderos/main/logo%20elite.png"
 LOGO_URL_SMALL = LOGO_URL_LARGE
-DASHBOARD_VIDEO_URL = "https://raw.githubusercontent.com/juandavdidtejedormedina-rgb/dashboard-invernaderos/59df2b2f7fee2b9632ae4865fedae119e81b3b79/flor%20video.mp4"
-DASHBOARD_LOCATION_QUERY = "La Ponderosa - The Elite Flower SAS CI Madrid Cundinamarca Colombia"
-LAZY_LOAD_MEDIA = True
+DASHBOARD_MEDIA = {
+    'La Ponderosa': {
+        'video_url': (
+            "https://raw.githubusercontent.com/"
+            "juandavdidtejedormedina-rgb/dashboard-invernaderos/"
+            "59df2b2f7fee2b9632ae4865fedae119e81b3b79/"
+            "flor%20video.mp4"
+        ),
+        'location_query': "La Ponderosa - The Elite Flower SAS CI Madrid Cundinamarca Colombia",
+    },
+    'Marley': {
+        'video_url': (
+            "https://raw.githubusercontent.com/"
+            "juandavdidtejedormedina-rgb/dashboard-invernaderos/"
+            "b54cbf5bc4f0a201231f54f5ddbdb12807c1a510/"
+            "For%20Creciendo.mp4"
+        ),
+        'location_query': "Finca Marly - The Elite Flower SAS CI Madrid Road Facatativa Cundinamarca Colombia",
+    }
+}
+LAZY_LOAD_MEDIA = False
 FINCA_OPTIONS = ['La Ponderosa', 'Marley']
 BLOCK_FARMS = {
     '27': 'La Ponderosa',
@@ -1547,8 +1565,13 @@ st.markdown(
     unsafe_allow_html=True
 )
 
+selected_finca_media = st.session_state.get('finca_compartida', 'La Ponderosa')
+_current_dashboard_media = _get_dashboard_media_config(selected_finca_media)
+DASHBOARD_VIDEO_URL = _current_dashboard_media.get('video_url', '')
+DASHBOARD_LOCATION_QUERY = _current_dashboard_media.get('location_query', '')
+
 if DASHBOARD_VIDEO_URL.strip():
-    with st.expander("Video introductorio", expanded=False):
+    with st.expander("Video introductorio", expanded=True):
         if not LAZY_LOAD_MEDIA or st.checkbox("Cargar video", key="cargar_video_dashboard"):
             youtube_embed_url = _youtube_embed_url(DASHBOARD_VIDEO_URL)
             if youtube_embed_url:
@@ -1559,7 +1582,7 @@ if DASHBOARD_VIDEO_URL.strip():
             st.caption("Carga el video solo cuando lo necesites.")
 
 if DASHBOARD_LOCATION_QUERY.strip():
-    with st.expander("Ubicación", expanded=False):
+    with st.expander("Ubicación", expanded=True):
         if not LAZY_LOAD_MEDIA or st.checkbox("Cargar mapa", key="cargar_mapa_dashboard"):
             components.iframe(
                 _google_maps_embed_url(DASHBOARD_LOCATION_QUERY),
@@ -1890,6 +1913,32 @@ def _render_chart_explanation(title, description, accent=None, kicker='Guía de 
         """,
         unsafe_allow_html=True
     )
+
+
+def _get_dashboard_media_config(selected_finca):
+    return DASHBOARD_MEDIA.get(selected_finca, DASHBOARD_MEDIA['La Ponderosa'])
+
+
+def _render_dashboard_media(selected_finca):
+    media_config = _get_dashboard_media_config(selected_finca)
+    video_url = str(media_config.get('video_url', '')).strip()
+    location_query = str(media_config.get('location_query', '')).strip()
+
+    if video_url:
+        with st.expander("Video introductorio", expanded=True):
+            youtube_embed_url = _youtube_embed_url(video_url)
+            if youtube_embed_url:
+                components.iframe(youtube_embed_url, height=430, scrolling=False)
+            else:
+                st.video(video_url)
+
+    if location_query:
+        with st.expander("Ubicación", expanded=True):
+            components.iframe(
+                _google_maps_embed_url(location_query),
+                height=430,
+                scrolling=False
+            )
 
 
 def _sidebar_icon_svg(icon_name):
