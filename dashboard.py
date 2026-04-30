@@ -5707,7 +5707,7 @@ _df_variables_all = pd.DataFrame()
 _df_cortinas_all = pd.DataFrame()
 
 if 'graficar_correlacion' not in st.session_state:
-    st.session_state.graficar_correlacion = False
+    st.session_state.graficar_correlacion = True
 if 'mostrar_aperturas_ideales' not in st.session_state:
     st.session_state.mostrar_aperturas_ideales = False
 if 'comparar_con_almacen' not in st.session_state:
@@ -6127,7 +6127,7 @@ with st.sidebar.expander("Series visibles", expanded=True):
         )
 
 toggle_chart_label = "Mostrar correlación" if not st.session_state.graficar_correlacion else "Ocultar correlación"
-if st.sidebar.button(toggle_chart_label, key="boton_toggle_graficos", use_container_width=True):
+if False and st.sidebar.button(toggle_chart_label, key="boton_toggle_graficos", use_container_width=True):
     st.session_state.graficar_correlacion = not st.session_state.graficar_correlacion
     st.rerun()
 
@@ -6194,7 +6194,7 @@ with tab_correlacion:
         tab_corr_graf, tab_corr_regs = st.tabs(["Correlación", "Registros"])
 
         with tab_corr_graf:
-            if not st.session_state.graficar_correlacion:
+            if False and not st.session_state.graficar_correlacion:
                 st.info("Usa el botón lateral para mostrar u ocultar el análisis de correlación.")
             else:
                 selected_vars = selected_vars_sidebar or st.session_state.get('variables_correlacion', available_correlacion_vars.copy())
