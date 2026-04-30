@@ -3538,6 +3538,99 @@ def _prepare_marley_hourly_metric_table(grouped_df):
     return table.round(2)
 
 
+def _build_marley_individual_series(df, variable, source_name, selected_range):
+    column_name = f"{variable} - {source_name}"
+    if df.empty or column_name not in df.columns:
+        return pd.DataFrame()
+
+    series_df = _build_marley_hourly_series(df, column_name, selected_range)
+    if series_df.empty or series_df[column_name].dropna().empty:
+        return pd.DataFrame()
+
+    return series_df.rename(columns={column_name: 'Valor'})
+
+
+def _make_marley_individual_variable_chart(df, variable, source_name, selected_range):
+    series_df = _build_marley_individual_series(df, variable, source_name, selected_range)
+    if series_df.empty:
+        return None
+
+    config = MARLEY_VARIABLES[variable]
+    time_axis = _get_marley_time_axis_config(series_df)
+    start_date, end_date = selected_range
+    variable_title = config['title'].replace('Comparativa de ', '').capitalize()
+
+    fig = go.Figure()
+    fig.add_trace(
+        go.Scatter(
+            x=series_df['FechaHora'],
+            y=series_df['Valor'],
+            name=f"{variable_title} - {source_name}",
+            mode='lines+markers',
+            line=dict(color=config['colors'][source_name], width=2.7),
+            marker=dict(size=5),
+            connectgaps=False,
+            hovertemplate=(
+                "<b>%{x|%Y-%m-%d %H:%M}</b><br>"
+                + f"{variable_title} {source_name}: "
+                + "%{y:.2f} "
+                + config['unit']
+                + "<extra></extra>"
+            ),
+        )
+    )
+    fig.update_layout(
+        title=dict(text=f"{variable_title} - {source_name}", x=0, xanchor='left'),
+        height=285,
+        margin=dict(l=24, r=18, t=54, b=42),
+        paper_bgcolor="rgba(255,255,255,0)",
+        plot_bgcolor="rgba(250,248,243,0.72)",
+        hovermode='x unified',
+        template='plotly_white',
+        showlegend=False,
+        xaxis=dict(
+            title=time_axis['title'],
+            showgrid=True,
+            gridcolor="rgba(76, 70, 120, 0.07)",
+            zeroline=False,
+            tickformat=time_axis['tickformat'],
+            dtick=time_axis['dtick'],
+            range=[
+                pd.Timestamp(start_date),
+                pd.Timestamp(end_date) + MARLEY_AXIS_END_OFFSET
+            ],
+        ),
+        yaxis=dict(
+            title=config['unit'],
+            showgrid=True,
+            gridcolor="rgba(76, 70, 120, 0.07)",
+            zeroline=False,
+        ),
+    )
+    return fig
+
+
+def _render_marley_individual_variable_charts(filtered_df, selected_range):
+    rendered_charts = []
+    for variable in MARLEY_VARIABLES:
+        for source_name in MARLEY_SENSOR_NAMES:
+            chart = _make_marley_individual_variable_chart(filtered_df, variable, source_name, selected_range)
+            if chart is not None:
+                rendered_charts.append(chart)
+
+    if not rendered_charts:
+        return
+
+    st.markdown("### Variables individuales Marley")
+    st.caption("Cada grafica muestra una variable de un solo sensor, en bloques de 30 minutos, para revisar el comportamiento puntual sin mezclarla con las demas.")
+
+    for start in range(0, len(rendered_charts), 2):
+        cols = st.columns(2)
+        for offset, chart in enumerate(rendered_charts[start:start + 2]):
+            with cols[offset]:
+                st.plotly_chart(chart, width="stretch")
+
+
 def _render_marley_dashboard(dashboard_mode):
     try:
         marley_df, marley_source_data = _load_marley_data()
@@ -3653,6 +3746,7 @@ def _render_marley_dashboard(dashboard_mode):
         st.plotly_chart(_make_marley_hourly_metric_chart(grouped_metric, selected_variable, dashboard_mode), width="stretch")
         with st.expander(f"Ver tabla dinámica de {dashboard_mode.lower()}", expanded=False):
             st.dataframe(_prepare_marley_hourly_metric_table(grouped_metric), width="stretch", hide_index=True)
+        _render_marley_individual_variable_charts(filtered_df, selected_range)
         st.stop()
 
     avg_abs_diff = overlap['DiffValue'].mean() if not overlap.empty else None
@@ -3812,6 +3906,8 @@ def _render_marley_dashboard(dashboard_mode):
         st.plotly_chart(scatter_chart, width="stretch")
     else:
         st.info("No hay suficientes datos simultáneos entre WIGA y ECOWITT para construir la dispersión.")
+
+    _render_marley_individual_variable_charts(filtered_df, selected_range)
 
     with st.expander("Ver registros consolidados de Marley", expanded=False):
         st.dataframe(filtered_df, width="stretch", hide_index=True)
