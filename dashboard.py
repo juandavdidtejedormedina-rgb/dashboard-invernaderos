@@ -122,6 +122,11 @@ DASHBOARD_LOCATION_QUERY = "La Ponderosa - The Elite Flower SAS CI Madrid Cundin
 STREAMLIT_LOGO_WIDTH = 108
 STREAMLIT_LOGO_HEIGHT = 108
 STREAMLIT_LOGO_BORDER_RADIUS = 14
+TEMP_FOCUS_CHART_ENABLED = True
+TEMP_FOCUS_CHART_PLACEMENT = 'below'  # Opciones: 'below', 'left', 'right'
+TEMP_FOCUS_CHART_HEIGHT = 260
+TEMP_FOCUS_CHART_COLUMN_LAYOUT = (1.15, 0.85)
+TEMP_FOCUS_CHART_TITLE = 'Temperatura del bloque'
 CORR_AXIS_TITLES = {
     'Temperatura': 'Temp.',
     'Humedad Relativa': 'Humedad',
@@ -3446,6 +3451,85 @@ def _render_correlacion(
     if selected_cortinas and not cortina_traces and selected_sensors:
         st.info('No hay información de motores para el periodo seleccionado. Se muestran únicamente las variables ambientales.')
 
+
+def _render_temperature_focus_chart(df_variables, fecha_variables, block_label=None):
+    if not TEMP_FOCUS_CHART_ENABLED:
+        return
+    if df_variables.empty or 'DateTime' not in df_variables.columns or 'Temperatura' not in df_variables.columns:
+        return
+
+    chart_df = df_variables[['DateTime', 'Temperatura']].dropna(subset=['DateTime', 'Temperatura']).copy()
+    if chart_df.empty:
+        return
+
+    fecha_inicio, fecha_fin = fecha_variables
+    multi_day_view = fecha_inicio != fecha_fin
+    hover_time_format = '%d/%m %H:%M' if multi_day_view else '%H:%M'
+    xaxis_tickformat = '%d/%m' if multi_day_view else '%H:%M'
+    xaxis_title = 'Fecha' if multi_day_view else 'Hora del día'
+    chart_title = TEMP_FOCUS_CHART_TITLE if not block_label else f'{TEMP_FOCUS_CHART_TITLE} | {block_label}'
+
+    fig_temp = go.Figure()
+    fig_temp.add_trace(
+        go.Scatter(
+            x=chart_df['DateTime'],
+            y=chart_df['Temperatura'],
+            name='Temperatura',
+            mode='lines+markers',
+            line=dict(color=VARIABLE_COLORS['Temperatura'], width=2.5),
+            marker=dict(size=5, color=VARIABLE_COLORS['Temperatura']),
+            hovertemplate=(
+                f'<b>%{{x|{hover_time_format}}}</b><br>'
+                'Temperatura: %{y:.2f} °C'
+                '<extra></extra>'
+            )
+        )
+    )
+    fig_temp.update_layout(
+        title=dict(
+            text=chart_title,
+            x=0,
+            xanchor='left',
+            font=dict(size=16, color=BRAND_COLORS['graphite'], family='Manrope, sans-serif')
+        ),
+        xaxis=dict(
+            title=xaxis_title,
+            tickformat=xaxis_tickformat,
+            tickmode='linear' if not multi_day_view else 'auto',
+            dtick=30 * 60 * 1000 if not multi_day_view else None,
+            showgrid=True,
+            gridcolor='rgba(76, 70, 120, 0.07)',
+            zeroline=False,
+            tickfont=dict(size=10, family='Manrope, sans-serif', color=BRAND_COLORS['graphite'])
+        ),
+        yaxis=dict(
+            title='Temperatura (°C)',
+            showgrid=True,
+            gridcolor='rgba(76, 70, 120, 0.07)',
+            zeroline=False,
+            tickfont=dict(size=10, family='Manrope, sans-serif', color=BRAND_COLORS['graphite'])
+        ),
+        template='plotly_white',
+        paper_bgcolor='rgba(255,255,255,0)',
+        plot_bgcolor='rgba(250,248,243,0.65)',
+        hovermode='x unified',
+        showlegend=False,
+        height=TEMP_FOCUS_CHART_HEIGHT,
+        margin=dict(l=52, r=24, t=58, b=44),
+        font=dict(family='Manrope, sans-serif', color=BRAND_COLORS['graphite'])
+    )
+
+    if TEMP_FOCUS_CHART_PLACEMENT == 'left':
+        left_col, right_col = st.columns(TEMP_FOCUS_CHART_COLUMN_LAYOUT)
+        with left_col:
+            st.plotly_chart(fig_temp, width='stretch')
+    elif TEMP_FOCUS_CHART_PLACEMENT == 'right':
+        left_col, right_col = st.columns(TEMP_FOCUS_CHART_COLUMN_LAYOUT)
+        with right_col:
+            st.plotly_chart(fig_temp, width='stretch')
+    else:
+        st.plotly_chart(fig_temp, width='stretch')
+
 # 4. Datos cargados en memoria para evitar recálculos repetidos
 def _sort_block_names(block_names):
     def sort_key(value):
@@ -4471,6 +4555,11 @@ with tab_correlacion:
                         show_ideal_aperturas=st.session_state.get('mostrar_aperturas_ideales', False),
                         df_variables_almacen=df_variables_almacen_corr,
                         compare_with_almacen=st.session_state.get('comparar_con_almacen', False)
+                    )
+                    _render_temperature_focus_chart(
+                        df_variables_corr,
+                        fecha_variables,
+                        block_label=block_label
                     )
 
         with tab_corr_regs:
