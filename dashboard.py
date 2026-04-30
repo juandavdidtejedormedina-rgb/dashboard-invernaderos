@@ -119,9 +119,9 @@ LOGO_URL_LARGE = "https://raw.githubusercontent.com/juandavdidtejedormedina-rgb/
 LOGO_URL_SMALL = LOGO_URL_LARGE
 DASHBOARD_VIDEO_URL = "https://raw.githubusercontent.com/juandavdidtejedormedina-rgb/dashboard-invernaderos/59df2b2f7fee2b9632ae4865fedae119e81b3b79/flor%20video.mp4"
 DASHBOARD_LOCATION_QUERY = "La Ponderosa - The Elite Flower SAS CI Madrid Cundinamarca Colombia"
-STREAMLIT_LOGO_WIDTH = 74
-STREAMLIT_LOGO_HEIGHT = 74
-STREAMLIT_LOGO_BORDER_RADIUS = 10
+STREAMLIT_LOGO_WIDTH = 108
+STREAMLIT_LOGO_HEIGHT = 108
+STREAMLIT_LOGO_BORDER_RADIUS = 14
 CORR_AXIS_TITLES = {
     'Temperatura': 'Temp.',
     'Humedad Relativa': 'Humedad',
