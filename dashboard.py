@@ -1732,6 +1732,97 @@ def _clamp_sidebar_date(value, min_date, max_date):
     return value
 
 
+def _format_selected_period_label(fecha_inicio, fecha_fin):
+    if fecha_inicio is None or fecha_fin is None:
+        return "Sin periodo seleccionado"
+    if fecha_inicio == fecha_fin:
+        return fecha_inicio.strftime('%d/%m/%Y')
+    return f"{fecha_inicio.strftime('%d/%m/%Y')} a {fecha_fin.strftime('%d/%m/%Y')}"
+
+
+def _render_selected_period_banner(
+    fecha_periodo,
+    min_fecha=None,
+    max_fecha=None,
+    navigation_state_key=None,
+    title_text='Periodo visible'
+):
+    if not fecha_periodo:
+        return
+
+    fecha_inicio, fecha_fin = fecha_periodo
+    single_day = fecha_inicio == fecha_fin
+    period_label = _format_selected_period_label(fecha_inicio, fecha_fin)
+    helper_text = (
+        'Estás viendo un solo día del historial.'
+        if single_day else
+        'Estás viendo un rango completo de días.'
+    )
+
+    col_info, col_prev, col_next = st.columns([8.5, 1.1, 1.1])
+    with col_info:
+        st.markdown(
+            f"""
+            <div style="
+                margin: 0.2rem 0 1rem 0;
+                padding: 0.95rem 1rem;
+                border-radius: 18px;
+                background: linear-gradient(135deg, rgba(194,223,234,0.18) 0%, rgba(244,199,206,0.14) 100%);
+                border: 1px solid rgba(84, 83, 134, 0.08);
+            ">
+                <div style="
+                    font-family: 'Manrope', sans-serif;
+                    font-size: 0.78rem;
+                    font-weight: 800;
+                    letter-spacing: 0.04em;
+                    text-transform: uppercase;
+                    color: {BRAND_COLORS['hero']};
+                    margin-bottom: 0.35rem;
+                ">
+                    {html.escape(title_text)}
+                </div>
+                <div style="
+                    font-family: 'Manrope', sans-serif;
+                    font-size: 1.3rem;
+                    font-weight: 800;
+                    color: {BRAND_COLORS['graphite']};
+                    margin-bottom: 0.2rem;
+                ">
+                    {html.escape(period_label)}
+                </div>
+                <div style="
+                    font-family: 'Manrope', sans-serif;
+                    font-size: 0.92rem;
+                    line-height: 1.5;
+                    color: rgba(56, 58, 53, 0.78);
+                ">
+                    {html.escape(helper_text)}
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+    can_navigate = bool(
+        single_day and
+        navigation_state_key and
+        min_fecha is not None and
+        max_fecha is not None
+    )
+    prev_disabled = (not can_navigate) or fecha_inicio <= min_fecha
+    next_disabled = (not can_navigate) or fecha_inicio >= max_fecha
+
+    with col_prev:
+        if st.button("◀", key=f"{navigation_state_key}_prev" if navigation_state_key else "period_prev_disabled", disabled=prev_disabled, width="stretch"):
+            st.session_state[navigation_state_key] = fecha_inicio - timedelta(days=1)
+            st.rerun()
+
+    with col_next:
+        if st.button("▶", key=f"{navigation_state_key}_next" if navigation_state_key else "period_next_disabled", disabled=next_disabled, width="stretch"):
+            st.session_state[navigation_state_key] = fecha_inicio + timedelta(days=1)
+            st.rerun()
+
+
 def _sidebar_icon_svg(icon_name):
     icons = {
         'filter': (
@@ -3323,6 +3414,7 @@ def _render_marley_dashboard(dashboard_mode):
 
     min_date = marley_df['FechaHora'].min().date()
     max_date = marley_df['FechaHora'].max().date()
+    marley_navigation_state_key = None
 
     with st.sidebar.expander("Periodo", expanded=True):
         if min_date == max_date:
@@ -3335,6 +3427,7 @@ def _render_marley_dashboard(dashboard_mode):
                 help=FILTER_HELP_TEXTS['fecha']
             )
             selected_range = (fecha_unica, fecha_unica)
+            marley_navigation_state_key = "marley_fecha_unica"
         else:
             modo_fechas = st.radio(
                 "Modo de fechas:",
@@ -3359,6 +3452,7 @@ def _render_marley_dashboard(dashboard_mode):
                     help=FILTER_HELP_TEXTS['fecha']
                 )
                 selected_range = (fecha_unica, fecha_unica)
+                marley_navigation_state_key = "marley_fecha_un_dia"
             else:
                 _sidebar_field_label("calendar", "Fecha inicio")
                 fecha_inicio = st.date_input(
@@ -3386,6 +3480,14 @@ def _render_marley_dashboard(dashboard_mode):
     if filtered_df.empty:
         st.warning("No hay datos disponibles para Marley en el rango seleccionado.")
         st.stop()
+
+    _render_selected_period_banner(
+        selected_range,
+        min_fecha=min_date,
+        max_fecha=max_date,
+        navigation_state_key=marley_navigation_state_key,
+        title_text='Periodo Marley'
+    )
 
     st.markdown("## Comparativa Marley")
     st.caption("Comparación entre los sensores WIGA y ECOWITT con promedios por bloque de 30 minutos.")
@@ -5207,6 +5309,9 @@ if dashboard_mode == "Varianza Y Promedio":
     )
     fecha_analisis = None
     analysis_block_names = []
+    analysis_navigation_state_key = None
+    analysis_min_fecha = None
+    analysis_max_fecha = None
 
     with st.sidebar.expander("Periodo", expanded=True):
         if _df_variables_all.empty:
@@ -5223,10 +5328,16 @@ if dashboard_mode == "Varianza Y Promedio":
             else:
                 min_fecha = min(fechas_disponibles)
                 max_fecha = max(fechas_disponibles)
+                analysis_min_fecha = min_fecha
+                analysis_max_fecha = max_fecha
 
                 if min_fecha == max_fecha:
-                    fecha_unica_default = _coerce_sidebar_date(
-                        st.session_state.get("fecha_analisis_unica", max_fecha),
+                    fecha_unica_default = _clamp_sidebar_date(
+                        _coerce_sidebar_date(
+                            st.session_state.get("fecha_analisis_unica", max_fecha),
+                            max_fecha
+                        ),
+                        min_fecha,
                         max_fecha
                     )
                     _sidebar_field_label("calendar", "Seleccionar fecha")
@@ -5237,6 +5348,7 @@ if dashboard_mode == "Varianza Y Promedio":
                         help=FILTER_HELP_TEXTS['fecha']
                     )
                     fecha_analisis = (fecha_unica, fecha_unica)
+                    analysis_navigation_state_key = "fecha_analisis_unica"
                 else:
                     modo_fechas_analisis = st.radio(
                         "Modo de fechas del análisis:",
@@ -5247,8 +5359,12 @@ if dashboard_mode == "Varianza Y Promedio":
                     )
 
                     if modo_fechas_analisis == "Un día":
-                        fecha_unica_default = _coerce_sidebar_date(
-                            st.session_state.get("fecha_analisis_un_dia", max_fecha),
+                        fecha_unica_default = _clamp_sidebar_date(
+                            _coerce_sidebar_date(
+                                st.session_state.get("fecha_analisis_un_dia", max_fecha),
+                                max_fecha
+                            ),
+                            min_fecha,
                             max_fecha
                         )
                         _sidebar_field_label("calendar", "Seleccionar fecha")
@@ -5259,6 +5375,7 @@ if dashboard_mode == "Varianza Y Promedio":
                             help=FILTER_HELP_TEXTS['fecha']
                         )
                         fecha_analisis = (fecha_unica, fecha_unica)
+                        analysis_navigation_state_key = "fecha_analisis_un_dia"
                     else:
                         _sidebar_field_label("calendar", "Fecha inicio")
                         fecha_inicio_analisis = st.date_input(
@@ -5315,6 +5432,13 @@ if dashboard_mode == "Varianza Y Promedio":
     elif not analysis_block_names:
         st.warning(f"Selecciona al menos un bloque para comparar dentro de la finca {selected_finca}.")
     else:
+        _render_selected_period_banner(
+            fecha_analisis,
+            min_fecha=analysis_min_fecha,
+            max_fecha=analysis_max_fecha,
+            navigation_state_key=analysis_navigation_state_key,
+            title_text='Periodo del análisis'
+        )
         fecha_inicio_analisis, fecha_fin_analisis = fecha_analisis
         df_variables_analisis = _filter_variables_multi_block_range(
             _df_variables_all,
@@ -5347,6 +5471,9 @@ block_codes, variable_block_map, cortina_block_map = _get_block_options(
 )
 bloque_variables = None
 bloque_seleccionado = None
+correlation_navigation_state_key = None
+correlation_min_fecha = None
+correlation_max_fecha = None
 selected_block_code_current = st.session_state.get("bloque_compartido")
 if not selected_block_code_current and block_codes:
     selected_block_code_current = block_codes[0]
@@ -5377,11 +5504,17 @@ with st.sidebar.expander("Periodo", expanded=True):
         else:
             min_fecha = min(fechas_disponibles)
             max_fecha = max(fechas_disponibles)
+            correlation_min_fecha = min_fecha
+            correlation_max_fecha = max_fecha
 
             if min_fecha == max_fecha:
                 st.caption("Solo hay una fecha con datos en variables para este bloque, pero puedes consultar cualquier día desde el calendario.")
-                fecha_unica_default = _coerce_sidebar_date(
-                    st.session_state.get("fecha_calendario_unica", max_fecha),
+                fecha_unica_default = _clamp_sidebar_date(
+                    _coerce_sidebar_date(
+                        st.session_state.get("fecha_calendario_unica", max_fecha),
+                        max_fecha
+                    ),
+                    min_fecha,
                     max_fecha
                 )
                 _sidebar_field_label("calendar", "Seleccionar fecha")
@@ -5393,6 +5526,7 @@ with st.sidebar.expander("Periodo", expanded=True):
                 )
                 fecha_variables = (fecha_unica, fecha_unica)
                 fecha_cortinas = (fecha_unica, fecha_unica)
+                correlation_navigation_state_key = "fecha_calendario_unica"
             else:
                 modo_fechas = st.radio(
                     "Modo de fechas:",
@@ -5403,8 +5537,12 @@ with st.sidebar.expander("Periodo", expanded=True):
                 )
 
                 if modo_fechas == "Un día":
-                    fecha_unica_default = _coerce_sidebar_date(
-                        st.session_state.get("fecha_calendario_un_dia", max_fecha),
+                    fecha_unica_default = _clamp_sidebar_date(
+                        _coerce_sidebar_date(
+                            st.session_state.get("fecha_calendario_un_dia", max_fecha),
+                            max_fecha
+                        ),
+                        min_fecha,
                         max_fecha
                     )
                     _sidebar_field_label("calendar", "Seleccionar fecha")
@@ -5416,6 +5554,7 @@ with st.sidebar.expander("Periodo", expanded=True):
                     )
                     fecha_variables = (fecha_unica, fecha_unica)
                     fecha_cortinas = (fecha_unica, fecha_unica)
+                    correlation_navigation_state_key = "fecha_calendario_un_dia"
                 else:
                     _sidebar_field_label("calendar", "Fecha inicio")
                     fecha_inicio = st.date_input(
@@ -5541,6 +5680,13 @@ with tab_correlacion:
     elif fecha_variables is None or fecha_cortinas is None or bloque_variables is None:
         st.warning("Selecciona bloque y fechas en los filtros de la barra lateral.")
     else:
+        _render_selected_period_banner(
+            fecha_variables,
+            min_fecha=correlation_min_fecha,
+            max_fecha=correlation_max_fecha,
+            navigation_state_key=correlation_navigation_state_key,
+            title_text='Periodo del bloque'
+        )
         fecha_inicio, fecha_fin = fecha_variables
         rango_multiple = fecha_inicio != fecha_fin
         variables_sensor = _get_available_sensor_vars(df_variables_corr)
