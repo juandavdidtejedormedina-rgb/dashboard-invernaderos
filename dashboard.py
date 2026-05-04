@@ -214,6 +214,8 @@ MARLEY_SENSOR_NAMES = ("WIGA", "ECOWITT")
 MARLEY_TIME_BUCKET = "30min"
 MARLEY_SERIES_END_OFFSET = pd.Timedelta(hours=23, minutes=30)
 MARLEY_AXIS_END_OFFSET = pd.Timedelta(hours=23, minutes=59)
+POINT_COMPARISON_TOLERANCE = pd.Timedelta(minutes=15)
+COMPARISON_RESOLUTION_OPTIONS = ("Promedio cada 30 min", "Punto por punto")
 PONDEROSA_ECOWITT_LOCAL_EXCEL_PATHS = [
     APP_DIR / 'ECOWITT Ponderosa.xlsx'
 ]
@@ -3576,6 +3578,99 @@ def _build_marley_hourly_comparison(df, variable, selected_range):
     return comparison
 
 
+def _finalize_sensor_comparison(comparison, sensor_names):
+    comparison = comparison.copy()
+    for source_name in sensor_names:
+        if source_name not in comparison.columns:
+            comparison[source_name] = pd.NA
+        comparison[source_name] = pd.to_numeric(comparison[source_name], errors='coerce')
+
+    comparison['DiffPct'] = pd.NA
+    comparison['DiffValue'] = pd.NA
+    comparison['SignedDiff'] = pd.NA
+
+    if len(sensor_names) >= 2:
+        first_source, second_source = sensor_names[:2]
+        valid_mask = comparison[first_source].notna() & comparison[second_source].notna()
+        comparison.loc[valid_mask, 'SignedDiff'] = (
+            comparison.loc[valid_mask, first_source] -
+            comparison.loc[valid_mask, second_source]
+        )
+        comparison.loc[valid_mask, 'DiffValue'] = comparison.loc[valid_mask, 'SignedDiff'].abs()
+        pct_base = (
+            comparison.loc[valid_mask, first_source].abs() +
+            comparison.loc[valid_mask, second_source].abs()
+        ) / 2
+        valid_pct_index = pct_base[pct_base != 0].index
+        comparison.loc[valid_pct_index, 'DiffPct'] = (
+            comparison.loc[valid_pct_index, 'DiffValue'] / pct_base.loc[valid_pct_index] * 100
+        )
+
+    comparison['SignedDiffLabel'] = comparison['SignedDiff'].apply(
+        lambda value: "No disponible" if pd.isna(value) else f"{value:+.2f}"
+    )
+    comparison['DiffValueLabel'] = comparison['DiffValue'].apply(
+        lambda value: "No disponible" if pd.isna(value) else f"{value:.2f}"
+    )
+    comparison['DiffPctLabel'] = comparison['DiffPct'].apply(
+        lambda value: "No disponible" if pd.isna(value) else f"{value:.2f}%"
+    )
+    return comparison.sort_values('FechaHora').reset_index(drop=True)
+
+
+def _build_point_comparison(df, variable, sensor_names, tolerance=POINT_COMPARISON_TOLERANCE):
+    source_frames = {}
+    for source_name in sensor_names:
+        column_name = f"{variable} - {source_name}"
+        if column_name not in df.columns:
+            source_frames[source_name] = pd.DataFrame(columns=['FechaHora', source_name])
+            continue
+
+        source_df = df[['FechaHora', column_name]].dropna(subset=[column_name]).copy()
+        if source_df.empty:
+            source_frames[source_name] = pd.DataFrame(columns=['FechaHora', source_name])
+            continue
+
+        source_df['FechaHora'] = pd.to_datetime(source_df['FechaHora'], errors='coerce')
+        source_df = source_df.dropna(subset=['FechaHora'])
+        source_df[column_name] = pd.to_numeric(source_df[column_name], errors='coerce')
+        source_df = (
+            source_df
+            .dropna(subset=[column_name])
+            .groupby('FechaHora', as_index=False)[column_name]
+            .mean()
+            .sort_values('FechaHora')
+            .rename(columns={column_name: source_name})
+        )
+        source_frames[source_name] = source_df
+
+    if len(sensor_names) >= 2:
+        first_source, second_source = sensor_names[:2]
+        first_df = source_frames[first_source]
+        second_df = source_frames[second_source]
+        if not first_df.empty and not second_df.empty:
+            comparison = pd.merge_asof(
+                first_df,
+                second_df,
+                on='FechaHora',
+                direction='nearest',
+                tolerance=tolerance
+            )
+            return _finalize_sensor_comparison(comparison, sensor_names)
+
+    comparison = None
+    for source_name in sensor_names:
+        source_df = source_frames[source_name]
+        if source_df.empty:
+            continue
+        comparison = source_df if comparison is None else comparison.merge(source_df, on='FechaHora', how='outer')
+
+    if comparison is None:
+        return pd.DataFrame(columns=['FechaHora', *sensor_names, 'DiffPct', 'DiffValue', 'SignedDiff'])
+
+    return _finalize_sensor_comparison(comparison, sensor_names)
+
+
 def _get_marley_time_axis_config(df):
     min_time = df['FechaHora'].min()
     max_time = df['FechaHora'].max()
@@ -3630,7 +3725,7 @@ def _get_marley_y_axis_config(df, variable):
     return {'title': 'Radiación PAR (µmol m-2 s-1)', 'range': [-25, axis_max], 'dtick': dtick}
 
 
-def _make_marley_comparison_chart(comparison, variable, selected_range):
+def _make_marley_comparison_chart(comparison, variable, selected_range, resolution_label=COMPARISON_RESOLUTION_OPTIONS[0]):
     config = MARLEY_VARIABLES[variable]
     fig = go.Figure()
     time_axis = _get_marley_time_axis_config(comparison)
@@ -3640,20 +3735,24 @@ def _make_marley_comparison_chart(comparison, variable, selected_range):
     )
     start_date, end_date = selected_range
     multi_day_view = start_date != end_date
+    point_mode = resolution_label == COMPARISON_RESOLUTION_OPTIONS[1]
+    chart_title = config['title'] if not point_mode else f"{config['title']} - punto por punto"
 
     for source_name in MARLEY_SENSOR_NAMES:
         source_df = comparison[['FechaHora', source_name, 'SignedDiffLabel', 'DiffValueLabel', 'DiffPctLabel']].copy()
         if source_df[source_name].dropna().empty:
             continue
 
+        trace_type = go.Scattergl if point_mode and len(source_df) > 250 else go.Scatter
         fig.add_trace(
-            go.Scatter(
+            trace_type(
                 x=source_df['FechaHora'],
                 y=source_df[source_name],
                 name=source_name,
-                mode='lines' if multi_day_view else 'lines+markers',
-                line=dict(color=config['colors'][source_name], width=3),
-                marker=dict(size=6),
+                mode='lines+markers' if point_mode or not multi_day_view else 'lines',
+                line=dict(color=config['colors'][source_name], width=2.2 if point_mode else 3),
+                marker=dict(size=4 if point_mode else 6),
+                opacity=0.86 if point_mode else 1,
                 connectgaps=False,
                 customdata=source_df[['SignedDiffLabel', 'DiffValueLabel', 'DiffPctLabel']],
                 hovertemplate=(
@@ -3706,7 +3805,7 @@ def _make_marley_comparison_chart(comparison, variable, selected_range):
     return fig
 
 
-def _make_marley_difference_chart(comparison, variable, selected_range):
+def _make_marley_difference_chart(comparison, variable, selected_range, resolution_label=COMPARISON_RESOLUTION_OPTIONS[0]):
     diff_df = comparison[['FechaHora', 'SignedDiff']].dropna().copy()
     if diff_df.empty:
         return None
@@ -4124,7 +4223,7 @@ def _render_marley_dashboard(dashboard_mode):
     )
 
     st.markdown(f"## Marley - {dashboard_mode}")
-    st.caption("Lectura comparativa entre los sensores WIGA y ECOWITT con datos consolidados en franjas de 30 minutos.")
+    st.caption("Lectura comparativa entre los sensores WIGA y ECOWITT, con opción de promedio por franja o lectura punto por punto.")
     _render_chart_explanation(
         'Cómo usar el análisis Marley',
         'Elige una variable para comparar ambos sensores. Las tarjetas explican la diferencia general y las gráficas muestran cuándo se parecen, cuándo se separan y qué sensor mide más alto.',
@@ -4167,7 +4266,19 @@ def _render_marley_dashboard(dashboard_mode):
             _render_marley_individual_variable_charts(filtered_df, selected_range)
         st.stop()
 
-    comparison = _build_marley_hourly_comparison(filtered_df, selected_variable, selected_range)
+    comparison_resolution = st.radio(
+        "Resolución de la gráfica WIGA vs ECOWITT:",
+        options=COMPARISON_RESOLUTION_OPTIONS,
+        horizontal=True,
+        key="marley_comparison_resolution",
+        help="Usa el promedio para una lectura limpia por media hora, o punto por punto para comparar lecturas crudas alineadas al registro más cercano."
+    )
+    point_mode = comparison_resolution == COMPARISON_RESOLUTION_OPTIONS[1]
+    comparison = (
+        _build_point_comparison(filtered_df, selected_variable, MARLEY_SENSOR_NAMES)
+        if point_mode else
+        _build_marley_hourly_comparison(filtered_df, selected_variable, selected_range)
+    )
     overlap = comparison.dropna(subset=list(MARLEY_SENSOR_NAMES)).copy()
 
     avg_abs_diff = overlap['DiffValue'].mean() if not overlap.empty else None
@@ -4318,12 +4429,16 @@ def _render_marley_dashboard(dashboard_mode):
 
     _render_chart_explanation(
         'Comparación directa WIGA vs ECOWITT',
-        'Aquí se superponen ambos sensores para la variable elegida. Si las líneas viajan cerca, las lecturas son similares; si se separan, hay diferencia entre equipos en esa franja de 30 minutos.',
+        (
+            'Aquí se superponen las lecturas punto por punto. Cada punto WIGA se compara con la lectura ECOWITT más cercana en el tiempo para ver mejor la relación real entre sensores.'
+            if point_mode else
+            'Aquí se superponen ambos sensores para la variable elegida. Si las líneas viajan cerca, las lecturas son similares; si se separan, hay diferencia entre equipos en esa franja de 30 minutos.'
+        ),
         accent=MARLEY_VARIABLES[selected_variable]['accent']
     )
-    _plotly_chart(_make_marley_comparison_chart(comparison, selected_variable, selected_range))
+    _plotly_chart(_make_marley_comparison_chart(comparison, selected_variable, selected_range, comparison_resolution))
 
-    difference_chart = _make_marley_difference_chart(comparison, selected_variable, selected_range)
+    difference_chart = _make_marley_difference_chart(comparison, selected_variable, selected_range, comparison_resolution)
     if difference_chart is not None:
         _render_chart_explanation(
             'Diferencia WIGA - ECOWITT',
@@ -4586,7 +4701,7 @@ def _get_ponderosa_y_axis_config(df, variable):
     return {'title': 'Radiación PAR (µmol m-2 s-1)', 'range': [-25, axis_max], 'dtick': dtick}
 
 
-def _make_ponderosa_comparison_chart(comparison, variable, selected_range):
+def _make_ponderosa_comparison_chart(comparison, variable, selected_range, resolution_label=COMPARISON_RESOLUTION_OPTIONS[0]):
     config = PONDEROSA_COMPARISON_VARIABLES[variable]
     fig = go.Figure()
     time_axis = _get_marley_time_axis_config(comparison)
@@ -4596,20 +4711,24 @@ def _make_ponderosa_comparison_chart(comparison, variable, selected_range):
     )
     start_date, end_date = selected_range
     multi_day_view = start_date != end_date
+    point_mode = resolution_label == COMPARISON_RESOLUTION_OPTIONS[1]
+    chart_title = config['title'] if not point_mode else f"{config['title']} - punto por punto"
 
     for source_name in PONDEROSA_SENSOR_NAMES:
         source_df = comparison[['FechaHora', source_name, 'SignedDiffLabel', 'DiffValueLabel', 'DiffPctLabel']].copy()
         if source_df[source_name].dropna().empty:
             continue
 
+        trace_type = go.Scattergl if point_mode and len(source_df) > 250 else go.Scatter
         fig.add_trace(
-            go.Scatter(
+            trace_type(
                 x=source_df['FechaHora'],
                 y=source_df[source_name],
                 name=source_name,
-                mode='lines' if multi_day_view else 'lines+markers',
-                line=dict(color=config['colors'][source_name], width=3),
-                marker=dict(size=6),
+                mode='lines+markers' if point_mode or not multi_day_view else 'lines',
+                line=dict(color=config['colors'][source_name], width=2.2 if point_mode else 3),
+                marker=dict(size=4 if point_mode else 6),
+                opacity=0.86 if point_mode else 1,
                 connectgaps=False,
                 customdata=source_df[['SignedDiffLabel', 'DiffValueLabel', 'DiffPctLabel']],
                 hovertemplate=(
@@ -4627,7 +4746,7 @@ def _make_ponderosa_comparison_chart(comparison, variable, selected_range):
         )
 
     fig.update_layout(
-        title=dict(text=config['title'], x=0, xanchor='left'),
+        title=dict(text=chart_title, x=0, xanchor='left'),
         height=470,
         margin=dict(l=28, r=28, t=74, b=28),
         paper_bgcolor="rgba(255,255,255,0)",
@@ -4659,7 +4778,7 @@ def _make_ponderosa_comparison_chart(comparison, variable, selected_range):
     return fig
 
 
-def _make_ponderosa_difference_chart(comparison, variable, selected_range):
+def _make_ponderosa_difference_chart(comparison, variable, selected_range, resolution_label=COMPARISON_RESOLUTION_OPTIONS[0]):
     diff_df = comparison[['FechaHora', 'SignedDiff']].dropna().copy()
     if diff_df.empty:
         return None
@@ -4668,6 +4787,7 @@ def _make_ponderosa_difference_chart(comparison, variable, selected_range):
     time_axis = _get_marley_time_axis_config(comparison)
     start_date, end_date = selected_range
     multi_day_view = start_date != end_date
+    point_mode = resolution_label == COMPARISON_RESOLUTION_OPTIONS[1]
     max_abs_diff = float(diff_df['SignedDiff'].abs().max())
     axis_limit = max(round(max_abs_diff * 1.15, 2), 0.5)
 
@@ -4685,7 +4805,11 @@ def _make_ponderosa_difference_chart(comparison, variable, selected_range):
     )
     fig.add_hline(y=0, line_width=1.4, line_dash='dash', line_color="rgba(45, 48, 64, 0.45)")
     fig.update_layout(
-        title=dict(text="Diferencia entre sensores por bloque de 30 minutos", x=0, xanchor='left'),
+        title=dict(
+            text="Diferencia entre sensores punto por punto" if point_mode else "Diferencia entre sensores por bloque de 30 minutos",
+            x=0,
+            xanchor='left'
+        ),
         height=340,
         margin=dict(l=28, r=28, t=72, b=28),
         paper_bgcolor="rgba(255,255,255,0)",
@@ -5161,18 +5285,34 @@ def _render_ponderosa_ecowitt_dashboard(df_variables_all, df_cortinas_all, selec
         help=FILTER_HELP_TEXTS['graficas_detalladas']
     )
 
-    comparison = _build_ponderosa_hourly_comparison(filtered_df, selected_variable, selected_range)
+    comparison_resolution = st.radio(
+        "Resolución de la gráfica WIGA vs ECOWITT:",
+        options=COMPARISON_RESOLUTION_OPTIONS,
+        horizontal=True,
+        key="ponderosa_ecowitt_comparison_resolution",
+        help="Usa el promedio para una lectura limpia por media hora, o punto por punto para comparar lecturas crudas alineadas al registro más cercano."
+    )
+    point_mode = comparison_resolution == COMPARISON_RESOLUTION_OPTIONS[1]
+    comparison = (
+        _build_point_comparison(filtered_df, selected_variable, PONDEROSA_SENSOR_NAMES)
+        if point_mode else
+        _build_ponderosa_hourly_comparison(filtered_df, selected_variable, selected_range)
+    )
     overlap = comparison.dropna(subset=list(PONDEROSA_SENSOR_NAMES)).copy()
     _render_ponderosa_comparison_metric_cards(overlap, selected_variable)
 
     _render_chart_explanation(
         'Comparación directa WIGA vs ECOWITT',
-        'Aquí se superponen ambos sensores para la variable elegida. Si las líneas viajan cerca, las lecturas son similares; si se separan, hay diferencia entre equipos en esa franja.',
+        (
+            'Aquí se superponen las lecturas punto por punto. Cada punto WIGA se compara con la lectura ECOWITT más cercana en el tiempo para revisar la relación real entre sensores.'
+            if point_mode else
+            'Aquí se superponen ambos sensores para la variable elegida. Si las líneas viajan cerca, las lecturas son similares; si se separan, hay diferencia entre equipos en esa franja.'
+        ),
         accent=PONDEROSA_COMPARISON_VARIABLES[selected_variable]['accent']
     )
-    _plotly_chart(_make_ponderosa_comparison_chart(comparison, selected_variable, selected_range))
+    _plotly_chart(_make_ponderosa_comparison_chart(comparison, selected_variable, selected_range, comparison_resolution))
 
-    difference_chart = _make_ponderosa_difference_chart(comparison, selected_variable, selected_range)
+    difference_chart = _make_ponderosa_difference_chart(comparison, selected_variable, selected_range, comparison_resolution)
     if difference_chart is not None:
         _render_chart_explanation(
             'Diferencia WIGA - ECOWITT',
