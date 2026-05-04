@@ -91,6 +91,35 @@ def _render_autoplay_video(video_url, height=430):
         unsafe_allow_javascript=True
     )
 
+
+def _get_dashboard_media_config(selected_finca):
+    return DASHBOARD_MEDIA.get(selected_finca, DASHBOARD_MEDIA['La Ponderosa'])
+
+
+def _render_dashboard_media(selected_finca, lazy_load=False):
+    media_config = _get_dashboard_media_config(selected_finca)
+    video_url = media_config.get('video_urls') or media_config.get('video_url', '')
+    location_query = str(media_config.get('location_query', '')).strip()
+
+    if video_url:
+        with st.expander("Video introductorio", expanded=True):
+            if not lazy_load or st.checkbox("Cargar video", key="cargar_video_dashboard"):
+                youtube_source_url = video_url[0] if isinstance(video_url, (list, tuple)) else video_url
+                youtube_embed_url = _youtube_embed_url(youtube_source_url)
+                if youtube_embed_url:
+                    st.iframe(youtube_embed_url, height=430)
+                else:
+                    _render_autoplay_video(video_url)
+            else:
+                st.caption("Carga el video solo cuando lo necesites.")
+
+    if location_query:
+        with st.expander("Ubicación", expanded=True):
+            if not lazy_load or st.checkbox("Cargar mapa", key="cargar_mapa_dashboard"):
+                st.iframe(_google_maps_embed_url(location_query), height=430)
+            else:
+                st.caption("Carga el mapa solo cuando lo necesites.")
+
 SENSOR_VARIABLES = ['Temperatura', 'Humedad Relativa', 'Radiación PAR', 'Gramos de agua']
 VARIABLE_LABELS = {
     'Temperatura': 'Temperatura (°C)',
@@ -277,6 +306,12 @@ PAR_FOCUS_CHART_ENABLED = True
 PAR_FOCUS_CHART_TITLE = 'Radiación PAR del bloque'
 WATER_FOCUS_CHART_ENABLED = True
 WATER_FOCUS_CHART_TITLE = 'Gramos de agua del bloque'
+FOCUS_CHART_CONFIGS = (
+    (TEMP_FOCUS_CHART_ENABLED, 'Temperatura', TEMP_FOCUS_CHART_TITLE),
+    (HUMIDITY_FOCUS_CHART_ENABLED, 'Humedad Relativa', HUMIDITY_FOCUS_CHART_TITLE),
+    (PAR_FOCUS_CHART_ENABLED, 'Radiación PAR', PAR_FOCUS_CHART_TITLE),
+    (WATER_FOCUS_CHART_ENABLED, 'Gramos de agua', WATER_FOCUS_CHART_TITLE),
+)
 FOCUS_CHARTS_INTERNAL_HEADING = 'Variables del bloque seleccionado'
 FOCUS_CHARTS_EXTERNAL_HEADING = 'Variables de la estación externa'
 MOTOR_FOCUS_CHART_ENABLED = True
@@ -1623,31 +1658,7 @@ st.markdown(
 )
 
 selected_finca_media = st.session_state.get('finca_compartida', 'La Ponderosa')
-_current_dashboard_media = DASHBOARD_MEDIA.get(selected_finca_media, DASHBOARD_MEDIA['La Ponderosa'])
-DASHBOARD_VIDEO_URL = _current_dashboard_media.get('video_urls') or _current_dashboard_media.get('video_url', '')
-DASHBOARD_LOCATION_QUERY = _current_dashboard_media.get('location_query', '')
-
-if DASHBOARD_VIDEO_URL:
-    with st.expander("Video introductorio", expanded=True):
-        if not LAZY_LOAD_MEDIA or st.checkbox("Cargar video", key="cargar_video_dashboard"):
-            youtube_source_url = DASHBOARD_VIDEO_URL[0] if isinstance(DASHBOARD_VIDEO_URL, (list, tuple)) else DASHBOARD_VIDEO_URL
-            youtube_embed_url = _youtube_embed_url(youtube_source_url)
-            if youtube_embed_url:
-                st.iframe(youtube_embed_url, height=430)
-            else:
-                _render_autoplay_video(DASHBOARD_VIDEO_URL)
-        else:
-            st.caption("Carga el video solo cuando lo necesites.")
-
-if DASHBOARD_LOCATION_QUERY.strip():
-    with st.expander("Ubicación", expanded=True):
-        if not LAZY_LOAD_MEDIA or st.checkbox("Cargar mapa", key="cargar_mapa_dashboard"):
-            st.iframe(
-                _google_maps_embed_url(DASHBOARD_LOCATION_QUERY),
-                height=430
-            )
-        else:
-            st.caption("Carga el mapa solo cuando lo necesites.")
+_render_dashboard_media(selected_finca_media, lazy_load=LAZY_LOAD_MEDIA)
 
 # --- Configuracion de URLs (Mover aqui para evitar NameError) ---
 URL_VARIABLES = "https://raw.githubusercontent.com/juandavdidtejedormedina-rgb/dashboard-invernaderos/main/Datos_variables.xlsx"
@@ -2004,32 +2015,6 @@ def _render_chart_explanation(title, description, accent=None, kicker='Guía de 
     )
 
 
-def _get_dashboard_media_config(selected_finca):
-    return DASHBOARD_MEDIA.get(selected_finca, DASHBOARD_MEDIA['La Ponderosa'])
-
-
-def _render_dashboard_media(selected_finca):
-    media_config = _get_dashboard_media_config(selected_finca)
-    video_url = media_config.get('video_urls') or str(media_config.get('video_url', '')).strip()
-    location_query = str(media_config.get('location_query', '')).strip()
-
-    if video_url:
-        with st.expander("Video introductorio", expanded=True):
-            youtube_source_url = video_url[0] if isinstance(video_url, (list, tuple)) else video_url
-            youtube_embed_url = _youtube_embed_url(youtube_source_url)
-            if youtube_embed_url:
-                st.iframe(youtube_embed_url, height=430)
-            else:
-                _render_autoplay_video(video_url)
-
-    if location_query:
-        with st.expander("Ubicación", expanded=True):
-            st.iframe(
-                _google_maps_embed_url(location_query),
-                height=430
-            )
-
-
 def _sidebar_icon_svg(icon_name):
     icons = {
         'filter': (
@@ -2067,6 +2052,14 @@ def _sidebar_field_label(icon_name, text):
         ),
         unsafe_allow_html=True
     )
+
+
+def _plotly_chart(fig, **kwargs):
+    st.plotly_chart(fig, width='stretch', **kwargs)
+
+
+def _dataframe(data, **kwargs):
+    st.dataframe(data, width='stretch', **kwargs)
 
 
 def _hex_to_rgba(hex_color, alpha):
@@ -3115,11 +3108,10 @@ def _get_available_variable_dates(df_variables_all, bloque_variables):
     if bloque_variables is None:
         return []
 
-    fechas_variables = set(
-        pd.Series(
-            df_variables_all[df_variables_all['Bloque'] == bloque_variables]['Fecha_Filtro'].dropna().unique()
-        ).tolist()
-    )
+    fechas_variables = df_variables_all.loc[
+        df_variables_all['Bloque'].eq(bloque_variables),
+        'Fecha_Filtro'
+    ].dropna().unique().tolist()
     return sorted(fechas_variables)
 
 
@@ -3303,7 +3295,8 @@ def _load_marley_data_from_source(excel_source, source_signature):
             errors='coerce'
         )
         df = df.dropna(subset=['FechaHora']).sort_values('FechaHora')
-        df = df[['FechaHora', *MARLEY_VARIABLES.keys()]].copy()
+        df['Fecha_Filtro'] = df['FechaHora'].dt.date
+        df = df[['FechaHora', 'Fecha_Filtro', *MARLEY_VARIABLES.keys()]].copy()
 
         for variable in MARLEY_VARIABLES:
             df.rename(columns={variable: f"{variable} - {source_name}"}, inplace=True)
@@ -3311,12 +3304,14 @@ def _load_marley_data_from_source(excel_source, source_signature):
 
     merged = None
     for frame in source_frames.values():
-        merged = frame if merged is None else merged.merge(frame, on='FechaHora', how='outer')
+        merge_frame = frame.drop(columns=['Fecha_Filtro'], errors='ignore')
+        merged = merge_frame if merged is None else merged.merge(merge_frame, on='FechaHora', how='outer')
 
     if merged is None:
         raise ValueError("No fue posible construir la tabla consolidada de Marley.")
 
     merged = merged.sort_values('FechaHora').reset_index(drop=True)
+    merged['Fecha_Filtro'] = merged['FechaHora'].dt.date
     return merged, source_frames
 
 
@@ -3832,7 +3827,7 @@ def _render_marley_individual_variable_charts(filtered_df, selected_range):
         cols = st.columns(2)
         for offset, chart in enumerate(rendered_charts[start:start + 2]):
             with cols[offset]:
-                st.plotly_chart(chart, width="stretch")
+                _plotly_chart(chart)
 
 
 def _render_marley_dashboard(dashboard_mode):
@@ -3915,7 +3910,7 @@ def _render_marley_dashboard(dashboard_mode):
                 )
                 selected_range = (fecha_inicio, fecha_fin)
 
-    filtered_df = marley_df[marley_df['FechaHora'].dt.date.between(*selected_range)].copy()
+    filtered_df = marley_df[marley_df['Fecha_Filtro'].between(*selected_range)].copy()
     if filtered_df.empty:
         st.warning("No hay datos disponibles para Marley en el rango seleccionado.")
         st.stop()
@@ -3944,8 +3939,6 @@ def _render_marley_dashboard(dashboard_mode):
         default=list(MARLEY_VARIABLES.keys())[0],
         key="marley_variable",
     )
-    comparison = _build_marley_hourly_comparison(filtered_df, selected_variable, selected_range)
-    overlap = comparison.dropna(subset=list(MARLEY_SENSOR_NAMES)).copy()
 
     if dashboard_mode == "Varianza":
         if selected_range[0] == selected_range[1]:
@@ -3962,11 +3955,14 @@ def _render_marley_dashboard(dashboard_mode):
             'Esta gráfica muestra qué tanto cambió cada sensor dentro de una misma hora del día durante el rango seleccionado. Valores bajos indican lecturas más estables; valores altos indican mayor fluctuación.',
             accent=MARLEY_VARIABLES[selected_variable]['accent']
         )
-        st.plotly_chart(_make_marley_hourly_metric_chart(grouped_metric, selected_variable, dashboard_mode), width="stretch")
+        _plotly_chart(_make_marley_hourly_metric_chart(grouped_metric, selected_variable, dashboard_mode))
         with st.expander(f"Ver tabla dinámica de {dashboard_mode.lower()}", expanded=False):
-            st.dataframe(_prepare_marley_hourly_metric_table(grouped_metric), width="stretch", hide_index=True)
+            _dataframe(_prepare_marley_hourly_metric_table(grouped_metric), hide_index=True)
         _render_marley_individual_variable_charts(filtered_df, selected_range)
         st.stop()
+
+    comparison = _build_marley_hourly_comparison(filtered_df, selected_variable, selected_range)
+    overlap = comparison.dropna(subset=list(MARLEY_SENSOR_NAMES)).copy()
 
     avg_abs_diff = overlap['DiffValue'].mean() if not overlap.empty else None
     avg_signed_diff = overlap['SignedDiff'].mean() if not overlap.empty else None
@@ -4119,7 +4115,7 @@ def _render_marley_dashboard(dashboard_mode):
         'Aquí se superponen ambos sensores para la variable elegida. Si las líneas viajan cerca, las lecturas son similares; si se separan, hay diferencia entre equipos en esa franja de 30 minutos.',
         accent=MARLEY_VARIABLES[selected_variable]['accent']
     )
-    st.plotly_chart(_make_marley_comparison_chart(comparison, selected_variable, selected_range), width="stretch")
+    _plotly_chart(_make_marley_comparison_chart(comparison, selected_variable, selected_range))
 
     difference_chart = _make_marley_difference_chart(comparison, selected_variable, selected_range)
     if difference_chart is not None:
@@ -4128,7 +4124,7 @@ def _render_marley_dashboard(dashboard_mode):
             'Esta gráfica convierte la comparación en una sola línea. Valores sobre cero significan que WIGA midió más alto; valores bajo cero significan que ECOWITT midió más alto.',
             accent=MARLEY_VARIABLES[selected_variable]['colors']['ECOWITT']
         )
-        st.plotly_chart(difference_chart, width="stretch")
+        _plotly_chart(difference_chart)
 
     scatter_chart = _make_marley_scatter_chart(comparison, selected_variable)
     if scatter_chart is not None:
@@ -4137,24 +4133,24 @@ def _render_marley_dashboard(dashboard_mode):
             'Cada punto cruza una lectura simultánea de WIGA y ECOWITT. Mientras más cerca esté de la línea diagonal, más parecidos fueron ambos sensores en ese momento.',
             accent=MARLEY_VARIABLES[selected_variable]['colors']['WIGA']
         )
-        st.plotly_chart(scatter_chart, width="stretch")
+        _plotly_chart(scatter_chart)
     else:
         st.info("No hay suficientes datos simultáneos entre WIGA y ECOWITT para construir la dispersión.")
 
     _render_marley_individual_variable_charts(filtered_df, selected_range)
 
     with st.expander("Ver registros consolidados de Marley", expanded=False):
-        st.dataframe(filtered_df, width="stretch", hide_index=True)
+        _dataframe(filtered_df.drop(columns=['Fecha_Filtro'], errors='ignore'), hide_index=True)
         summary_rows = []
         for source_name, source_df in marley_source_data.items():
-            current = source_df[source_df['FechaHora'].dt.date.between(*selected_range)].copy()
+            current = source_df[source_df['Fecha_Filtro'].between(*selected_range)]
             summary_rows.append({
                 'Equipo': source_name,
                 'Registros': len(current),
                 'Inicio': current['FechaHora'].min().strftime('%Y-%m-%d %H:%M') if not current.empty else '-',
                 'Fin': current['FechaHora'].max().strftime('%Y-%m-%d %H:%M') if not current.empty else '-',
             })
-        st.dataframe(pd.DataFrame(summary_rows), width="stretch", hide_index=True)
+        _dataframe(pd.DataFrame(summary_rows), hide_index=True)
 
     st.stop()
 
@@ -4934,7 +4930,7 @@ def _render_correlacion(
     )
     if plot_compaction_messages:
         st.caption("Para mantener fluida la página, las series largas se muestran resumidas automáticamente por franjas de tiempo.")
-    st.plotly_chart(fig_corr, width='stretch')
+    _plotly_chart(fig_corr)
 
     if selected_cortinas and not cortina_traces and selected_sensors:
         st.info('No hay información de motores para el periodo seleccionado. Se muestran únicamente las variables ambientales.')
@@ -5023,45 +5019,20 @@ def _render_focus_chart_grid(df_variables, fecha_variables, block_label=None, he
     if df_variables.empty:
         return
 
-    fig_temp = _build_focus_variable_chart(
-        df_variables,
-        fecha_variables,
-        'Temperatura',
-        TEMP_FOCUS_CHART_TITLE,
-        block_label=block_label
-    )
-    fig_humidity = (
+    figures = [
         _build_focus_variable_chart(
             df_variables,
             fecha_variables,
-            'Humedad Relativa',
-            HUMIDITY_FOCUS_CHART_TITLE,
+            variable_name,
+            chart_title,
             block_label=block_label
         )
-        if HUMIDITY_FOCUS_CHART_ENABLED else None
-    )
-    fig_par = (
-        _build_focus_variable_chart(
-            df_variables,
-            fecha_variables,
-            'Radiación PAR',
-            PAR_FOCUS_CHART_TITLE,
-            block_label=block_label
-        )
-        if PAR_FOCUS_CHART_ENABLED else None
-    )
-    fig_water = (
-        _build_focus_variable_chart(
-            df_variables,
-            fecha_variables,
-            'Gramos de agua',
-            WATER_FOCUS_CHART_TITLE,
-            block_label=block_label
-        )
-        if WATER_FOCUS_CHART_ENABLED else None
-    )
+        for enabled, variable_name, chart_title in FOCUS_CHART_CONFIGS
+        if enabled
+    ]
+    figures = [fig for fig in figures if fig is not None]
 
-    if fig_temp is None and fig_humidity is None and fig_par is None and fig_water is None:
+    if not figures:
         return
 
     if heading:
@@ -5078,31 +5049,21 @@ def _render_focus_chart_grid(df_variables, fecha_variables, block_label=None, he
         )
 
     if TEMP_FOCUS_CHART_PLACEMENT == 'below':
-        top_left, top_right = st.columns(TEMP_FOCUS_CHART_COLUMN_LAYOUT)
-        with top_left:
-            if fig_temp is not None:
-                st.plotly_chart(fig_temp, width='stretch')
-        with top_right:
-            if fig_humidity is not None:
-                st.plotly_chart(fig_humidity, width='stretch')
-
-        bottom_left, bottom_right = st.columns(TEMP_FOCUS_CHART_COLUMN_LAYOUT)
-        with bottom_left:
-            if fig_par is not None:
-                st.plotly_chart(fig_par, width='stretch')
-        with bottom_right:
-            if fig_water is not None:
-                st.plotly_chart(fig_water, width='stretch')
-    elif TEMP_FOCUS_CHART_PLACEMENT == 'left' and fig_temp is not None:
+        for start_index in range(0, len(figures), 2):
+            row_columns = st.columns(TEMP_FOCUS_CHART_COLUMN_LAYOUT)
+            for column, figure in zip(row_columns, figures[start_index:start_index + 2]):
+                with column:
+                    _plotly_chart(figure)
+    elif TEMP_FOCUS_CHART_PLACEMENT == 'left':
         left_col, right_col = st.columns(TEMP_FOCUS_CHART_COLUMN_LAYOUT)
         with left_col:
-            st.plotly_chart(fig_temp, width='stretch')
-    elif TEMP_FOCUS_CHART_PLACEMENT == 'right' and fig_temp is not None:
+            _plotly_chart(figures[0])
+    elif TEMP_FOCUS_CHART_PLACEMENT == 'right':
         left_col, right_col = st.columns(TEMP_FOCUS_CHART_COLUMN_LAYOUT)
         with right_col:
-            st.plotly_chart(fig_temp, width='stretch')
-    elif fig_temp is not None:
-        st.plotly_chart(fig_temp, width='stretch')
+            _plotly_chart(figures[0])
+    else:
+        _plotly_chart(figures[0])
 
 
 def _build_motor_focus_chart(datos_cortinas_sel, fecha_variables, block_label=None):
@@ -5203,7 +5164,7 @@ def _build_motor_focus_chart(datos_cortinas_sel, fecha_variables, block_label=No
 
 
 def _render_temperature_focus_chart(df_variables, fecha_variables, block_label=None, df_external=None, datos_cortinas_sel=None):
-    if not TEMP_FOCUS_CHART_ENABLED:
+    if not any(enabled for enabled, _, _ in FOCUS_CHART_CONFIGS) and not MOTOR_FOCUS_CHART_ENABLED:
         return
 
     internal_available = isinstance(df_variables, pd.DataFrame) and not df_variables.empty
@@ -5236,7 +5197,7 @@ def _render_temperature_focus_chart(df_variables, fecha_variables, block_label=N
             'Esta gráfica muestra cuándo y cuánto se abrieron los motores del bloque. Ayuda a explicar cambios de temperatura, humedad o radiación después de movimientos de ventilación.',
             accent=BRAND_COLORS['hero']
         )
-        st.plotly_chart(motor_fig, width='stretch')
+        _plotly_chart(motor_fig)
 
 # 4. Datos cargados en memoria para evitar recálculos repetidos
 def _sort_block_names(block_names):
@@ -5449,9 +5410,8 @@ def _render_hourly_metric_chart(grouped_df, variable_name, metric_column):
         metric_description,
         accent=VARIABLE_COLORS.get(variable_name, BRAND_COLORS['hero'])
     )
-    st.plotly_chart(
+    _plotly_chart(
         fig,
-        width='stretch',
         config={
             'displaylogo': False,
             'responsive': True,
@@ -5470,11 +5430,8 @@ def _collect_analysis_metrics(df_source, tab_label):
         if not required_cols.issubset(df_source.columns):
             continue
 
-        data = df_source[['DateTime', 'Bloque', variable_name]].dropna(subset=['DateTime', 'Bloque', variable_name]).copy()
-        if data.empty:
-            continue
-
-        series = pd.to_numeric(data[variable_name], errors='coerce').dropna()
+        valid_rows = df_source['DateTime'].notna() & df_source['Bloque'].notna()
+        series = pd.to_numeric(df_source.loc[valid_rows, variable_name], errors='coerce').dropna()
         if series.empty:
             continue
 
@@ -5653,151 +5610,8 @@ def _render_hourly_analysis_view(df_variables, fecha_variables, selected_blocks,
     for tab_idx, tab in enumerate(metric_tabs):
         tab_label = "Promedio" if tab_idx == 0 else "Varianza"
         with tab:
-            # Calcular métricas generales para todas las variables
-            metrics_data = {}
-            for variable_name in SENSOR_VARIABLES:
-                required_cols = {'DateTime', 'Bloque', variable_name}
-                if not required_cols.issubset(df_variables.columns):
-                    continue
-                
-                data = df_variables[['DateTime', 'Bloque', variable_name]].dropna(subset=['DateTime', 'Bloque', variable_name]).copy()
-                if data.empty:
-                    continue
-
-                series = data[variable_name]
-                stats_payload = {
-                    'principal': series.mean() if tab_label == "Promedio" else (series.var(ddof=1) if len(series) > 1 else 0.0),
-                    'minimo': series.min(),
-                    'maximo': series.max()
-                }
-                metrics_data[variable_name] = stats_payload
-            
-            # Mostrar tarjetas de métricas
-            metric_cols = st.columns(4)
-            for idx, variable_name in enumerate(SENSOR_VARIABLES):
-                if idx < len(metric_cols):
-                    with metric_cols[idx]:
-                        if variable_name in metrics_data:
-                            stats_payload = metrics_data[variable_name]
-                            value = stats_payload['principal']
-                            color = VARIABLE_COLORS.get(variable_name, BRAND_COLORS['graphite'])
-                            unit = VARIABLE_UNITS.get(variable_name, '')
-                            min_value = stats_payload['minimo']
-                            max_value = stats_payload['maximo']
-                            
-                            # Decidir formato según si es promedio o varianza
-                            if tab_label == "Promedio":
-                                display_value = f"{value:.1f}"
-                                if single_day_analysis:
-                                    descriptor = "Promedio general de todas las mediciones del día seleccionado."
-                                    footer_label = "Promedio general del día"
-                                else:
-                                    descriptor = "Promedio general de todas las mediciones del rango seleccionado."
-                                    footer_label = "Promedio general del periodo"
-                            else:
-                                display_value = f"{value:.2f}"
-                                descriptor = "Varianza general calculada con todas las mediciones del rango seleccionado."
-                                footer_label = "Varianza general del periodo"
-                                if single_day_analysis:
-                                    display_value = "0.00"
-                                    descriptor = "En un solo día la varianza se reporta en 0 por consistencia analítica."
-                                    footer_label = "Varianza en un día"
-                            
-                            metric_card_html = f'''
-                            <div style="
-                                background: linear-gradient(135deg, rgba(255,255,255,0.95) 0%, rgba(255,255,255,0.85) 100%);
-                                border-left: 4px solid {color};
-                                padding: 20px;
-                                border-radius: 8px;
-                                box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-                                overflow: hidden;
-                            ">
-                                <p style="
-                                    font-family: 'Manrope', sans-serif;
-                                    font-size: 13px;
-                                    color: {color};
-                                    font-weight: 500;
-                                    margin: 0 0 12px 0;
-                                    text-transform: uppercase;
-                                    letter-spacing: 0.5px;
-                                ">{variable_name}</p>
-                                <div style="display: flex; align-items: baseline; gap: 4px; flex-wrap: wrap;">
-                                    <p style="
-                                        font-family: 'Manrope', sans-serif;
-                                        font-size: 32px;
-                                        font-weight: 700;
-                                        color: {BRAND_COLORS['ink']};
-                                        margin: 0;
-                                        line-height: 1;
-                                    ">{display_value}</p>
-                                    <p style="
-                                        font-family: 'Manrope', sans-serif;
-                                        font-size: 12px;
-                                        color: {BRAND_COLORS['graphite']};
-                                        margin: 0;
-                                        font-weight: 500;
-                                        word-break: break-word;
-                                        line-height: 1.3;
-                                    ">{unit}</p>
-                                </div>
-                                <p style="
-                                    font-family: 'Manrope', sans-serif;
-                                    font-size: 11px;
-                                    color: {BRAND_COLORS['graphite']};
-                                    margin: 10px 0 0 0;
-                                    line-height: 1.45;
-                                ">{descriptor}</p>
-                                <div style="
-                                    display: flex;
-                                    justify-content: space-between;
-                                    gap: 8px;
-                                    margin-top: 12px;
-                                    padding-top: 10px;
-                                    border-top: 1px solid rgba(76, 70, 120, 0.10);
-                                ">
-                                    <div>
-                                        <p style="
-                                            font-family: 'Manrope', sans-serif;
-                                            font-size: 10px;
-                                            color: {BRAND_COLORS['graphite']};
-                                            margin: 0 0 4px 0;
-                                            text-transform: uppercase;
-                                        ">Mínimo</p>
-                                        <p style="
-                                            font-family: 'Manrope', sans-serif;
-                                            font-size: 14px;
-                                            font-weight: 700;
-                                            color: {BRAND_COLORS['ink']};
-                                            margin: 0;
-                                        ">{min_value:.2f}</p>
-                                    </div>
-                                    <div style="text-align: right;">
-                                        <p style="
-                                            font-family: 'Manrope', sans-serif;
-                                            font-size: 10px;
-                                            color: {BRAND_COLORS['graphite']};
-                                            margin: 0 0 4px 0;
-                                            text-transform: uppercase;
-                                        ">Máximo</p>
-                                        <p style="
-                                            font-family: 'Manrope', sans-serif;
-                                            font-size: 14px;
-                                            font-weight: 700;
-                                            color: {BRAND_COLORS['ink']};
-                                            margin: 0;
-                                        ">{max_value:.2f}</p>
-                                    </div>
-                                </div>
-                                <p style="
-                                    font-family: 'Manrope', sans-serif;
-                                    font-size: 11px;
-                                    color: {color};
-                                    margin: 10px 0 0 0;
-                                    font-weight: 500;
-                                ">{footer_label}</p>
-                            </div>
-                            '''
-                            st.markdown(metric_card_html, unsafe_allow_html=True)
+            metrics_data = _collect_analysis_metrics(df_variables, tab_label)
+            _render_analysis_metric_cards_row(metrics_data, tab_label, single_day_analysis)
 
             external_metrics_data = _collect_analysis_metrics(df_external_station, tab_label)
             _render_analysis_metric_cards_row(
@@ -5853,7 +5667,7 @@ def _render_hourly_analysis_view(df_variables, fecha_variables, selected_blocks,
                     if tab_label == "Promedio":
                         _render_hourly_metric_chart(grouped_df, variable_name, 'Promedio')
                         with st.expander('Ver tabla dinámica de promedio', expanded=False):
-                            st.dataframe(_prepare_hourly_pivot_display(pivot_promedio), width='stretch')
+                            _dataframe(_prepare_hourly_pivot_display(pivot_promedio))
                     else:  # Varianza
                         if single_day_analysis:
                             _render_chart_explanation(
@@ -5868,14 +5682,12 @@ def _render_hourly_analysis_view(df_variables, fecha_variables, selected_blocks,
                         else:
                             _render_hourly_metric_chart(grouped_df, variable_name, 'Varianza')
                             with st.expander('Ver tabla dinámica de varianza', expanded=False):
-                                st.dataframe(_prepare_hourly_pivot_display(pivot_varianza), width='stretch')
+                                _dataframe(_prepare_hourly_pivot_display(pivot_varianza))
 
 
 _df_variables_all = pd.DataFrame()
 _df_cortinas_all = pd.DataFrame()
 
-if 'graficar_correlacion' not in st.session_state:
-    st.session_state.graficar_correlacion = True
 if 'mostrar_aperturas_ideales' not in st.session_state:
     st.session_state.mostrar_aperturas_ideales = False
 if 'comparar_con_almacen' not in st.session_state:
@@ -6321,11 +6133,6 @@ with st.sidebar.expander("Series visibles", expanded=True):
             help=FILTER_HELP_TEXTS['aperturas_ideales']
         )
 
-toggle_chart_label = "Mostrar correlación" if not st.session_state.graficar_correlacion else "Ocultar correlación"
-if False and st.sidebar.button(toggle_chart_label, key="boton_toggle_graficos", use_container_width=True):
-    st.session_state.graficar_correlacion = not st.session_state.graficar_correlacion
-    st.rerun()
-
 # Vista principal
 tab_correlacion = st.container()
 
@@ -6389,22 +6196,18 @@ with tab_correlacion:
         tab_corr_graf, tab_corr_regs = st.tabs(["Correlación", "Registros"])
 
         with tab_corr_graf:
-            if False and not st.session_state.graficar_correlacion:
-                st.info("Usa el botón lateral para mostrar u ocultar el análisis de correlación.")
-            else:
-                selected_vars = selected_vars_sidebar or st.session_state.get('variables_correlacion', available_correlacion_vars.copy())
+            selected_vars = selected_vars_sidebar or st.session_state.get('variables_correlacion', available_correlacion_vars.copy())
 
-                if df_variables_corr.empty:
-                    fecha_label = fecha_inicio.strftime('%Y-%m-%d') if not rango_multiple else f"{fecha_inicio.strftime('%Y-%m-%d')} a {fecha_fin.strftime('%Y-%m-%d')}"
-                    st.warning(f"No se encontraron datos de variables para el rango seleccionado: {fecha_label}.")
-                elif not available_correlacion_vars:
-                    st.warning("No se encontraron variables con datos para graficar en el rango seleccionado.")
-                elif datos_cortinas_sel.empty:
-                    st.info("No hay información de motores para este periodo. Se mostrarán las variables ambientales disponibles.")
+            if df_variables_corr.empty:
+                fecha_label = fecha_inicio.strftime('%Y-%m-%d') if not rango_multiple else f"{fecha_inicio.strftime('%Y-%m-%d')} a {fecha_fin.strftime('%Y-%m-%d')}"
+                st.warning(f"No se encontraron datos de variables para el rango seleccionado: {fecha_label}.")
+            elif not available_correlacion_vars:
+                st.warning("No se encontraron variables con datos para graficar en el rango seleccionado.")
+            elif datos_cortinas_sel.empty:
+                st.info("No hay información de motores para este periodo. Se mostrarán las variables ambientales disponibles.")
 
-                if df_variables_corr.empty or not available_correlacion_vars:
-                    pass
-                elif not selected_vars:
+            if not df_variables_corr.empty and available_correlacion_vars:
+                if not selected_vars:
                     st.warning('Selecciona al menos una variable para mostrar la correlación.')
                 else:
                     with _loading_context(
@@ -6436,10 +6239,10 @@ with tab_correlacion:
                 if datos_sensores_corr.empty:
                     st.info("No hay registros de sensores para los filtros seleccionados.")
                 else:
-                    st.dataframe(datos_sensores_corr, width='stretch')
+                    _dataframe(datos_sensores_corr)
 
             with reg_cortinas_tab:
                 if datos_cortinas_sel.empty:
                     st.info("No hay registros de cortinas para los filtros seleccionados.")
                 else:
-                    st.dataframe(datos_cortinas_sel, width='stretch')
+                    _dataframe(datos_cortinas_sel)
