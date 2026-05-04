@@ -9,6 +9,7 @@ import re
 import html
 import base64
 import unicodedata
+from contextlib import nullcontext
 from pathlib import Path
 from datetime import date, datetime, timedelta
 from urllib.parse import quote_plus
@@ -1812,6 +1813,10 @@ def _clamp_sidebar_date(value, min_date, max_date):
     if value > max_date:
         return max_date
     return value
+
+
+def _loading_context(enabled, message):
+    return st.spinner(message, show_time=True) if enabled else nullcontext()
 
 
 def _get_sidebar_default_range_end(fecha_inicio, max_date, default_days=7):
@@ -5901,7 +5906,11 @@ with st.sidebar.expander("Vista", expanded=True):
     )
 
 if selected_finca == 'Marley':
-    _render_marley_dashboard(dashboard_mode)
+    with _loading_context(
+        st.session_state.get("marley_modo_fechas") == "Varios dÃ­as",
+        "Cargando grÃ¡ficas de Marley..."
+    ):
+        _render_marley_dashboard(dashboard_mode)
 
 _df_variables_all, _df_cortinas_all = cargar_dashboard_completo()
 
@@ -6069,12 +6078,16 @@ if dashboard_mode == "Varianza Y Promedio":
             )
             if estacion_externa_name else pd.DataFrame()
         )
-        _render_hourly_analysis_view(
-            df_variables_analisis,
-            fecha_analisis,
-            analysis_block_names,
-            df_external_station=df_estacion_externa_analisis
-        )
+        with _loading_context(
+            st.session_state.get("modo_fechas_analisis") == "Varios dÃ­as",
+            "Cargando anÃ¡lisis de varios dÃ­as..."
+        ):
+            _render_hourly_analysis_view(
+                df_variables_analisis,
+                fecha_analisis,
+                analysis_block_names,
+                df_external_station=df_estacion_externa_analisis
+            )
     st.stop()
 
 block_codes, variable_block_map, cortina_block_map = _get_block_options(
@@ -6374,23 +6387,27 @@ with tab_correlacion:
                 elif not selected_vars:
                     st.warning('Selecciona al menos una variable para mostrar la correlación.')
                 else:
-                    _render_correlacion(
-                        df_variables_corr,
-                        datos_cortinas_sel,
-                        fecha_variables,
-                        selected_vars,
-                        block_label=block_label,
-                        show_ideal_aperturas=st.session_state.get('mostrar_aperturas_ideales', False),
-                        df_variables_almacen=df_variables_almacen_corr,
-                        compare_with_almacen=st.session_state.get('comparar_con_almacen', False)
-                    )
-                    _render_temperature_focus_chart(
-                        df_variables_corr,
-                        fecha_variables,
-                        block_label=block_label,
-                        df_external=df_variables_almacen_corr,
-                        datos_cortinas_sel=datos_cortinas_sel
-                    )
+                    with _loading_context(
+                        st.session_state.get("modo_fechas_compartidas") == "Varios dÃ­as",
+                        "Cargando grÃ¡ficas de correlaciÃ³n..."
+                    ):
+                        _render_correlacion(
+                            df_variables_corr,
+                            datos_cortinas_sel,
+                            fecha_variables,
+                            selected_vars,
+                            block_label=block_label,
+                            show_ideal_aperturas=st.session_state.get('mostrar_aperturas_ideales', False),
+                            df_variables_almacen=df_variables_almacen_corr,
+                            compare_with_almacen=st.session_state.get('comparar_con_almacen', False)
+                        )
+                        _render_temperature_focus_chart(
+                            df_variables_corr,
+                            fecha_variables,
+                            block_label=block_label,
+                            df_external=df_variables_almacen_corr,
+                            datos_cortinas_sel=datos_cortinas_sel
+                        )
 
         with tab_corr_regs:
             reg_sensores_tab, reg_cortinas_tab = st.tabs(["Registros sensores", "Registros cortinas"])
