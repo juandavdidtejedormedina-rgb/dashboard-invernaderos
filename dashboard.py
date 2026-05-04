@@ -4387,26 +4387,31 @@ def _render_marley_dashboard(dashboard_mode):
             st.warning(f"No hay datos suficientes para graficar las variables de {source_name} en el periodo seleccionado.")
             st.stop()
 
-        _plotly_chart(combined_chart)
-        _render_marley_individual_variable_charts(
-            filtered_df,
-            selected_range,
-            source_names=(source_name,),
-            heading=f"Variables individuales {source_name} - Marley",
-            resolution_label=source_resolution
-        )
+        tab_general, tab_detail, tab_records = st.tabs(["Vista general", "Detalle individual", "Registros"])
+        with tab_general:
+            _plotly_chart(combined_chart)
 
-        if st.checkbox(
-            f"Cargar registros consolidados de Marley - {source_name}",
-            key=f"mostrar_marley_{source_name.lower()}_registros",
-            help=FILTER_HELP_TEXTS['registros']
-        ):
-            source_columns = [
-                column
-                for column in filtered_df.columns
-                if column == 'FechaHora' or column.endswith(f" - {source_name}")
-            ]
-            _dataframe(filtered_df[source_columns].dropna(how='all', subset=source_columns[1:]), hide_index=True)
+        with tab_detail:
+            _render_marley_individual_variable_charts(
+                filtered_df,
+                selected_range,
+                source_names=(source_name,),
+                heading=f"Variables individuales {source_name} - Marley",
+                resolution_label=source_resolution
+            )
+
+        with tab_records:
+            if st.checkbox(
+                f"Cargar registros consolidados de Marley - {source_name}",
+                key=f"mostrar_marley_{source_name.lower()}_registros",
+                help=FILTER_HELP_TEXTS['registros']
+            ):
+                source_columns = [
+                    column
+                    for column in filtered_df.columns
+                    if column == 'FechaHora' or column.endswith(f" - {source_name}")
+                ]
+                _dataframe(filtered_df[source_columns].dropna(how='all', subset=source_columns[1:]), hide_index=True)
         st.stop()
 
     st.markdown(f"## Marley - {dashboard_mode}")
@@ -5353,15 +5358,20 @@ def _render_ponderosa_ecowitt_values_dashboard():
         st.warning("No hay datos suficientes para graficar las variables de ECOWITT Ponderosa.")
         st.stop()
 
-    _plotly_chart(combined_chart)
-    _render_ponderosa_ecowitt_individual_charts(filtered_df, selected_range, ecowitt_resolution)
+    tab_general, tab_detail, tab_records = st.tabs(["Vista general", "Detalle individual", "Registros"])
+    with tab_general:
+        _plotly_chart(combined_chart)
 
-    if st.checkbox(
-        "Cargar registros ECOWITT Ponderosa",
-        key="mostrar_ponderosa_ecowitt_only_registros",
-        help=FILTER_HELP_TEXTS['registros']
-    ):
-        _dataframe(filtered_df.drop(columns=['Fecha_Filtro'], errors='ignore'), hide_index=True)
+    with tab_detail:
+        _render_ponderosa_ecowitt_individual_charts(filtered_df, selected_range, ecowitt_resolution)
+
+    with tab_records:
+        if st.checkbox(
+            "Cargar registros ECOWITT Ponderosa",
+            key="mostrar_ponderosa_ecowitt_only_registros",
+            help=FILTER_HELP_TEXTS['registros']
+        ):
+            _dataframe(filtered_df.drop(columns=['Fecha_Filtro'], errors='ignore'), hide_index=True)
 
     st.stop()
 
@@ -7280,9 +7290,9 @@ with st.sidebar.expander("Finca", expanded=True):
     )
 
 dashboard_view_options = (
-    ["Comparativa", "Varianza", "Solo WIGA", "Solo ECOWITT"]
+    ["Comparativa", "Solo WIGA", "Solo ECOWITT", "Varianza"]
     if selected_finca == 'Marley' else
-    ["Correlación", "Varianza Y Promedio", "Comparativa WIGA / ECOWITT", "Solo ECOWITT"]
+    ["Correlación", "Comparativa WIGA / ECOWITT", "Solo ECOWITT", "Varianza Y Promedio"]
 )
 if st.session_state.get("modo_dashboard") not in dashboard_view_options:
     st.session_state["modo_dashboard"] = dashboard_view_options[0]
