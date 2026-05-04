@@ -196,6 +196,7 @@ BRAND_COLORS = {
     'white': '#FFFFFF'
 }
 APP_DIR = Path(__file__).resolve().parent
+DATA_CACHE_VERSION = "2026-05-04-date-fix-v1"
 LOGO_PATH = APP_DIR / 'logo elite.png'
 MARLEY_LOCAL_EXCEL_PATHS = [
     APP_DIR / 'Datos Final marley.xlsx',
@@ -1822,7 +1823,8 @@ def _prepare_variables_sheet(df_sheet):
 
 
 @st.cache_data
-def cargar_datos(ruta_bytes):
+def cargar_datos(ruta_bytes, cache_version=DATA_CACHE_VERSION):
+    _ = cache_version
     if not ruta_bytes:
         return pd.DataFrame()
 
@@ -4454,7 +4456,8 @@ def _prepare_sensor_series_for_plot(serie, value_col, multi_day_view=False):
 
 
 @st.cache_data
-def cargar_cortinas(ruta_bytes):
+def cargar_cortinas(ruta_bytes, cache_version=DATA_CACHE_VERSION):
+    _ = cache_version
     if not ruta_bytes:
         return pd.DataFrame()
 
@@ -4499,7 +4502,8 @@ def cargar_cortinas(ruta_bytes):
 
 
 @st.cache_data(show_spinner="Cargando dashboard y preparando datos...")
-def cargar_dashboard_completo():
+def cargar_dashboard_completo(cache_version=DATA_CACHE_VERSION):
+    _ = cache_version
     archivo_variables_bytes = descargar_desde_github(URL_VARIABLES_FALLBACKS)
     archivo_cortinas_bytes = descargar_desde_github(URL_CORTINAS)
 
@@ -4508,8 +4512,16 @@ def cargar_dashboard_completo():
     if archivo_cortinas_bytes is None:
         archivo_cortinas_bytes = _read_first_local_file_bytes(LOCAL_CORTINAS_PATHS)
 
-    df_variables = cargar_datos(archivo_variables_bytes) if archivo_variables_bytes else pd.DataFrame()
-    df_cortinas = cargar_cortinas(archivo_cortinas_bytes) if archivo_cortinas_bytes else pd.DataFrame()
+    df_variables = (
+        cargar_datos(archivo_variables_bytes, cache_version=cache_version)
+        if archivo_variables_bytes else
+        pd.DataFrame()
+    )
+    df_cortinas = (
+        cargar_cortinas(archivo_cortinas_bytes, cache_version=cache_version)
+        if archivo_cortinas_bytes else
+        pd.DataFrame()
+    )
     return df_variables, df_cortinas
 
 
