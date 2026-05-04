@@ -1741,6 +1741,35 @@ def _build_normalized_text_key(value):
     return re.sub(r'\s+', ' ', normalized).strip()
 
 
+def _parse_date_series(date_series):
+    if pd.api.types.is_datetime64_any_dtype(date_series):
+        return pd.to_datetime(date_series, errors='coerce')
+
+    text_values = date_series.astype(str).str.strip()
+    text_values = text_values.replace({'': None, 'nan': None, 'NaT': None, 'None': None})
+    parsed_dates = pd.Series(pd.NaT, index=text_values.index, dtype='datetime64[ns]')
+
+    iso_mask = text_values.notna() & text_values.str.match(r'^\d{4}-\d{2}-\d{2}$')
+    if iso_mask.any():
+        parsed_dates.loc[iso_mask] = pd.to_datetime(
+            text_values.loc[iso_mask],
+            format='%Y-%m-%d',
+            errors='coerce'
+        )
+
+    remaining_mask = text_values.notna() & parsed_dates.isna()
+    if remaining_mask.any():
+        with warnings.catch_warnings():
+            warnings.simplefilter('ignore', UserWarning)
+            parsed_dates.loc[remaining_mask] = pd.to_datetime(
+                text_values.loc[remaining_mask],
+                errors='coerce',
+                dayfirst=True
+            )
+
+    return parsed_dates
+
+
 def _normalize_variable_column_name(column_name):
     text = re.sub(r'\s+', ' ', str(column_name).strip())
     normalized_key = _build_normalized_text_key(text)
@@ -1775,9 +1804,7 @@ def _combine_fecha_hora_columns(df):
         return df
 
     df = df.copy()
-    with warnings.catch_warnings():
-        warnings.simplefilter('ignore', UserWarning)
-        fecha_series = pd.to_datetime(df['Fecha'], errors='coerce', dayfirst=True)
+    fecha_series = _parse_date_series(df['Fecha'])
     hora_series = df['Hora'].astype(str).str.strip().replace({'NaT': '', 'nan': '', 'None': ''})
     df['DateTime'] = pd.to_datetime(
         fecha_series.dt.strftime('%Y-%m-%d') + ' ' + hora_series,
@@ -1817,7 +1844,7 @@ def cargar_datos(ruta_bytes):
             if 'DateTime' not in df_sheet.columns:
                 continue
 
-            df_sheet['DateTime'] = pd.to_datetime(df_sheet['DateTime'], errors='coerce', dayfirst=True)
+            df_sheet['DateTime'] = _parse_date_series(df_sheet['DateTime'])
             df_sheet = df_sheet.dropna(subset=['DateTime']).sort_values('DateTime')
             df_sheet['Fecha_Filtro'] = df_sheet['DateTime'].dt.date
             df_sheet['Bloque'] = sheet
@@ -4447,10 +4474,7 @@ def cargar_cortinas(ruta_bytes):
                 continue
             data = _assign_cortinas_columns(data)
             data['Bloque'] = sheet
-            data = data[data['Fecha'].notna()].copy()
-            with warnings.catch_warnings():
-                warnings.simplefilter('ignore', UserWarning)
-                data['Fecha'] = pd.to_datetime(data['Fecha'], errors='coerce').dt.date
+            data['Fecha'] = _parse_date_series(data['Fecha']).dt.date
             data = data[data['Fecha'].notna()].copy()
             data['Dia'] = pd.to_datetime(data['Fecha'], errors='coerce').dt.weekday.map(WEEKDAY_ES)
 
