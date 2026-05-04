@@ -3512,6 +3512,7 @@ def _make_marley_difference_chart(comparison, variable, selected_range):
     config = MARLEY_VARIABLES[variable]
     time_axis = _get_marley_time_axis_config(comparison)
     start_date, end_date = selected_range
+    multi_day_view = start_date != end_date
     max_abs_diff = float(diff_df['SignedDiff'].abs().max())
     axis_limit = max(round(max_abs_diff * 1.15, 2), 0.5)
 
