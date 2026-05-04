@@ -1666,21 +1666,40 @@ selected_finca_media = st.session_state.get('finca_compartida', 'La Ponderosa')
 _render_dashboard_media(selected_finca_media, lazy_load=LAZY_LOAD_MEDIA)
 
 # --- Configuracion de URLs (Mover aqui para evitar NameError) ---
-URL_VARIABLES = "https://raw.githubusercontent.com/juandavdidtejedormedina-rgb/dashboard-invernaderos/main/Datos_variables.xlsx"
+URL_VARIABLES = "https://raw.githubusercontent.com/juandavdidtejedormedina-rgb/dashboard-invernaderos/main/Datos_Variables.xlsx"
+URL_VARIABLES_FALLBACKS = (
+    URL_VARIABLES,
+    "https://raw.githubusercontent.com/juandavdidtejedormedina-rgb/dashboard-invernaderos/8ad936f88e1d3bb9363c8223ec6deeb8222f238c/Datos_Variables.xlsx",
+)
 URL_CORTINAS = "https://raw.githubusercontent.com/juandavdidtejedormedina-rgb/dashboard-invernaderos/main/Registro_Cortinas_Final.xlsx"
-LOCAL_VARIABLES_PATH = APP_DIR / "Datos_variables.xlsx"
-LOCAL_CORTINAS_PATH = APP_DIR / "Registro_Cortinas_Final.xlsx"
+LOCAL_VARIABLES_PATHS = (
+    APP_DIR / "Datos_Variables.xlsx",
+    APP_DIR / "Datos_variables.xlsx",
+)
+LOCAL_CORTINAS_PATHS = (
+    APP_DIR / "Registro_Cortinas_Final.xlsx",
+)
 
 # Definición de la función de descarga
 @st.cache_data(show_spinner="Descargando datos desde el repositorio...")
-def descargar_desde_github(url):
-    try:
-        response = requests.get(url, timeout=30)
-        response.raise_for_status()
-        return response.content
-    except Exception as e:
-        st.error(f"Error al conectar con GitHub: {e}")
-        return None
+def descargar_desde_github(urls):
+    candidate_urls = (urls,) if isinstance(urls, str) else tuple(urls)
+    errors = []
+
+    for url in candidate_urls:
+        try:
+            response = requests.get(url, timeout=30)
+            response.raise_for_status()
+            return response.content
+        except requests.RequestException as error:
+            errors.append(f"{url} ({error})")
+
+    if errors:
+        st.warning(
+            "No fue posible descargar un archivo desde GitHub. "
+            "Se intentará usar el respaldo local si existe."
+        )
+    return None
 
 
 def _read_local_file_bytes(path):
@@ -1692,6 +1711,14 @@ def _read_local_file_bytes(path):
     except OSError as error:
         st.warning(f"No fue posible leer el respaldo local {path.name}: {error}")
         return None
+
+
+def _read_first_local_file_bytes(paths):
+    for path in paths:
+        file_bytes = _read_local_file_bytes(path)
+        if file_bytes:
+            return file_bytes
+    return None
 
 # 3. Funciones de carga de datos con corrección de FECHAS
 
@@ -4449,13 +4476,13 @@ def cargar_cortinas(ruta_bytes):
 
 @st.cache_data(show_spinner="Cargando dashboard y preparando datos...")
 def cargar_dashboard_completo():
-    archivo_variables_bytes = descargar_desde_github(URL_VARIABLES)
+    archivo_variables_bytes = descargar_desde_github(URL_VARIABLES_FALLBACKS)
     archivo_cortinas_bytes = descargar_desde_github(URL_CORTINAS)
 
     if archivo_variables_bytes is None:
-        archivo_variables_bytes = _read_local_file_bytes(LOCAL_VARIABLES_PATH)
+        archivo_variables_bytes = _read_first_local_file_bytes(LOCAL_VARIABLES_PATHS)
     if archivo_cortinas_bytes is None:
-        archivo_cortinas_bytes = _read_local_file_bytes(LOCAL_CORTINAS_PATH)
+        archivo_cortinas_bytes = _read_first_local_file_bytes(LOCAL_CORTINAS_PATHS)
 
     df_variables = cargar_datos(archivo_variables_bytes) if archivo_variables_bytes else pd.DataFrame()
     df_cortinas = cargar_cortinas(archivo_cortinas_bytes) if archivo_cortinas_bytes else pd.DataFrame()
