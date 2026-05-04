@@ -126,19 +126,22 @@ VARIABLE_LABELS = {
     'Temperatura': 'Temperatura (°C)',
     'Humedad Relativa': 'Humedad Relativa (%)',
     'Radiación PAR': 'Radiación PAR (µmol m⁻² s⁻¹)',
-    'Gramos de agua': 'Gramos de agua (g)'
+    'Gramos de agua': 'Gramos de agua (g)',
+    'LUX': 'LUX'
 }
 VARIABLE_UNITS = {
     'Temperatura': '°C',
     'Humedad Relativa': '%',
     'Radiación PAR': 'µmol m⁻² s⁻¹',
-    'Gramos de agua': 'g'
+    'Gramos de agua': 'g',
+    'LUX': 'lux'
 }
 VARIABLE_COLORS = {
     'Temperatura': '#7DB7FF',
     'Humedad Relativa': '#4A4A4A',
     'Radiación PAR': '#6BEA5B',
-    'Gramos de agua': '#F2A04B'
+    'Gramos de agua': '#F2A04B',
+    'LUX': '#B9832F'
 }
 CORTINA_COLORS = {
     'FRENTE 1': '#5E5AAE',
@@ -158,13 +161,14 @@ VARIABLE_SELECTOR_LABELS = {
     'Humedad Relativa': 'Humedad Relativa (%)',
     'Radiación PAR': 'Radiación PAR',
     'Gramos de agua': 'Gramos de agua (g)',
+    'LUX': 'LUX',
     'FRENTE 1': 'Frente 1',
     'FRENTE 2': 'Frente 2',
     'PUERTA 1': 'Puerta 1',
     'PUERTA 2': 'Puerta 2'
 }
 FILTER_HELP_TEXTS = {
-    'modo_dashboard': 'Elige entre correlación por bloque, varianza y promedio por franja horaria, o comparativa WIGA / ECOWITT cuando esté disponible.',
+    'modo_dashboard': 'Elige la vista principal: WIGA, bloques, WIGA con bloques, ECOWITT, comparación, varianza o promedio.',
     'finca': 'Selecciona la finca que quieres explorar en el dashboard. Los bloques y fechas disponibles se ajustan según esa finca.',
     'modo_fechas': 'Define si quieres analizar un solo día o un rango de varios días.',
     'fecha': 'Selecciona la fecha o el rango que se usará para filtrar los registros visibles en la vista actual.',
@@ -280,6 +284,32 @@ PONDEROSA_COMPARISON_VARIABLES = {
         "unit": "µmol m-2 s-1",
         "colors": {"WIGA": "#6BEA5B", "ECOWITT": "#524B82"},
         "accent": "#6BEA5B",
+    },
+}
+PONDEROSA_WIGA_VARIABLES = {
+    "Temperatura": {
+        "title": "Temperatura",
+        "unit": "°C",
+        "colors": {"WIGA": VARIABLE_COLORS["Temperatura"]},
+        "accent": VARIABLE_COLORS["Temperatura"],
+    },
+    "Humedad Relativa": {
+        "title": "Humedad relativa",
+        "unit": "%",
+        "colors": {"WIGA": VARIABLE_COLORS["Humedad Relativa"]},
+        "accent": VARIABLE_COLORS["Humedad Relativa"],
+    },
+    "Radiación PAR": {
+        "title": "Radiación PAR",
+        "unit": "µmol m-2 s-1",
+        "colors": {"WIGA": VARIABLE_COLORS["Radiación PAR"]},
+        "accent": VARIABLE_COLORS["Radiación PAR"],
+    },
+    "Gramos de agua": {
+        "title": "Gramos de agua",
+        "unit": "g",
+        "colors": {"WIGA": VARIABLE_COLORS["Gramos de agua"]},
+        "accent": VARIABLE_COLORS["Gramos de agua"],
     },
 }
 PONDEROSA_ECOWITT_VARIABLES = {
@@ -4763,7 +4793,7 @@ def _build_ponderosa_wiga_source(df_variables_all, bloque_variables):
     if df_variables_all.empty or not bloque_variables:
         return pd.DataFrame()
 
-    required_columns = ['DateTime', 'Fecha_Filtro', *PONDEROSA_COMPARISON_VARIABLES.keys()]
+    required_columns = ['DateTime', 'Fecha_Filtro', *SENSOR_VARIABLES]
     available_columns = [column for column in required_columns if column in df_variables_all.columns]
     if 'DateTime' not in available_columns:
         return pd.DataFrame()
@@ -4777,13 +4807,13 @@ def _build_ponderosa_wiga_source(df_variables_all, bloque_variables):
     if 'Fecha_Filtro' not in df.columns:
         df['Fecha_Filtro'] = df['FechaHora'].dt.date
 
-    for variable in PONDEROSA_COMPARISON_VARIABLES:
+    for variable in SENSOR_VARIABLES:
         if variable not in df.columns:
             df[variable] = pd.NA
         df[variable] = pd.to_numeric(df[variable], errors='coerce')
 
-    df = df[['FechaHora', 'Fecha_Filtro', *PONDEROSA_COMPARISON_VARIABLES.keys()]].copy()
-    for variable in PONDEROSA_COMPARISON_VARIABLES:
+    df = df[['FechaHora', 'Fecha_Filtro', *SENSOR_VARIABLES]].copy()
+    for variable in SENSOR_VARIABLES:
         df.rename(columns={variable: f"{variable} - WIGA"}, inplace=True)
     return df
 
@@ -4872,7 +4902,11 @@ def _build_ponderosa_hourly_comparison(df, variable, selected_range):
 
 
 def _get_ponderosa_y_axis_config(df, variable):
-    config = PONDEROSA_COMPARISON_VARIABLES.get(variable) or PONDEROSA_ECOWITT_VARIABLES[variable]
+    config = (
+        PONDEROSA_WIGA_VARIABLES.get(variable) or
+        PONDEROSA_COMPARISON_VARIABLES.get(variable) or
+        PONDEROSA_ECOWITT_VARIABLES.get(variable, {})
+    )
     series = []
     for source_name in PONDEROSA_SENSOR_NAMES:
         column_name = f"{variable} - {source_name}"
@@ -4898,9 +4932,15 @@ def _get_ponderosa_y_axis_config(df, variable):
     if variable == 'Temperatura':
         return {'title': 'Temperatura (°C)', 'range': [round(vmin - 1.5, 1), round(vmax + 1.5, 1)], 'dtick': 2}
 
+    if variable == 'Gramos de agua':
+        return {'title': 'Gramos de agua (g)', 'range': [round(vmin - 0.8, 1), round(vmax + 0.8, 1)], 'dtick': 1}
+
     if variable == 'LUX':
         axis_max = int(vmax * 1.08) if vmax > 0 else 100
         return {'title': 'LUX', 'range': [0, axis_max], 'dtick': 10000 if axis_max > 50000 else 5000}
+
+    if variable != 'Radiación PAR':
+        return {'title': config.get('unit', VARIABLE_UNITS.get(variable, ''))}
 
     axis_max = int(vmax * 1.05) if vmax > 0 else 10
     spread = max(axis_max, 1)
@@ -5091,8 +5131,16 @@ def _make_ponderosa_scatter_chart(comparison, variable):
     return fig
 
 
-def _build_ponderosa_ecowitt_individual_series(df, variable, selected_range, resolution_label=COMPARISON_RESOLUTION_OPTIONS[0]):
-    column_name = f"{variable} - ECOWITT"
+def _get_ponderosa_source_variable_configs(source_name):
+    if source_name == "WIGA":
+        return PONDEROSA_WIGA_VARIABLES
+    if source_name == "ECOWITT":
+        return PONDEROSA_ECOWITT_VARIABLES
+    return {**PONDEROSA_WIGA_VARIABLES, **PONDEROSA_ECOWITT_VARIABLES}
+
+
+def _build_ponderosa_source_individual_series(df, variable, source_name, selected_range, resolution_label=COMPARISON_RESOLUTION_OPTIONS[0]):
+    column_name = f"{variable} - {source_name}"
     if df.empty or column_name not in df.columns:
         return pd.DataFrame()
 
@@ -5114,12 +5162,17 @@ def _build_ponderosa_ecowitt_individual_series(df, variable, selected_range, res
     return series_df.rename(columns={column_name: 'Valor'})
 
 
-def _make_ponderosa_ecowitt_individual_chart(df, variable, selected_range, resolution_label=COMPARISON_RESOLUTION_OPTIONS[0]):
-    series_df = _build_ponderosa_ecowitt_individual_series(df, variable, selected_range, resolution_label)
+def _build_ponderosa_ecowitt_individual_series(df, variable, selected_range, resolution_label=COMPARISON_RESOLUTION_OPTIONS[0]):
+    return _build_ponderosa_source_individual_series(df, variable, "ECOWITT", selected_range, resolution_label)
+
+
+def _make_ponderosa_source_individual_chart(df, variable, source_name, selected_range, resolution_label=COMPARISON_RESOLUTION_OPTIONS[0]):
+    series_df = _build_ponderosa_source_individual_series(df, variable, source_name, selected_range, resolution_label)
     if series_df.empty:
         return None
 
-    config = PONDEROSA_ECOWITT_VARIABLES[variable]
+    variable_configs = _get_ponderosa_source_variable_configs(source_name)
+    config = variable_configs[variable]
     time_axis = _get_marley_time_axis_config(series_df)
     start_date, end_date = selected_range
     point_mode = resolution_label == COMPARISON_RESOLUTION_OPTIONS[1]
@@ -5136,7 +5189,7 @@ def _make_ponderosa_ecowitt_individual_chart(df, variable, selected_range, resol
             y=series_df['Valor'],
             name=config['title'],
             mode='lines+markers',
-            line=dict(color=config['colors'].get('ECOWITT', config['accent']), width=2.1 if point_mode else 2.7),
+            line=dict(color=config['colors'].get(source_name, config['accent']), width=2.1 if point_mode else 2.7),
             marker=dict(size=3.5 if point_mode else 5),
             opacity=0.86 if point_mode else 1,
             connectgaps=False,
@@ -5151,7 +5204,7 @@ def _make_ponderosa_ecowitt_individual_chart(df, variable, selected_range, resol
     )
     fig.update_layout(
         title=dict(
-            text=f"{config['title']} - ECOWITT" + (" - punto por punto" if point_mode else ""),
+            text=f"{config['title']} - {source_name}" + (" - punto por punto" if point_mode else ""),
             x=0,
             xanchor='left'
         ),
@@ -5185,20 +5238,39 @@ def _make_ponderosa_ecowitt_individual_chart(df, variable, selected_range, resol
     return fig
 
 
-def _render_ponderosa_ecowitt_individual_charts(filtered_df, selected_range, resolution_label=COMPARISON_RESOLUTION_OPTIONS[0]):
+def _make_ponderosa_ecowitt_individual_chart(df, variable, selected_range, resolution_label=COMPARISON_RESOLUTION_OPTIONS[0]):
+    return _make_ponderosa_source_individual_chart(df, variable, "ECOWITT", selected_range, resolution_label)
+
+
+def _render_ponderosa_source_individual_charts(
+    filtered_df,
+    selected_range,
+    variables,
+    source_names,
+    heading,
+    description,
+    resolution_label=COMPARISON_RESOLUTION_OPTIONS[0]
+):
     rendered_charts = []
-    for variable in PONDEROSA_ECOWITT_VARIABLES:
-        chart = _make_ponderosa_ecowitt_individual_chart(filtered_df, variable, selected_range, resolution_label)
-        if chart is not None:
-            rendered_charts.append(chart)
+    for source_name in source_names:
+        for variable in variables:
+            chart = _make_ponderosa_source_individual_chart(
+                filtered_df,
+                variable,
+                source_name,
+                selected_range,
+                resolution_label
+            )
+            if chart is not None:
+                rendered_charts.append(chart)
 
     if not rendered_charts:
         return
 
-    st.markdown("### Variables individuales ECOWITT Ponderosa")
+    st.markdown(f"### {heading}")
     _render_chart_explanation(
-        'Lectura individual ECOWITT',
-        'Estas gráficas muestran las cuatro variables medidas por ECOWITT, incluyendo LUX, sin mezclarlas con WIGA.',
+        'Lectura individual',
+        description,
         accent=BRAND_COLORS['hero']
     )
 
@@ -5207,6 +5279,454 @@ def _render_ponderosa_ecowitt_individual_charts(filtered_df, selected_range, res
         for offset, chart in enumerate(rendered_charts[start:start + 2]):
             with cols[offset]:
                 _plotly_chart(chart)
+
+
+def _render_ponderosa_ecowitt_individual_charts(filtered_df, selected_range, resolution_label=COMPARISON_RESOLUTION_OPTIONS[0]):
+    _render_ponderosa_source_individual_charts(
+        filtered_df,
+        selected_range,
+        list(PONDEROSA_ECOWITT_VARIABLES.keys()),
+        ("ECOWITT",),
+        "Variables individuales ECOWITT Ponderosa",
+        "Estas gráficas muestran las cuatro variables medidas por ECOWITT, incluyendo LUX, sin mezclarlas con WIGA.",
+        resolution_label
+    )
+
+
+def _get_available_cortina_dates(df_cortinas_all, bloque_cortinas=None):
+    if df_cortinas_all.empty or 'Fecha' not in df_cortinas_all.columns:
+        return []
+
+    filtered_df = df_cortinas_all
+    if bloque_cortinas and 'Bloque' in filtered_df.columns:
+        filtered_df = filtered_df[filtered_df['Bloque'].eq(bloque_cortinas)]
+
+    return sorted(filtered_df['Fecha'].dropna().unique().tolist())
+
+
+def _build_cortinas_only_chart(datos_cortinas_sel, fecha_periodo, selected_motors, block_label=None):
+    if datos_cortinas_sel.empty or not selected_motors:
+        return None
+
+    fecha_inicio, fecha_fin = fecha_periodo
+    multi_day_view = fecha_inicio != fecha_fin
+    hover_time_format = '%d/%m %H:%M' if multi_day_view else '%H:%M'
+    xaxis_tickformat = '%d/%m' if multi_day_view else '%H:%M'
+    xaxis_title = 'Fecha' if multi_day_view else 'Hora del día'
+    profile_times = []
+
+    fig = go.Figure()
+    for motor_name in selected_motors:
+        df_state = pd.DataFrame()
+        for config in SIDE_CONFIGS.values():
+            if config['element_col'] not in datos_cortinas_sel.columns:
+                continue
+            df_state = _build_cortina_apertura_profile(datos_cortinas_sel, motor_name, config)
+            if not df_state.empty:
+                break
+
+        if df_state.empty:
+            continue
+
+        profile_times.extend(pd.to_datetime(df_state['Hora'], errors='coerce').dropna().tolist())
+        color = CORTINA_COLORS.get(motor_name, BRAND_COLORS['hero'])
+        fig.add_trace(go.Scatter(
+            x=df_state['Hora'],
+            y=df_state['Apertura'],
+            name=VARIABLE_SELECTOR_LABELS.get(motor_name, motor_name),
+            mode='lines+markers',
+            line=dict(color=color, width=3, shape='hv'),
+            marker=dict(size=5, color=color),
+            hovertemplate=(
+                f'<b>%{{x|{hover_time_format}}}</b><br>'
+                f'{VARIABLE_SELECTOR_LABELS.get(motor_name, motor_name)}: %{{y:.0f}}% abierto'
+                '<extra></extra>'
+            )
+        ))
+
+    if not fig.data:
+        return None
+
+    xaxis_range = None
+    if not multi_day_view and profile_times:
+        min_time = pd.Timestamp(min(profile_times)).floor('30min').to_pydatetime()
+        max_time = pd.Timestamp(max(profile_times)).ceil('30min').to_pydatetime()
+        xaxis_range = [min_time, max_time]
+
+    title_suffix = f" - {block_label}" if block_label else ""
+    fig.update_layout(
+        title=dict(text=f"Comportamiento de bloques{title_suffix}", x=0, xanchor='left'),
+        height=520,
+        margin=dict(l=42, r=24, t=76, b=52),
+        paper_bgcolor="rgba(255,255,255,0)",
+        plot_bgcolor="rgba(250,248,243,0.72)",
+        hovermode='x unified',
+        template='plotly_white',
+        legend=dict(orientation='h', yanchor='bottom', y=1.02, xanchor='left', x=0),
+        xaxis=dict(
+            title=xaxis_title,
+            tickformat=xaxis_tickformat,
+            tickmode='linear' if not multi_day_view else 'auto',
+            dtick=30 * 60 * 1000 if not multi_day_view else None,
+            range=xaxis_range,
+            showgrid=True,
+            gridcolor="rgba(76, 70, 120, 0.07)",
+            zeroline=False,
+        ),
+        yaxis=dict(
+            title='Apertura (%)',
+            range=[0, 100],
+            showgrid=True,
+            gridcolor="rgba(76, 70, 120, 0.07)",
+            zeroline=False,
+        ),
+    )
+    return fig
+
+
+def _render_ponderosa_wiga_values_dashboard(df_variables_all, df_cortinas_all, selected_finca):
+    block_codes, variable_block_map, _ = _get_block_options(
+        df_variables_all,
+        df_cortinas_all,
+        selected_finca=selected_finca
+    )
+    if df_variables_all.empty or not block_codes:
+        st.warning("No hay datos WIGA disponibles para La Ponderosa.")
+        st.stop()
+
+    with st.sidebar.expander("Bloque", expanded=True):
+        _sidebar_field_label("location", "Seleccionar bloque")
+        selected_block_code = st.selectbox(
+            "Seleccionar bloque WIGA:",
+            options=block_codes,
+            format_func=_format_block_display_name,
+            key="ponderosa_wiga_only_bloque",
+            help=FILTER_HELP_TEXTS['bloque']
+        )
+
+    bloque_variables = variable_block_map.get(selected_block_code)
+    available_dates = _get_available_variable_dates(df_variables_all, bloque_variables)
+    if not available_dates:
+        st.warning("No hay fechas disponibles para el bloque WIGA seleccionado.")
+        st.stop()
+
+    min_date = available_dates[0]
+    max_date = available_dates[-1]
+    navigation_state_key = None
+    date_state_keys = (
+        "ponderosa_wiga_only_fecha_unica",
+        "ponderosa_wiga_only_fecha_un_dia",
+        "ponderosa_wiga_only_fecha_inicio",
+        "ponderosa_wiga_only_fecha_fin",
+    )
+    for state_key in date_state_keys:
+        if state_key in st.session_state and st.session_state[state_key] not in available_dates:
+            del st.session_state[state_key]
+
+    with st.sidebar.expander("Periodo", expanded=True):
+        if min_date == max_date:
+            fecha_unica = _date_input_with_state(
+                "Seleccionar fecha:",
+                default_value=max_date,
+                key="ponderosa_wiga_only_fecha_unica",
+                min_value=min_date,
+                max_value=max_date,
+                help_text=FILTER_HELP_TEXTS['fecha']
+            )
+            fecha_unica = _get_nearest_available_date(fecha_unica, available_dates)
+            selected_range = (fecha_unica, fecha_unica)
+            navigation_state_key = "ponderosa_wiga_only_fecha_unica"
+        else:
+            modo_fechas = st.radio(
+                "Modo de fechas:",
+                options=["Un día", "Varios días"],
+                horizontal=True,
+                key="ponderosa_wiga_only_modo_fechas",
+                help=FILTER_HELP_TEXTS['modo_fechas']
+            )
+            if modo_fechas == "Un día":
+                fecha_unica_default = _get_nearest_available_date(
+                    st.session_state.get("ponderosa_wiga_only_fecha_un_dia", max_date),
+                    available_dates
+                )
+                _sidebar_field_label("calendar", "Seleccionar fecha")
+                fecha_unica = _date_input_with_state(
+                    "Seleccionar fecha:",
+                    default_value=fecha_unica_default,
+                    key="ponderosa_wiga_only_fecha_un_dia",
+                    min_value=min_date,
+                    max_value=max_date,
+                    help_text=FILTER_HELP_TEXTS['fecha']
+                )
+                fecha_unica = _get_nearest_available_date(fecha_unica, available_dates)
+                selected_range = (fecha_unica, fecha_unica)
+                navigation_state_key = "ponderosa_wiga_only_fecha_un_dia"
+            else:
+                default_range_end = _get_sidebar_default_range_end(min_date, max_date, default_days=5)
+                fecha_inicio_default = _get_nearest_available_date(
+                    st.session_state.get("ponderosa_wiga_only_fecha_inicio", min_date),
+                    available_dates
+                )
+                fecha_fin_default = _get_nearest_available_date(
+                    st.session_state.get("ponderosa_wiga_only_fecha_fin", default_range_end),
+                    available_dates
+                )
+                _sidebar_field_label("calendar", "Fecha inicio")
+                fecha_inicio = _date_input_with_state(
+                    "Fecha inicio:",
+                    default_value=fecha_inicio_default,
+                    key="ponderosa_wiga_only_fecha_inicio",
+                    min_value=min_date,
+                    max_value=max_date,
+                    help_text=FILTER_HELP_TEXTS['fecha']
+                )
+                _sidebar_field_label("calendar", "Fecha fin")
+                fecha_fin = _date_input_with_state(
+                    "Fecha fin:",
+                    default_value=fecha_fin_default,
+                    key="ponderosa_wiga_only_fecha_fin",
+                    min_value=min_date,
+                    max_value=max_date,
+                    help_text=FILTER_HELP_TEXTS['fecha']
+                )
+                fecha_inicio = _get_nearest_available_date(fecha_inicio, available_dates)
+                fecha_fin = _get_nearest_available_date(fecha_fin, available_dates)
+                selected_range = _normalize_sidebar_date_range(fecha_inicio, fecha_fin, min_date, max_date)
+
+    source_df = _build_ponderosa_wiga_source(df_variables_all, bloque_variables)
+    filtered_df = source_df[source_df['Fecha_Filtro'].between(*selected_range)].copy()
+    if filtered_df.empty:
+        st.warning("No hay datos WIGA en el periodo seleccionado.")
+        st.stop()
+
+    _render_selected_period_banner(
+        selected_range,
+        min_fecha=min_date,
+        max_fecha=max_date,
+        navigation_state_key=navigation_state_key,
+        title_text='Periodo WIGA Ponderosa',
+        available_dates=available_dates
+    )
+
+    block_label = _format_block_display_name(selected_block_code)
+    st.markdown(f"## La Ponderosa - Solo WIGA | {block_label}")
+    st.caption("Lectura de las cuatro variables de Datos_Variables para el bloque seleccionado.")
+    wiga_resolution = st.radio(
+        "Resolución de las gráficas WIGA:",
+        options=COMPARISON_RESOLUTION_OPTIONS,
+        horizontal=True,
+        key="ponderosa_wiga_only_resolution",
+        help="Usa el promedio para una lectura limpia por media hora, o punto por punto para ver las lecturas reales sin agrupar."
+    )
+
+    combined_chart = _make_source_all_variables_chart(
+        filtered_df,
+        selected_range,
+        list(PONDEROSA_WIGA_VARIABLES.keys()),
+        PONDEROSA_WIGA_VARIABLES,
+        "WIGA",
+        _build_ponderosa_source_individual_series,
+        "Variables WIGA - La Ponderosa",
+        wiga_resolution,
+    )
+    if combined_chart is None:
+        st.warning("No hay datos suficientes para graficar las variables WIGA.")
+        st.stop()
+
+    tab_general, tab_detail, tab_records = st.tabs(["Vista general", "Detalle individual", "Registros"])
+    with tab_general:
+        _plotly_chart(combined_chart)
+
+    with tab_detail:
+        _render_ponderosa_source_individual_charts(
+            filtered_df,
+            selected_range,
+            list(PONDEROSA_WIGA_VARIABLES.keys()),
+            ("WIGA",),
+            "Variables individuales WIGA Ponderosa",
+            "Cada gráfica muestra una variable WIGA de Datos_Variables con su propia escala.",
+            wiga_resolution
+        )
+
+    with tab_records:
+        if st.checkbox(
+            "Cargar registros WIGA Ponderosa",
+            key="mostrar_ponderosa_wiga_only_registros",
+            help=FILTER_HELP_TEXTS['registros']
+        ):
+            _dataframe(filtered_df.drop(columns=['Fecha_Filtro'], errors='ignore'), hide_index=True)
+
+    st.stop()
+
+
+def _render_ponderosa_cortinas_dashboard(df_cortinas_all, selected_finca):
+    _, _, cortina_block_map = _get_block_options(
+        pd.DataFrame(),
+        df_cortinas_all,
+        selected_finca=selected_finca
+    )
+    block_codes = _sort_block_names(list(cortina_block_map.keys()))
+    if df_cortinas_all.empty or not block_codes:
+        st.warning("No hay registros de cortinas disponibles para La Ponderosa.")
+        st.stop()
+
+    with st.sidebar.expander("Bloque", expanded=True):
+        _sidebar_field_label("location", "Seleccionar bloque")
+        selected_block_code = st.selectbox(
+            "Seleccionar bloque:",
+            options=block_codes,
+            format_func=_format_block_display_name,
+            key="ponderosa_cortinas_bloque",
+            help="Selecciona el bloque para revisar solo el comportamiento de cortinas."
+        )
+
+    bloque_cortinas = cortina_block_map.get(selected_block_code)
+    available_dates = _get_available_cortina_dates(df_cortinas_all, bloque_cortinas)
+    if not available_dates:
+        st.warning("No hay fechas disponibles en registros de cortinas para el bloque seleccionado.")
+        st.stop()
+
+    min_date = available_dates[0]
+    max_date = available_dates[-1]
+    navigation_state_key = None
+    date_state_keys = (
+        "ponderosa_cortinas_fecha_unica",
+        "ponderosa_cortinas_fecha_un_dia",
+        "ponderosa_cortinas_fecha_inicio",
+        "ponderosa_cortinas_fecha_fin",
+    )
+    for state_key in date_state_keys:
+        if state_key in st.session_state and st.session_state[state_key] not in available_dates:
+            del st.session_state[state_key]
+
+    with st.sidebar.expander("Periodo", expanded=True):
+        if min_date == max_date:
+            fecha_unica = _date_input_with_state(
+                "Seleccionar fecha:",
+                default_value=max_date,
+                key="ponderosa_cortinas_fecha_unica",
+                min_value=min_date,
+                max_value=max_date,
+                help_text=FILTER_HELP_TEXTS['fecha']
+            )
+            fecha_unica = _get_nearest_available_date(fecha_unica, available_dates)
+            selected_range = (fecha_unica, fecha_unica)
+            navigation_state_key = "ponderosa_cortinas_fecha_unica"
+        else:
+            modo_fechas = st.radio(
+                "Modo de fechas:",
+                options=["Un día", "Varios días"],
+                horizontal=True,
+                key="ponderosa_cortinas_modo_fechas",
+                help=FILTER_HELP_TEXTS['modo_fechas']
+            )
+            if modo_fechas == "Un día":
+                fecha_unica_default = _get_nearest_available_date(
+                    st.session_state.get("ponderosa_cortinas_fecha_un_dia", max_date),
+                    available_dates
+                )
+                _sidebar_field_label("calendar", "Seleccionar fecha")
+                fecha_unica = _date_input_with_state(
+                    "Seleccionar fecha:",
+                    default_value=fecha_unica_default,
+                    key="ponderosa_cortinas_fecha_un_dia",
+                    min_value=min_date,
+                    max_value=max_date,
+                    help_text=FILTER_HELP_TEXTS['fecha']
+                )
+                fecha_unica = _get_nearest_available_date(fecha_unica, available_dates)
+                selected_range = (fecha_unica, fecha_unica)
+                navigation_state_key = "ponderosa_cortinas_fecha_un_dia"
+            else:
+                default_range_end = _get_sidebar_default_range_end(min_date, max_date, default_days=5)
+                fecha_inicio_default = _get_nearest_available_date(
+                    st.session_state.get("ponderosa_cortinas_fecha_inicio", min_date),
+                    available_dates
+                )
+                fecha_fin_default = _get_nearest_available_date(
+                    st.session_state.get("ponderosa_cortinas_fecha_fin", default_range_end),
+                    available_dates
+                )
+                _sidebar_field_label("calendar", "Fecha inicio")
+                fecha_inicio = _date_input_with_state(
+                    "Fecha inicio:",
+                    default_value=fecha_inicio_default,
+                    key="ponderosa_cortinas_fecha_inicio",
+                    min_value=min_date,
+                    max_value=max_date,
+                    help_text=FILTER_HELP_TEXTS['fecha']
+                )
+                _sidebar_field_label("calendar", "Fecha fin")
+                fecha_fin = _date_input_with_state(
+                    "Fecha fin:",
+                    default_value=fecha_fin_default,
+                    key="ponderosa_cortinas_fecha_fin",
+                    min_value=min_date,
+                    max_value=max_date,
+                    help_text=FILTER_HELP_TEXTS['fecha']
+                )
+                fecha_inicio = _get_nearest_available_date(fecha_inicio, available_dates)
+                fecha_fin = _get_nearest_available_date(fecha_fin, available_dates)
+                selected_range = _normalize_sidebar_date_range(fecha_inicio, fecha_fin, min_date, max_date)
+
+    fecha_inicio, fecha_fin = selected_range
+    filtered_df = _filter_cortinas_range(df_cortinas_all, bloque_cortinas, fecha_inicio, fecha_fin)
+    if filtered_df.empty:
+        st.warning("No hay registros de cortinas en el periodo seleccionado.")
+        st.stop()
+
+    available_motors = _get_available_cortina_vars(filtered_df)
+    with st.sidebar.expander("Cortinas visibles", expanded=True):
+        if not available_motors:
+            st.write("No hay frentes o puertas disponibles en este periodo.")
+        else:
+            for motor_name in available_motors:
+                key = f"ponderosa_cortina_visible_{_build_normalized_text_key(motor_name).replace(' ', '_')}"
+                if key not in st.session_state:
+                    st.session_state[key] = True
+                st.checkbox(
+                    VARIABLE_SELECTOR_LABELS.get(motor_name, motor_name),
+                    key=key,
+                    help=VARIABLE_FILTER_HELP.get(motor_name, FILTER_HELP_TEXTS['series_visibles'])
+                )
+
+    selected_motors = [
+        motor_name
+        for motor_name in available_motors
+        if st.session_state.get(f"ponderosa_cortina_visible_{_build_normalized_text_key(motor_name).replace(' ', '_')}", True)
+    ]
+    block_label = _format_block_display_name(selected_block_code)
+    _render_selected_period_banner(
+        selected_range,
+        min_fecha=min_date,
+        max_fecha=max_date,
+        navigation_state_key=navigation_state_key,
+        title_text='Periodo de bloques',
+        available_dates=available_dates
+    )
+
+    st.markdown(f"## La Ponderosa - Solo bloques | {block_label}")
+    st.caption("Vista dedicada al comportamiento de frentes y puertas registrado en Registro_Cortinas.")
+    tab_chart, tab_records = st.tabs(["Comportamiento", "Registros"])
+    with tab_chart:
+        if not selected_motors:
+            st.warning("Selecciona al menos una cortina para graficar.")
+        else:
+            chart = _build_cortinas_only_chart(filtered_df, selected_range, selected_motors, block_label=block_label)
+            if chart is None:
+                st.warning("No hay información de apertura para las cortinas seleccionadas.")
+            else:
+                _render_chart_explanation(
+                    "Comportamiento de cortinas",
+                    "Esta vista muestra únicamente la apertura de frentes y puertas del bloque seleccionado, sin mezclarla con variables WIGA o ECOWITT.",
+                    accent=BRAND_COLORS['hero']
+                )
+                _plotly_chart(chart)
+
+    with tab_records:
+        _dataframe(filtered_df, hide_index=True)
+
+    st.stop()
 
 
 def _render_ponderosa_ecowitt_values_dashboard():
@@ -5673,7 +6193,7 @@ def _render_ponderosa_ecowitt_dashboard(df_variables_all, df_cortinas_all, selec
         key="ponderosa_ecowitt_variable",
     )
     show_details = st.checkbox(
-        "Cargar variables individuales de ECOWITT",
+        "Cargar detalle individual WIGA / ECOWITT",
         key="mostrar_ponderosa_ecowitt_detalles",
         help=FILTER_HELP_TEXTS['graficas_detalladas']
     )
@@ -5726,7 +6246,15 @@ def _render_ponderosa_ecowitt_dashboard(df_variables_all, df_cortinas_all, selec
         st.info("No hay suficientes datos simultáneos entre WIGA y ECOWITT para construir la dispersión.")
 
     if show_details:
-        _render_ponderosa_ecowitt_individual_charts(filtered_df, selected_range, comparison_resolution)
+        _render_ponderosa_source_individual_charts(
+            filtered_df,
+            selected_range,
+            list(PONDEROSA_COMPARISON_VARIABLES.keys()),
+            PONDEROSA_SENSOR_NAMES,
+            "Variables individuales WIGA / ECOWITT Ponderosa",
+            "Estas gráficas separan cada variable compartida por sensor para revisar la forma de cada lectura sin la superposición de la comparativa.",
+            comparison_resolution
+        )
 
     if st.checkbox(
         "Cargar registros consolidados de Ponderosa",
@@ -6783,12 +7311,16 @@ def _get_block_analysis_color(block_name):
 
 
 def _format_block_display_name(block_name):
+    raw_name = str(block_name)
+    if raw_name.upper().startswith('ECOWITT'):
+        return raw_name
+
     block_identifier = _extract_block_identifier(block_name)
     if block_identifier in SPECIAL_BLOCK_LABELS:
         return SPECIAL_BLOCK_LABELS[block_identifier]
     if block_identifier and str(block_identifier).isdigit():
         return f'Bloque {block_identifier}'
-    return str(block_name)
+    return raw_name
 
 
 def _build_hourly_block_analysis(df_variables, variable_name):
@@ -6981,12 +7513,13 @@ def _render_hourly_metric_chart(grouped_df, variable_name, metric_column):
     )
 
 
-def _collect_analysis_metrics(df_source, tab_label):
+def _collect_analysis_metrics(df_source, tab_label, variable_options=None):
     metrics_data = {}
     if not isinstance(df_source, pd.DataFrame) or df_source.empty:
         return metrics_data
 
-    for variable_name in SENSOR_VARIABLES:
+    variable_options = variable_options or SENSOR_VARIABLES
+    for variable_name in variable_options:
         required_cols = {'DateTime', 'Bloque', variable_name}
         if not required_cols.issubset(df_source.columns):
             continue
@@ -7005,7 +7538,7 @@ def _collect_analysis_metrics(df_source, tab_label):
     return metrics_data
 
 
-def _render_analysis_metric_cards_row(metrics_data, tab_label, single_day_analysis, heading=None):
+def _render_analysis_metric_cards_row(metrics_data, tab_label, single_day_analysis, heading=None, variable_options=None):
     if not metrics_data:
         return
 
@@ -7015,12 +7548,13 @@ def _render_analysis_metric_cards_row(metrics_data, tab_label, single_day_analys
             unsafe_allow_html=True
         )
 
-    metric_cols = st.columns(4)
-    for idx, variable_name in enumerate(SENSOR_VARIABLES):
-        if idx >= len(metric_cols) or variable_name not in metrics_data:
+    variable_options = [variable for variable in (variable_options or SENSOR_VARIABLES) if variable in metrics_data]
+    metric_cols = st.columns(min(4, max(1, len(variable_options))))
+    for idx, variable_name in enumerate(variable_options):
+        if variable_name not in metrics_data:
             continue
 
-        with metric_cols[idx]:
+        with metric_cols[idx % len(metric_cols)]:
             stats_payload = metrics_data[variable_name]
             value = stats_payload['principal']
             color = VARIABLE_COLORS.get(variable_name, BRAND_COLORS['graphite'])
@@ -7142,7 +7676,15 @@ def _render_analysis_metric_cards_row(metrics_data, tab_label, single_day_analys
             st.markdown(metric_card_html, unsafe_allow_html=True)
 
 
-def _render_hourly_analysis_view(df_variables, fecha_variables, selected_blocks, df_external_station=None):
+def _render_hourly_analysis_view(
+    df_variables,
+    fecha_variables,
+    selected_blocks,
+    df_external_station=None,
+    forced_metric=None,
+    variable_options=None,
+    variable_state_key="analisis_variable_option"
+):
     if df_variables.empty:
         fecha_inicio, fecha_fin = fecha_variables
         fecha_label = (
@@ -7166,25 +7708,30 @@ def _render_hourly_analysis_view(df_variables, fecha_variables, selected_blocks,
     single_day_analysis = fecha_inicio == fecha_fin
 
     metric_options = ["Promedio", "Varianza"]
-    if st.session_state.get("analisis_metric_option") not in metric_options:
-        st.session_state["analisis_metric_option"] = metric_options[0]
-    tab_label = st.segmented_control(
-        "Métrica del análisis",
-        options=metric_options,
-        key="analisis_metric_option",
-        help="Calcula solo la métrica visible para mantener esta vista más rápida.",
-        width="stretch"
-    )
+    if forced_metric in metric_options:
+        tab_label = forced_metric
+    else:
+        if st.session_state.get("analisis_metric_option") not in metric_options:
+            st.session_state["analisis_metric_option"] = metric_options[0]
+        tab_label = st.segmented_control(
+            "Métrica del análisis",
+            options=metric_options,
+            key="analisis_metric_option",
+            help="Calcula solo la métrica visible para mantener esta vista más rápida.",
+            width="stretch"
+        )
 
-    metrics_data = _collect_analysis_metrics(df_variables, tab_label)
-    _render_analysis_metric_cards_row(metrics_data, tab_label, single_day_analysis)
+    variable_options = variable_options or SENSOR_VARIABLES
+    metrics_data = _collect_analysis_metrics(df_variables, tab_label, variable_options)
+    _render_analysis_metric_cards_row(metrics_data, tab_label, single_day_analysis, variable_options=variable_options)
 
-    external_metrics_data = _collect_analysis_metrics(df_external_station, tab_label)
+    external_metrics_data = _collect_analysis_metrics(df_external_station, tab_label, variable_options)
     _render_analysis_metric_cards_row(
         external_metrics_data,
         tab_label,
         single_day_analysis,
-        heading='Estación externa'
+        heading='Estación externa',
+        variable_options=variable_options
     )
 
     if len(selected_blocks) == 1 and tab_label == "Promedio":
@@ -7216,13 +7763,13 @@ def _render_hourly_analysis_view(df_variables, fecha_variables, selected_blocks,
             kicker='Cómo leer este análisis'
         )
 
-    if st.session_state.get("analisis_variable_option") not in SENSOR_VARIABLES:
-        st.session_state["analisis_variable_option"] = SENSOR_VARIABLES[0]
+    if st.session_state.get(variable_state_key) not in variable_options:
+        st.session_state[variable_state_key] = variable_options[0]
     variable_name = st.segmented_control(
         "Variable del análisis",
-        options=SENSOR_VARIABLES,
+        options=variable_options,
         format_func=lambda value: VARIABLE_SELECTOR_LABELS.get(value, VARIABLE_LABELS.get(value, value)),
-        key="analisis_variable_option",
+        key=variable_state_key,
         help="Calcula solo la variable seleccionada para evitar cargar todas las gráficas a la vez.",
         width="stretch"
     )
@@ -7250,6 +7797,224 @@ def _render_hourly_analysis_view(df_variables, fecha_variables, selected_blocks,
         _render_hourly_metric_chart(grouped_df, variable_name, 'Varianza')
         with st.expander('Ver tabla dinámica de varianza', expanded=False):
             _dataframe(_prepare_hourly_pivot_display(pivot_varianza))
+
+
+def _build_ponderosa_ecowitt_metric_frame(ecowitt_df):
+    if ecowitt_df.empty:
+        return pd.DataFrame()
+
+    df = ecowitt_df[['FechaHora', 'Fecha_Filtro', *PONDEROSA_ECOWITT_VARIABLES.keys()]].copy()
+    df = df.rename(columns={'FechaHora': 'DateTime'})
+    df['Bloque'] = f"ECOWITT Bloque {PONDEROSA_ECOWITT_BLOCK_CODE}"
+    for variable in PONDEROSA_ECOWITT_VARIABLES:
+        df[variable] = pd.to_numeric(df[variable], errors='coerce')
+    return df[['DateTime', 'Fecha_Filtro', 'Bloque', *PONDEROSA_ECOWITT_VARIABLES.keys()]]
+
+
+def _get_ponderosa_metric_variable_options(source_option):
+    if source_option == "WIGA":
+        return list(PONDEROSA_WIGA_VARIABLES.keys())
+    if source_option == "ECOWITT":
+        return list(PONDEROSA_ECOWITT_VARIABLES.keys())
+    return list(dict.fromkeys([*PONDEROSA_WIGA_VARIABLES.keys(), *PONDEROSA_ECOWITT_VARIABLES.keys()]))
+
+
+def _render_ponderosa_metric_dashboard(df_variables_all, df_cortinas_all, selected_finca, metric_name):
+    source_options = ["WIGA", "ECOWITT", "WIGA + ECOWITT"]
+    metric_key = _build_normalized_text_key(metric_name).replace(' ', '_')
+
+    with st.sidebar.expander("Fuente", expanded=True):
+        _sidebar_field_label("filter", "Fuente del análisis")
+        source_option = st.radio(
+            "Analizar:",
+            options=source_options,
+            horizontal=False,
+            key=f"ponderosa_{metric_key}_source",
+            help="Elige si quieres calcular la métrica sobre WIGA, ECOWITT o ambos en la misma vista."
+        )
+
+    include_wiga = source_option in ("WIGA", "WIGA + ECOWITT")
+    include_ecowitt = source_option in ("ECOWITT", "WIGA + ECOWITT")
+
+    block_codes, variable_block_map, _ = _get_block_options(
+        df_variables_all,
+        df_cortinas_all,
+        selected_finca=selected_finca
+    )
+    selected_wiga_block_names = []
+    if include_wiga:
+        with st.sidebar.expander("Bloques WIGA", expanded=True):
+            if not block_codes:
+                st.warning("No hay bloques WIGA disponibles para La Ponderosa.")
+            else:
+                _sidebar_field_label("location", "Bloques incluidos")
+                for block_code in block_codes:
+                    block_state_key = f"ponderosa_{metric_key}_wiga_block_{block_code}"
+                    if block_state_key not in st.session_state:
+                        st.session_state[block_state_key] = block_code == PONDEROSA_ECOWITT_BLOCK_CODE or len(block_codes) == 1
+                    st.checkbox(
+                        _format_block_display_name(block_code),
+                        key=block_state_key,
+                        help=FILTER_HELP_TEXTS['bloques_comparados']
+                    )
+
+                selected_wiga_block_names = [
+                    variable_block_map[block_code]
+                    for block_code in block_codes
+                    if st.session_state.get(f"ponderosa_{metric_key}_wiga_block_{block_code}", False)
+                    and block_code in variable_block_map
+                ]
+
+    ecowitt_df = pd.DataFrame()
+    if include_ecowitt:
+        try:
+            ecowitt_df = _load_ponderosa_ecowitt_data()
+        except Exception as error:
+            st.error(f"No fue posible cargar ECOWITT Ponderosa. Detalle: {error}")
+            st.stop()
+
+    available_dates_set = set()
+    if include_wiga and selected_wiga_block_names:
+        available_dates_set.update(_get_all_variable_dates_for_blocks(df_variables_all, selected_wiga_block_names))
+    if include_ecowitt and not ecowitt_df.empty:
+        available_dates_set.update(ecowitt_df['Fecha_Filtro'].dropna().unique().tolist())
+
+    available_dates = sorted(available_dates_set)
+    if not available_dates:
+        st.warning("No hay fechas disponibles para la fuente seleccionada.")
+        st.stop()
+
+    min_date = available_dates[0]
+    max_date = available_dates[-1]
+    navigation_state_key = None
+    date_state_keys = (
+        f"ponderosa_{metric_key}_fecha_unica",
+        f"ponderosa_{metric_key}_fecha_un_dia",
+        f"ponderosa_{metric_key}_fecha_inicio",
+        f"ponderosa_{metric_key}_fecha_fin",
+    )
+    for state_key in date_state_keys:
+        if state_key in st.session_state and st.session_state[state_key] not in available_dates:
+            del st.session_state[state_key]
+
+    with st.sidebar.expander("Periodo", expanded=True):
+        if min_date == max_date:
+            fecha_unica = _date_input_with_state(
+                "Seleccionar fecha:",
+                default_value=max_date,
+                key=f"ponderosa_{metric_key}_fecha_unica",
+                min_value=min_date,
+                max_value=max_date,
+                help_text=FILTER_HELP_TEXTS['fecha']
+            )
+            fecha_unica = _get_nearest_available_date(fecha_unica, available_dates)
+            selected_range = (fecha_unica, fecha_unica)
+            navigation_state_key = f"ponderosa_{metric_key}_fecha_unica"
+        else:
+            modo_fechas = st.radio(
+                "Modo de fechas:",
+                options=["Un día", "Varios días"],
+                horizontal=True,
+                key=f"ponderosa_{metric_key}_modo_fechas",
+                help=FILTER_HELP_TEXTS['modo_fechas']
+            )
+            if modo_fechas == "Un día":
+                fecha_unica_default = _get_nearest_available_date(
+                    st.session_state.get(f"ponderosa_{metric_key}_fecha_un_dia", max_date),
+                    available_dates
+                )
+                _sidebar_field_label("calendar", "Seleccionar fecha")
+                fecha_unica = _date_input_with_state(
+                    "Seleccionar fecha:",
+                    default_value=fecha_unica_default,
+                    key=f"ponderosa_{metric_key}_fecha_un_dia",
+                    min_value=min_date,
+                    max_value=max_date,
+                    help_text=FILTER_HELP_TEXTS['fecha']
+                )
+                fecha_unica = _get_nearest_available_date(fecha_unica, available_dates)
+                selected_range = (fecha_unica, fecha_unica)
+                navigation_state_key = f"ponderosa_{metric_key}_fecha_un_dia"
+            else:
+                default_range_end = _get_sidebar_default_range_end(min_date, max_date, default_days=7)
+                fecha_inicio_default = _get_nearest_available_date(
+                    st.session_state.get(f"ponderosa_{metric_key}_fecha_inicio", min_date),
+                    available_dates
+                )
+                fecha_fin_default = _get_nearest_available_date(
+                    st.session_state.get(f"ponderosa_{metric_key}_fecha_fin", default_range_end),
+                    available_dates
+                )
+                _sidebar_field_label("calendar", "Fecha inicio")
+                fecha_inicio = _date_input_with_state(
+                    "Fecha inicio:",
+                    default_value=fecha_inicio_default,
+                    key=f"ponderosa_{metric_key}_fecha_inicio",
+                    min_value=min_date,
+                    max_value=max_date,
+                    help_text=FILTER_HELP_TEXTS['fecha']
+                )
+                _sidebar_field_label("calendar", "Fecha fin")
+                fecha_fin = _date_input_with_state(
+                    "Fecha fin:",
+                    default_value=fecha_fin_default,
+                    key=f"ponderosa_{metric_key}_fecha_fin",
+                    min_value=min_date,
+                    max_value=max_date,
+                    help_text=FILTER_HELP_TEXTS['fecha']
+                )
+                fecha_inicio = _get_nearest_available_date(fecha_inicio, available_dates)
+                fecha_fin = _get_nearest_available_date(fecha_fin, available_dates)
+                selected_range = _normalize_sidebar_date_range(fecha_inicio, fecha_fin, min_date, max_date)
+
+    fecha_inicio, fecha_fin = selected_range
+    frames = []
+    if include_wiga and selected_wiga_block_names:
+        wiga_frame = _filter_variables_multi_block_range(
+            df_variables_all,
+            fecha_inicio,
+            fecha_fin,
+            selected_wiga_block_names
+        )
+        if not wiga_frame.empty:
+            frames.append(wiga_frame)
+
+    if include_ecowitt and not ecowitt_df.empty:
+        ecowitt_metric_frame = _build_ponderosa_ecowitt_metric_frame(ecowitt_df)
+        ecowitt_metric_frame = ecowitt_metric_frame[
+            ecowitt_metric_frame['Fecha_Filtro'].between(fecha_inicio, fecha_fin)
+        ].copy()
+        if not ecowitt_metric_frame.empty:
+            frames.append(ecowitt_metric_frame)
+
+    if not frames:
+        st.warning("No hay datos para calcular la métrica en el periodo seleccionado.")
+        st.stop()
+
+    analysis_df = pd.concat(frames, ignore_index=True, sort=False)
+    selected_blocks = _sort_block_names(analysis_df['Bloque'].dropna().unique().tolist())
+    variable_options = _get_ponderosa_metric_variable_options(source_option)
+
+    _render_selected_period_banner(
+        selected_range,
+        min_fecha=min_date,
+        max_fecha=max_date,
+        navigation_state_key=navigation_state_key,
+        title_text=f'Periodo de {metric_name.lower()}',
+        available_dates=available_dates
+    )
+
+    st.markdown(f"## La Ponderosa - {metric_name}")
+    st.caption(f"Análisis de {metric_name.lower()} para {source_option}. ECOWITT corresponde al Bloque {PONDEROSA_ECOWITT_BLOCK_CODE}.")
+    _render_hourly_analysis_view(
+        analysis_df,
+        selected_range,
+        selected_blocks,
+        forced_metric=metric_name,
+        variable_options=variable_options,
+        variable_state_key=f"ponderosa_{metric_key}_variable"
+    )
+    st.stop()
 
 
 _df_variables_all = pd.DataFrame()
@@ -7292,7 +8057,7 @@ with st.sidebar.expander("Finca", expanded=True):
 dashboard_view_options = (
     ["Comparativa", "Solo WIGA", "Solo ECOWITT", "Varianza"]
     if selected_finca == 'Marley' else
-    ["Correlación", "Comparativa WIGA / ECOWITT", "Solo ECOWITT", "Varianza Y Promedio"]
+    ["Solo WIGA", "Solo bloques", "WIGA con bloques", "Solo ECOWITT", "WIGA vs ECOWITT", "Varianza", "Promedio"]
 )
 if st.session_state.get("modo_dashboard") not in dashboard_view_options:
     st.session_state["modo_dashboard"] = dashboard_view_options[0]
@@ -7309,7 +8074,7 @@ with st.sidebar.expander("Vista", expanded=True):
         help=(
             "Elige cómo quieres analizar Marley: comparativa, varianza o lecturas individuales por sensor."
             if selected_finca == 'Marley' else
-            "Elige la vista de Ponderosa: correlación por bloque, varianza y promedio, comparación WIGA / ECOWITT o lectura solo ECOWITT."
+            "Elige la vista de Ponderosa: WIGA, bloques, WIGA con bloques, ECOWITT, comparación, varianza o promedio."
         )
     )
 
@@ -7323,7 +8088,23 @@ if selected_finca == 'Marley':
 
 _df_variables_all, _df_cortinas_all = cargar_dashboard_completo()
 
-if dashboard_mode == "Comparativa WIGA / ECOWITT":
+if dashboard_mode == "Solo WIGA":
+    with _loading_context(
+        st.session_state.get("ponderosa_wiga_only_modo_fechas") == "Varios días",
+        "Cargando variables WIGA de Ponderosa..."
+    ):
+        _render_ponderosa_wiga_values_dashboard(_df_variables_all, _df_cortinas_all, selected_finca)
+    st.stop()
+
+if dashboard_mode == "Solo bloques":
+    with _loading_context(
+        st.session_state.get("ponderosa_cortinas_modo_fechas") == "Varios días",
+        "Cargando comportamiento de bloques..."
+    ):
+        _render_ponderosa_cortinas_dashboard(_df_cortinas_all, selected_finca)
+    st.stop()
+
+if dashboard_mode == "WIGA vs ECOWITT":
     with _loading_context(
         st.session_state.get("ponderosa_ecowitt_modo_fechas") == "Varios días",
         "Cargando comparativa WIGA / ECOWITT de Ponderosa..."
@@ -7337,6 +8118,14 @@ if dashboard_mode == "Solo ECOWITT":
         "Cargando variables ECOWITT de Ponderosa..."
     ):
         _render_ponderosa_ecowitt_values_dashboard()
+    st.stop()
+
+if dashboard_mode in ("Varianza", "Promedio"):
+    with _loading_context(
+        st.session_state.get(f"ponderosa_{_build_normalized_text_key(dashboard_mode).replace(' ', '_')}_modo_fechas") == "Varios días",
+        f"Cargando {dashboard_mode.lower()} de Ponderosa..."
+    ):
+        _render_ponderosa_metric_dashboard(_df_variables_all, _df_cortinas_all, selected_finca, dashboard_mode)
     st.stop()
 
 if dashboard_mode == "Varianza Y Promedio":
