@@ -1955,6 +1955,33 @@ def _clamp_sidebar_date(value, min_date, max_date):
     return value
 
 
+def _get_nearest_available_date(value, available_dates):
+    if not available_dates:
+        return value
+
+    ordered_dates = sorted(available_dates)
+    value = _coerce_sidebar_date(value, ordered_dates[-1])
+    if value in ordered_dates:
+        return value
+
+    previous_dates = [available_date for available_date in ordered_dates if available_date <= value]
+    if previous_dates:
+        return previous_dates[-1]
+    return ordered_dates[0]
+
+
+def _date_input_with_state(label, default_value, key, min_value, max_value, help_text=None):
+    kwargs = {
+        'key': key,
+        'min_value': min_value,
+        'max_value': max_value,
+        'help': help_text,
+    }
+    if key not in st.session_state:
+        kwargs['value'] = default_value
+    return st.date_input(label, **kwargs)
+
+
 def _loading_context(enabled, message):
     return st.spinner(message, show_time=True) if enabled else nullcontext()
 
@@ -1982,7 +2009,23 @@ def _format_selected_period_label(fecha_inicio, fecha_fin):
     return f"{fecha_inicio.strftime('%d/%m/%Y')} a {fecha_fin.strftime('%d/%m/%Y')}"
 
 
-def _shift_selected_period_day(navigation_state_key, current_date, delta_days, min_fecha, max_fecha):
+def _shift_selected_period_day(navigation_state_key, current_date, delta_days, min_fecha, max_fecha, available_dates=None):
+    if available_dates:
+        ordered_dates = sorted({_coerce_sidebar_date(value, value) for value in available_dates})
+        if ordered_dates:
+            if current_date in ordered_dates:
+                current_index = ordered_dates.index(current_date)
+            else:
+                candidates = [
+                    index
+                    for index, available_date in enumerate(ordered_dates)
+                    if available_date <= current_date
+                ]
+                current_index = candidates[-1] if candidates else 0
+            target_index = max(0, min(current_index + delta_days, len(ordered_dates) - 1))
+            st.session_state[navigation_state_key] = ordered_dates[target_index]
+            return
+
     shifted_date = current_date + timedelta(days=delta_days)
     st.session_state[navigation_state_key] = _clamp_sidebar_date(shifted_date, min_fecha, max_fecha)
 
@@ -1992,7 +2035,8 @@ def _render_selected_period_banner(
     min_fecha=None,
     max_fecha=None,
     navigation_state_key=None,
-    title_text='Periodo visible'
+    title_text='Periodo visible',
+    available_dates=None
 ):
     if not fecha_periodo:
         return
@@ -2056,8 +2100,11 @@ def _render_selected_period_banner(
         min_fecha is not None and
         max_fecha is not None
     )
-    prev_disabled = (not can_navigate) or fecha_inicio <= min_fecha
-    next_disabled = (not can_navigate) or fecha_inicio >= max_fecha
+    ordered_available_dates = sorted(available_dates) if available_dates else None
+    prev_limit = ordered_available_dates[0] if ordered_available_dates else min_fecha
+    next_limit = ordered_available_dates[-1] if ordered_available_dates else max_fecha
+    prev_disabled = (not can_navigate) or fecha_inicio <= prev_limit
+    next_disabled = (not can_navigate) or fecha_inicio >= next_limit
 
     with col_prev:
         st.button(
@@ -2065,9 +2112,9 @@ def _render_selected_period_banner(
             key=f"{navigation_state_key}_prev" if navigation_state_key else "period_prev_disabled",
             disabled=prev_disabled,
             width="stretch",
-            on_click=_shift_selected_period_day if can_navigate else None,
-            args=(navigation_state_key, fecha_inicio, -1, min_fecha, max_fecha) if can_navigate else None
-        )
+        on_click=_shift_selected_period_day if can_navigate else None,
+        args=(navigation_state_key, fecha_inicio, -1, min_fecha, max_fecha, ordered_available_dates) if can_navigate else None
+    )
 
     with col_next:
         st.button(
@@ -2075,9 +2122,9 @@ def _render_selected_period_banner(
             key=f"{navigation_state_key}_next" if navigation_state_key else "period_next_disabled",
             disabled=next_disabled,
             width="stretch",
-            on_click=_shift_selected_period_day if can_navigate else None,
-            args=(navigation_state_key, fecha_inicio, 1, min_fecha, max_fecha) if can_navigate else None
-        )
+        on_click=_shift_selected_period_day if can_navigate else None,
+        args=(navigation_state_key, fecha_inicio, 1, min_fecha, max_fecha, ordered_available_dates) if can_navigate else None
+    )
 
 
 def _render_chart_explanation(title, description, accent=None, kicker='Guía de lectura'):
@@ -3536,12 +3583,12 @@ def _get_marley_time_axis_config(df):
     total_days = max(span.total_seconds() / 86400, 0)
 
     if total_days <= 1.1:
-        return {'tickformat': '%H:%M', 'dtick': 60 * 60 * 1000, 'title': 'Hora del día'}
+        return {'tickformat': '%H:%M', 'dtick': 30 * 60 * 1000, 'title': 'Hora del día', 'tickmode': 'linear'}
     if total_days <= 3:
-        return {'tickformat': '%d/%m\n%H:%M', 'dtick': 6 * 60 * 60 * 1000, 'title': 'Fecha y hora'}
+        return {'tickformat': '%d/%m\n%H:%M', 'dtick': 6 * 60 * 60 * 1000, 'title': 'Fecha y hora', 'tickmode': 'linear'}
     if total_days <= 10:
-        return {'tickformat': '%d/%m\n%H:%M', 'dtick': 12 * 60 * 60 * 1000, 'title': 'Fecha y hora'}
-    return {'tickformat': '%d/%m/%Y', 'dtick': 24 * 60 * 60 * 1000, 'title': 'Fecha'}
+        return {'tickformat': '%d/%m\n%H:%M', 'dtick': 12 * 60 * 60 * 1000, 'title': 'Fecha y hora', 'tickmode': 'linear'}
+    return {'tickformat': '%d/%m/%Y', 'dtick': 24 * 60 * 60 * 1000, 'title': 'Fecha', 'tickmode': 'linear'}
 
 
 def _get_marley_y_axis_config(df, variable):
@@ -3638,6 +3685,7 @@ def _make_marley_comparison_chart(comparison, variable, selected_range):
             gridcolor="rgba(76, 70, 120, 0.07)",
             zeroline=False,
             tickformat=time_axis['tickformat'],
+            tickmode=time_axis.get('tickmode', 'linear'),
             dtick=time_axis['dtick'],
             ticklabelmode='period',
             range=[
@@ -3696,6 +3744,7 @@ def _make_marley_difference_chart(comparison, variable, selected_range):
             gridcolor="rgba(76, 70, 120, 0.07)",
             zeroline=False,
             tickformat=time_axis['tickformat'],
+            tickmode=time_axis.get('tickmode', 'linear'),
             dtick=time_axis['dtick'],
             range=[pd.Timestamp(start_date), pd.Timestamp(end_date) + MARLEY_AXIS_END_OFFSET],
         ),
@@ -3939,6 +3988,7 @@ def _make_marley_individual_variable_chart(df, variable, source_name, selected_r
             gridcolor="rgba(76, 70, 120, 0.07)",
             zeroline=False,
             tickformat=time_axis['tickformat'],
+            tickmode=time_axis.get('tickmode', 'linear'),
             dtick=time_axis['dtick'],
             range=[
                 pd.Timestamp(start_date),
@@ -4591,6 +4641,7 @@ def _make_ponderosa_comparison_chart(comparison, variable, selected_range):
             gridcolor="rgba(76, 70, 120, 0.07)",
             zeroline=False,
             tickformat=time_axis['tickformat'],
+            tickmode=time_axis.get('tickmode', 'linear'),
             dtick=time_axis['dtick'],
             ticklabelmode='period',
             range=[pd.Timestamp(start_date), pd.Timestamp(end_date) + MARLEY_AXIS_END_OFFSET],
@@ -4646,6 +4697,7 @@ def _make_ponderosa_difference_chart(comparison, variable, selected_range):
             gridcolor="rgba(76, 70, 120, 0.07)",
             zeroline=False,
             tickformat=time_axis['tickformat'],
+            tickmode=time_axis.get('tickmode', 'linear'),
             dtick=time_axis['dtick'],
             range=[pd.Timestamp(start_date), pd.Timestamp(end_date) + MARLEY_AXIS_END_OFFSET],
         ),
@@ -4766,6 +4818,7 @@ def _make_ponderosa_ecowitt_individual_chart(df, variable, selected_range):
             gridcolor="rgba(76, 70, 120, 0.07)",
             zeroline=False,
             tickformat=time_axis['tickformat'],
+            tickmode=time_axis.get('tickmode', 'linear'),
             dtick=time_axis['dtick'],
             range=[pd.Timestamp(start_date), pd.Timestamp(end_date) + MARLEY_AXIS_END_OFFSET],
         ),
@@ -5000,15 +5053,17 @@ def _render_ponderosa_ecowitt_dashboard(df_variables_all, df_cortinas_all, selec
 
     with st.sidebar.expander("Periodo", expanded=True):
         if min_date == max_date:
-            fecha_unica = st.selectbox(
+            fecha_unica = _date_input_with_state(
                 "Seleccionar fecha:",
-                options=available_dates,
-                index=0,
+                default_value=max_date,
                 key="ponderosa_ecowitt_fecha_unica",
-                format_func=lambda value: value.strftime('%Y/%m/%d'),
-                help=FILTER_HELP_TEXTS['fecha']
+                min_value=min_date,
+                max_value=max_date,
+                help_text=FILTER_HELP_TEXTS['fecha']
             )
+            fecha_unica = _get_nearest_available_date(fecha_unica, available_dates)
             selected_range = (fecha_unica, fecha_unica)
+            navigation_state_key = "ponderosa_ecowitt_fecha_unica"
         else:
             modo_fechas = st.radio(
                 "Modo de fechas:",
@@ -5022,17 +5077,19 @@ def _render_ponderosa_ecowitt_dashboard(df_variables_all, df_cortinas_all, selec
                     st.session_state.get("ponderosa_ecowitt_fecha_un_dia", max_date),
                     max_date
                 )
-                fecha_unica_index = available_dates.index(fecha_unica_default) if fecha_unica_default in available_dates else len(available_dates) - 1
+                fecha_unica_default = _get_nearest_available_date(fecha_unica_default, available_dates)
                 _sidebar_field_label("calendar", "Seleccionar fecha")
-                fecha_unica = st.selectbox(
+                fecha_unica = _date_input_with_state(
                     "Seleccionar fecha:",
-                    options=available_dates,
-                    index=fecha_unica_index,
+                    default_value=fecha_unica_default,
                     key="ponderosa_ecowitt_fecha_un_dia",
-                    format_func=lambda value: value.strftime('%Y/%m/%d'),
-                    help=FILTER_HELP_TEXTS['fecha']
+                    min_value=min_date,
+                    max_value=max_date,
+                    help_text=FILTER_HELP_TEXTS['fecha']
                 )
+                fecha_unica = _get_nearest_available_date(fecha_unica, available_dates)
                 selected_range = (fecha_unica, fecha_unica)
+                navigation_state_key = "ponderosa_ecowitt_fecha_un_dia"
             else:
                 default_range_end = _get_sidebar_default_range_end(min_date, max_date, default_days=5)
                 fecha_inicio_default = _coerce_sidebar_date(
@@ -5043,26 +5100,28 @@ def _render_ponderosa_ecowitt_dashboard(df_variables_all, df_cortinas_all, selec
                     st.session_state.get("ponderosa_ecowitt_fecha_fin", default_range_end),
                     default_range_end
                 )
-                fecha_inicio_index = available_dates.index(fecha_inicio_default) if fecha_inicio_default in available_dates else 0
-                fecha_fin_index = available_dates.index(fecha_fin_default) if fecha_fin_default in available_dates else len(available_dates) - 1
+                fecha_inicio_default = _get_nearest_available_date(fecha_inicio_default, available_dates)
+                fecha_fin_default = _get_nearest_available_date(fecha_fin_default, available_dates)
                 _sidebar_field_label("calendar", "Fecha inicio")
-                fecha_inicio = st.selectbox(
+                fecha_inicio = _date_input_with_state(
                     "Fecha inicio:",
-                    options=available_dates,
-                    index=fecha_inicio_index,
+                    default_value=fecha_inicio_default,
                     key="ponderosa_ecowitt_fecha_inicio",
-                    format_func=lambda value: value.strftime('%Y/%m/%d'),
-                    help=FILTER_HELP_TEXTS['fecha']
+                    min_value=min_date,
+                    max_value=max_date,
+                    help_text=FILTER_HELP_TEXTS['fecha']
                 )
                 _sidebar_field_label("calendar", "Fecha fin")
-                fecha_fin = st.selectbox(
+                fecha_fin = _date_input_with_state(
                     "Fecha fin:",
-                    options=available_dates,
-                    index=fecha_fin_index,
+                    default_value=fecha_fin_default,
                     key="ponderosa_ecowitt_fecha_fin",
-                    format_func=lambda value: value.strftime('%Y/%m/%d'),
-                    help=FILTER_HELP_TEXTS['fecha']
+                    min_value=min_date,
+                    max_value=max_date,
+                    help_text=FILTER_HELP_TEXTS['fecha']
                 )
+                fecha_inicio = _get_nearest_available_date(fecha_inicio, available_dates)
+                fecha_fin = _get_nearest_available_date(fecha_fin, available_dates)
                 selected_range = _normalize_sidebar_date_range(fecha_inicio, fecha_fin, min_date, max_date)
 
     filtered_df = comparison_df[comparison_df['Fecha_Filtro'].between(*selected_range)].copy()
@@ -5075,7 +5134,8 @@ def _render_ponderosa_ecowitt_dashboard(df_variables_all, df_cortinas_all, selec
         min_fecha=min_date,
         max_fecha=max_date,
         navigation_state_key=navigation_state_key,
-        title_text='Periodo Ponderosa WIGA / ECOWITT'
+        title_text='Periodo Ponderosa WIGA / ECOWITT',
+        available_dates=available_dates
     )
 
     block_label = _format_block_display_name(selected_source_code)
