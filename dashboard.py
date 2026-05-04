@@ -163,7 +163,7 @@ VARIABLE_SELECTOR_LABELS = {
     'PUERTA 2': 'Puerta 2'
 }
 FILTER_HELP_TEXTS = {
-    'modo_dashboard': 'Elige entre la vista de correlación por bloque y la vista comparativa de varianza y promedio por franja horaria.',
+    'modo_dashboard': 'Elige entre correlación por bloque, varianza y promedio por franja horaria, o comparativa WIGA / ECOWITT cuando esté disponible.',
     'finca': 'Selecciona la finca que quieres explorar en el dashboard. Los bloques y fechas disponibles se ajustan según esa finca.',
     'modo_fechas': 'Define si quieres analizar un solo día o un rango de varios días.',
     'fecha': 'Selecciona la fecha o el rango que se usará para filtrar los registros visibles en la vista actual.',
@@ -196,7 +196,7 @@ BRAND_COLORS = {
     'white': '#FFFFFF'
 }
 APP_DIR = Path(__file__).resolve().parent
-DATA_CACHE_VERSION = "2026-05-04-date-fix-v1"
+DATA_CACHE_VERSION = "2026-05-04-ponderosa-ecowitt-v1"
 LOGO_PATH = APP_DIR / 'logo elite.png'
 MARLEY_LOCAL_EXCEL_PATHS = [
     APP_DIR / 'Datos Final marley.xlsx',
@@ -214,6 +214,21 @@ MARLEY_SENSOR_NAMES = ("WIGA", "ECOWITT")
 MARLEY_TIME_BUCKET = "30min"
 MARLEY_SERIES_END_OFFSET = pd.Timedelta(hours=23, minutes=30)
 MARLEY_AXIS_END_OFFSET = pd.Timedelta(hours=23, minutes=59)
+PONDEROSA_ECOWITT_LOCAL_EXCEL_PATHS = [
+    APP_DIR / 'ECOWITT Ponderosa.xlsx'
+]
+PONDEROSA_ECOWITT_REMOTE_EXCEL_URLS = [
+    (
+        "https://raw.githubusercontent.com/"
+        "juandavdidtejedormedina-rgb/dashboard-invernaderos/"
+        "2a0c6005a0ce0e60ae0ab3af99dfc117cf746576/"
+        "ECOWITT%20Ponderosa.xlsx"
+    )
+]
+PONDEROSA_SENSOR_NAMES = ("WIGA", "ECOWITT")
+PONDEROSA_ECOWITT_BLOCK_CODE = "35"
+PONDEROSA_ECOWITT_RECORDS_DEFAULT = False
+PONDEROSA_ECOWITT_DETAILS_DEFAULT = False
 MARLEY_SHEETS = {
     "WIGA": ["WIGGA MONTAÑA", "WIGA MARLEY"],
     "ECOWITT": ["ECOWITT MONTAÑA", "ECOWIT MARLEY"],
@@ -244,6 +259,35 @@ MARLEY_VARIABLES = {
         "accent": "#6BEA5B",
     },
 }
+PONDEROSA_COMPARISON_VARIABLES = {
+    "Temperatura": {
+        "title": "Comparativa de temperatura",
+        "unit": "°C",
+        "colors": {"WIGA": "#F2A04B", "ECOWITT": "#C06C84"},
+        "accent": "#D39A58",
+    },
+    "Humedad Relativa": {
+        "title": "Comparativa de humedad relativa",
+        "unit": "%",
+        "colors": {"WIGA": "#4A4A4A", "ECOWITT": "#7DB7FF"},
+        "accent": "#8077AE",
+    },
+    "Radiación PAR": {
+        "title": "Comparativa de radiación PAR",
+        "unit": "µmol m-2 s-1",
+        "colors": {"WIGA": "#6BEA5B", "ECOWITT": "#524B82"},
+        "accent": "#6BEA5B",
+    },
+}
+PONDEROSA_ECOWITT_VARIABLES = {
+    **PONDEROSA_COMPARISON_VARIABLES,
+    "LUX": {
+        "title": "Luminosidad LUX",
+        "unit": "lux",
+        "colors": {"ECOWITT": "#B9832F"},
+        "accent": "#B9832F",
+    },
+}
 MARLEY_CANONICAL_COLUMNS = {
     "fecha": "Fecha",
     "hora": "Hora",
@@ -261,6 +305,20 @@ MARLEY_CANONICAL_COLUMNS = {
     "radiacion par mol m 2 s 1": "Radiación PAR (µmol m-2 s-1)",
     "radiacion par umol m 2 s 1": "Radiación PAR (µmol m-2 s-1)",
     "radiacion par": "Radiación PAR (µmol m-2 s-1)",
+}
+PONDEROSA_ECOWITT_CANONICAL_COLUMNS = {
+    "timestamp recepcion": "FechaHora",
+    "fecha hora": "FechaHora",
+    "fechahora": "FechaHora",
+    "temperatura c": "Temperatura",
+    "temperatura": "Temperatura",
+    "humedad relativa": "Humedad Relativa",
+    "humedad relativa %": "Humedad Relativa",
+    "radiacion par umol m 2 s 1": "Radiación PAR",
+    "radiacion par mol m 2 s 1": "Radiación PAR",
+    "radiacion par": "Radiación PAR",
+    "luz lux": "LUX",
+    "lux": "LUX",
 }
 LOGO_URL_LARGE = "https://raw.githubusercontent.com/juandavdidtejedormedina-rgb/dashboard-invernaderos/main/logo%20elite.png"
 LOGO_URL_SMALL = LOGO_URL_LARGE
@@ -4258,6 +4316,845 @@ def _render_marley_dashboard(dashboard_mode):
     st.stop()
 
 
+def _resolve_ponderosa_ecowitt_sources():
+    sources = []
+    for candidate in PONDEROSA_ECOWITT_LOCAL_EXCEL_PATHS:
+        if candidate.exists():
+            sources.append(candidate)
+    sources.extend(PONDEROSA_ECOWITT_REMOTE_EXCEL_URLS)
+    return sources
+
+
+def _build_ponderosa_ecowitt_source_signature(excel_source):
+    if isinstance(excel_source, Path):
+        stat = excel_source.stat()
+        return f"{excel_source}|{stat.st_mtime_ns}|{stat.st_size}|{DATA_CACHE_VERSION}"
+    return f"{excel_source}|{DATA_CACHE_VERSION}"
+
+
+def _open_ponderosa_ecowitt_workbook(excel_source):
+    if isinstance(excel_source, Path):
+        return pd.ExcelFile(excel_source)
+
+    response = requests.get(excel_source, timeout=45)
+    response.raise_for_status()
+    return pd.ExcelFile(io.BytesIO(response.content))
+
+
+def _standardize_ponderosa_ecowitt_columns(df):
+    renamed = {}
+    for column in df.columns:
+        normalized = _build_normalized_text_key(column)
+        if normalized in PONDEROSA_ECOWITT_CANONICAL_COLUMNS:
+            renamed[column] = PONDEROSA_ECOWITT_CANONICAL_COLUMNS[normalized]
+    return df.rename(columns=renamed)
+
+
+@st.cache_data(show_spinner="Cargando ECOWITT Ponderosa...")
+def _load_ponderosa_ecowitt_data_from_source(excel_source, source_signature):
+    _ = source_signature
+    workbook = _open_ponderosa_ecowitt_workbook(excel_source)
+    sheet_name = workbook.sheet_names[0]
+    df = workbook.parse(sheet_name=sheet_name)
+    df = _standardize_ponderosa_ecowitt_columns(df)
+
+    if 'FechaHora' not in df.columns:
+        raise ValueError("El archivo ECOWITT Ponderosa no tiene una columna de fecha/hora reconocible.")
+
+    df['FechaHora'] = pd.to_datetime(df['FechaHora'], errors='coerce')
+    df = df.dropna(subset=['FechaHora']).sort_values('FechaHora')
+    df['Fecha_Filtro'] = df['FechaHora'].dt.date
+
+    for variable in PONDEROSA_ECOWITT_VARIABLES:
+        if variable not in df.columns:
+            df[variable] = pd.NA
+        df[variable] = pd.to_numeric(df[variable], errors='coerce')
+
+    return df[['FechaHora', 'Fecha_Filtro', *PONDEROSA_ECOWITT_VARIABLES.keys()]].copy()
+
+
+def _load_ponderosa_ecowitt_data():
+    errors = []
+    for excel_source in _resolve_ponderosa_ecowitt_sources():
+        try:
+            return _load_ponderosa_ecowitt_data_from_source(
+                excel_source,
+                _build_ponderosa_ecowitt_source_signature(excel_source)
+            )
+        except Exception as error:
+            errors.append(f"{excel_source}: {error}")
+
+    raise ValueError("No fue posible cargar ECOWITT Ponderosa.\n" + "\n".join(errors))
+
+
+def _build_ponderosa_wiga_source(df_variables_all, bloque_variables):
+    if df_variables_all.empty or not bloque_variables:
+        return pd.DataFrame()
+
+    required_columns = ['DateTime', 'Fecha_Filtro', *PONDEROSA_COMPARISON_VARIABLES.keys()]
+    available_columns = [column for column in required_columns if column in df_variables_all.columns]
+    if 'DateTime' not in available_columns:
+        return pd.DataFrame()
+
+    df = df_variables_all[df_variables_all['Bloque'] == bloque_variables][available_columns].copy()
+    if df.empty:
+        return df
+
+    df['FechaHora'] = pd.to_datetime(df['DateTime'], errors='coerce')
+    df = df.dropna(subset=['FechaHora']).sort_values('FechaHora')
+    if 'Fecha_Filtro' not in df.columns:
+        df['Fecha_Filtro'] = df['FechaHora'].dt.date
+
+    for variable in PONDEROSA_COMPARISON_VARIABLES:
+        if variable not in df.columns:
+            df[variable] = pd.NA
+        df[variable] = pd.to_numeric(df[variable], errors='coerce')
+
+    df = df[['FechaHora', 'Fecha_Filtro', *PONDEROSA_COMPARISON_VARIABLES.keys()]].copy()
+    for variable in PONDEROSA_COMPARISON_VARIABLES:
+        df.rename(columns={variable: f"{variable} - WIGA"}, inplace=True)
+    return df
+
+
+def _build_ponderosa_ecowitt_source(ecowitt_df):
+    if ecowitt_df.empty:
+        return pd.DataFrame()
+
+    df = ecowitt_df[['FechaHora', 'Fecha_Filtro', *PONDEROSA_ECOWITT_VARIABLES.keys()]].copy()
+    for variable in PONDEROSA_ECOWITT_VARIABLES:
+        df.rename(columns={variable: f"{variable} - ECOWITT"}, inplace=True)
+    return df
+
+
+def _build_ponderosa_comparison_dataset(df_variables_all, ecowitt_df, bloque_variables):
+    wiga_source = _build_ponderosa_wiga_source(df_variables_all, bloque_variables)
+    ecowitt_source = _build_ponderosa_ecowitt_source(ecowitt_df)
+    if wiga_source.empty and ecowitt_source.empty:
+        return pd.DataFrame(), {'WIGA': wiga_source, 'ECOWITT': ecowitt_source}
+
+    merge_frames = []
+    if not wiga_source.empty:
+        merge_frames.append(wiga_source.drop(columns=['Fecha_Filtro'], errors='ignore'))
+    if not ecowitt_source.empty:
+        merge_frames.append(ecowitt_source.drop(columns=['Fecha_Filtro'], errors='ignore'))
+
+    merged = merge_frames[0]
+    for frame in merge_frames[1:]:
+        merged = merged.merge(frame, on='FechaHora', how='outer')
+
+    merged = merged.sort_values('FechaHora').reset_index(drop=True)
+    merged['Fecha_Filtro'] = merged['FechaHora'].dt.date
+    return merged, {'WIGA': wiga_source, 'ECOWITT': ecowitt_source}
+
+
+def _build_ponderosa_full_time_index(selected_range):
+    start_date, end_date = selected_range
+    return pd.date_range(
+        start=pd.Timestamp(start_date),
+        end=pd.Timestamp(end_date) + MARLEY_SERIES_END_OFFSET,
+        freq=MARLEY_TIME_BUCKET,
+    )
+
+
+def _build_ponderosa_hourly_series(df, column_name, selected_range):
+    source_df = df[['FechaHora', column_name]].dropna(subset=[column_name]).copy()
+    if source_df.empty:
+        return source_df
+
+    source_df['FechaHora'] = source_df['FechaHora'].dt.floor(MARLEY_TIME_BUCKET)
+    source_df = source_df.groupby('FechaHora', as_index=False)[column_name].mean()
+    full_index = _build_ponderosa_full_time_index(selected_range)
+    source_df = source_df.set_index('FechaHora').reindex(full_index).rename_axis('FechaHora').reset_index()
+    return source_df
+
+
+def _build_ponderosa_hourly_comparison(df, variable, selected_range):
+    wiga_col = f"{variable} - WIGA"
+    ecowitt_col = f"{variable} - ECOWITT"
+
+    hourly_wiga = _build_ponderosa_hourly_series(df, wiga_col, selected_range).rename(columns={wiga_col: 'WIGA'})
+    hourly_eco = _build_ponderosa_hourly_series(df, ecowitt_col, selected_range).rename(columns={ecowitt_col: 'ECOWITT'})
+    comparison = hourly_wiga.merge(hourly_eco, on='FechaHora', how='outer')
+    comparison['DiffPct'] = pd.NA
+    comparison['DiffValue'] = pd.NA
+    comparison['SignedDiff'] = pd.NA
+
+    valid_mask = comparison['WIGA'].notna() & comparison['ECOWITT'].notna()
+    comparison.loc[valid_mask, 'SignedDiff'] = comparison.loc[valid_mask, 'WIGA'] - comparison.loc[valid_mask, 'ECOWITT']
+    comparison.loc[valid_mask, 'DiffValue'] = comparison.loc[valid_mask, 'SignedDiff'].abs()
+    pct_base = (comparison.loc[valid_mask, 'WIGA'].abs() + comparison.loc[valid_mask, 'ECOWITT'].abs()) / 2
+    valid_pct_index = pct_base[pct_base != 0].index
+    comparison.loc[valid_pct_index, 'DiffPct'] = (
+        comparison.loc[valid_pct_index, 'DiffValue'] / pct_base.loc[valid_pct_index] * 100
+    )
+    comparison['SignedDiffLabel'] = comparison['SignedDiff'].apply(
+        lambda value: "No disponible" if pd.isna(value) else f"{value:+.2f}"
+    )
+    comparison['DiffValueLabel'] = comparison['DiffValue'].apply(
+        lambda value: "No disponible" if pd.isna(value) else f"{value:.2f}"
+    )
+    comparison['DiffPctLabel'] = comparison['DiffPct'].apply(
+        lambda value: "No disponible" if pd.isna(value) else f"{value:.2f}%"
+    )
+    return comparison
+
+
+def _get_ponderosa_y_axis_config(df, variable):
+    config = PONDEROSA_COMPARISON_VARIABLES.get(variable) or PONDEROSA_ECOWITT_VARIABLES[variable]
+    series = []
+    for source_name in PONDEROSA_SENSOR_NAMES:
+        column_name = f"{variable} - {source_name}"
+        if column_name in df.columns:
+            clean = pd.to_numeric(df[column_name], errors='coerce').dropna()
+            if not clean.empty:
+                series.append(clean)
+
+    if not series:
+        return {'title': config['unit']}
+
+    values = pd.concat(series, ignore_index=True)
+    vmin = float(values.min())
+    vmax = float(values.max())
+
+    if variable == 'Humedad Relativa':
+        axis_min = max(0, min(100, (int(vmin // 5) * 5) - 5))
+        axis_max = min(100, (int(vmax // 5) * 5) + 5)
+        if axis_max <= axis_min:
+            axis_max = min(100, axis_min + 5)
+        return {'title': 'Humedad relativa (%)', 'range': [axis_min, axis_max], 'dtick': 5, 'ticksuffix': '%'}
+
+    if variable == 'Temperatura':
+        return {'title': 'Temperatura (°C)', 'range': [round(vmin - 1.5, 1), round(vmax + 1.5, 1)], 'dtick': 2}
+
+    if variable == 'LUX':
+        axis_max = int(vmax * 1.08) if vmax > 0 else 100
+        return {'title': 'LUX', 'range': [0, axis_max], 'dtick': 10000 if axis_max > 50000 else 5000}
+
+    axis_max = int(vmax * 1.05) if vmax > 0 else 10
+    spread = max(axis_max, 1)
+    dtick = 10 if spread <= 100 else 25 if spread <= 300 else 50 if spread <= 800 else 100
+    return {'title': 'Radiación PAR (µmol m-2 s-1)', 'range': [-25, axis_max], 'dtick': dtick}
+
+
+def _make_ponderosa_comparison_chart(comparison, variable, selected_range):
+    config = PONDEROSA_COMPARISON_VARIABLES[variable]
+    fig = go.Figure()
+    time_axis = _get_marley_time_axis_config(comparison)
+    y_axis = _get_ponderosa_y_axis_config(
+        comparison.rename(columns={name: f"{variable} - {name}" for name in PONDEROSA_SENSOR_NAMES}),
+        variable
+    )
+    start_date, end_date = selected_range
+    multi_day_view = start_date != end_date
+
+    for source_name in PONDEROSA_SENSOR_NAMES:
+        source_df = comparison[['FechaHora', source_name, 'SignedDiffLabel', 'DiffValueLabel', 'DiffPctLabel']].copy()
+        if source_df[source_name].dropna().empty:
+            continue
+
+        fig.add_trace(
+            go.Scatter(
+                x=source_df['FechaHora'],
+                y=source_df[source_name],
+                name=source_name,
+                mode='lines' if multi_day_view else 'lines+markers',
+                line=dict(color=config['colors'][source_name], width=3),
+                marker=dict(size=6),
+                connectgaps=False,
+                customdata=source_df[['SignedDiffLabel', 'DiffValueLabel', 'DiffPctLabel']],
+                hovertemplate=(
+                    "<b>%{x|%Y-%m-%d %H:%M}</b><br>"
+                    + f"{source_name}: "
+                    + "%{y:.2f} "
+                    + config['unit']
+                    + "<br>Diferencia WIGA - ECOWITT: %{customdata[0]} "
+                    + config['unit']
+                    + "<br>Diferencia absoluta: %{customdata[1]} "
+                    + config['unit']
+                    + "<br>Diferencia % sobre promedio: %{customdata[2]}<extra></extra>"
+                ),
+            )
+        )
+
+    fig.update_layout(
+        title=dict(text=config['title'], x=0, xanchor='left'),
+        height=470,
+        margin=dict(l=28, r=28, t=74, b=28),
+        paper_bgcolor="rgba(255,255,255,0)",
+        plot_bgcolor="rgba(250,248,243,0.72)",
+        hovermode='x unified',
+        template='plotly_white',
+        legend=dict(orientation='h', yanchor='bottom', y=1.02, xanchor='left', x=0),
+        xaxis=dict(
+            title=time_axis['title'],
+            showgrid=True,
+            gridcolor="rgba(76, 70, 120, 0.07)",
+            zeroline=False,
+            tickformat=time_axis['tickformat'],
+            dtick=time_axis['dtick'],
+            ticklabelmode='period',
+            range=[pd.Timestamp(start_date), pd.Timestamp(end_date) + MARLEY_AXIS_END_OFFSET],
+        ),
+        yaxis=dict(
+            title=y_axis['title'],
+            showgrid=True,
+            gridcolor="rgba(76, 70, 120, 0.07)",
+            zeroline=False,
+            range=y_axis.get('range'),
+            dtick=y_axis.get('dtick'),
+            ticksuffix=y_axis.get('ticksuffix', ''),
+        ),
+    )
+    return fig
+
+
+def _make_ponderosa_difference_chart(comparison, variable, selected_range):
+    diff_df = comparison[['FechaHora', 'SignedDiff']].dropna().copy()
+    if diff_df.empty:
+        return None
+
+    config = PONDEROSA_COMPARISON_VARIABLES[variable]
+    time_axis = _get_marley_time_axis_config(comparison)
+    start_date, end_date = selected_range
+    multi_day_view = start_date != end_date
+    max_abs_diff = float(diff_df['SignedDiff'].abs().max())
+    axis_limit = max(round(max_abs_diff * 1.15, 2), 0.5)
+
+    fig = go.Figure()
+    fig.add_trace(
+        (go.Scattergl if multi_day_view else go.Scatter)(
+            x=diff_df['FechaHora'],
+            y=diff_df['SignedDiff'],
+            name='WIGA - ECOWITT',
+            mode='lines+markers',
+            line=dict(color=config['accent'], width=3),
+            marker=dict(size=6),
+            hovertemplate="<b>%{x|%Y-%m-%d %H:%M}</b><br>Diferencia: %{y:+.2f} " + config['unit'] + "<extra></extra>",
+        )
+    )
+    fig.add_hline(y=0, line_width=1.4, line_dash='dash', line_color="rgba(45, 48, 64, 0.45)")
+    fig.update_layout(
+        title=dict(text="Diferencia entre sensores por bloque de 30 minutos", x=0, xanchor='left'),
+        height=340,
+        margin=dict(l=28, r=28, t=72, b=28),
+        paper_bgcolor="rgba(255,255,255,0)",
+        plot_bgcolor="rgba(250,248,243,0.72)",
+        template='plotly_white',
+        xaxis=dict(
+            title=time_axis['title'],
+            showgrid=True,
+            gridcolor="rgba(76, 70, 120, 0.07)",
+            zeroline=False,
+            tickformat=time_axis['tickformat'],
+            dtick=time_axis['dtick'],
+            range=[pd.Timestamp(start_date), pd.Timestamp(end_date) + MARLEY_AXIS_END_OFFSET],
+        ),
+        yaxis=dict(
+            title=f"Diferencia ({config['unit']})",
+            range=[-axis_limit, axis_limit],
+            showgrid=True,
+            gridcolor="rgba(76, 70, 120, 0.07)",
+            zeroline=False,
+        ),
+    )
+    return fig
+
+
+def _make_ponderosa_scatter_chart(comparison, variable):
+    hourly = comparison.dropna(subset=list(PONDEROSA_SENSOR_NAMES)).copy()
+    if hourly.empty:
+        return None
+
+    config = PONDEROSA_COMPARISON_VARIABLES[variable]
+    axis_min = float(min(hourly['WIGA'].min(), hourly['ECOWITT'].min()))
+    axis_max = float(max(hourly['WIGA'].max(), hourly['ECOWITT'].max()))
+    padding = max((axis_max - axis_min) * 0.08, 0.5)
+    axis_min -= padding
+    axis_max += padding
+
+    fig = go.Figure()
+    fig.add_trace(
+        go.Scatter(
+            x=hourly['WIGA'],
+            y=hourly['ECOWITT'],
+            mode='markers',
+            name='Lecturas simultáneas',
+            marker=dict(size=8, color=config['accent'], opacity=0.72),
+            text=hourly['FechaHora'].dt.strftime('%Y-%m-%d %H:%M'),
+            hovertemplate="<b>%{text}</b><br>WIGA: %{x:.2f} " + config['unit'] + "<br>ECOWITT: %{y:.2f} " + config['unit'] + "<extra></extra>",
+        )
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=[axis_min, axis_max],
+            y=[axis_min, axis_max],
+            mode='lines',
+            name='Referencia y = x',
+            line=dict(color="#D39A58", width=2, dash='dash'),
+            hoverinfo='skip',
+        )
+    )
+    fig.update_layout(
+        title=dict(text="Dispersión entre sensores", x=0, xanchor='left'),
+        height=420,
+        margin=dict(l=28, r=28, t=72, b=28),
+        paper_bgcolor="rgba(255,255,255,0)",
+        plot_bgcolor="rgba(250,248,243,0.72)",
+        template='plotly_white',
+        legend=dict(orientation='h', yanchor='bottom', y=1.02, xanchor='left', x=0),
+        xaxis=dict(title=f"WIGA ({config['unit']})", range=[axis_min, axis_max], showgrid=True, zeroline=False),
+        yaxis=dict(title=f"ECOWITT ({config['unit']})", range=[axis_min, axis_max], showgrid=True, zeroline=False, scaleanchor='x', scaleratio=1),
+    )
+    return fig
+
+
+def _build_ponderosa_ecowitt_individual_series(df, variable, selected_range):
+    column_name = f"{variable} - ECOWITT"
+    if df.empty or column_name not in df.columns:
+        return pd.DataFrame()
+
+    series_df = _build_ponderosa_hourly_series(df, column_name, selected_range)
+    if series_df.empty or series_df[column_name].dropna().empty:
+        return pd.DataFrame()
+    return series_df.rename(columns={column_name: 'Valor'})
+
+
+def _make_ponderosa_ecowitt_individual_chart(df, variable, selected_range):
+    series_df = _build_ponderosa_ecowitt_individual_series(df, variable, selected_range)
+    if series_df.empty:
+        return None
+
+    config = PONDEROSA_ECOWITT_VARIABLES[variable]
+    time_axis = _get_marley_time_axis_config(series_df)
+    start_date, end_date = selected_range
+    y_axis = _get_ponderosa_y_axis_config(
+        series_df.rename(columns={'Valor': f"{variable} - ECOWITT"}),
+        variable
+    )
+
+    fig = go.Figure()
+    fig.add_trace(
+        go.Scatter(
+            x=series_df['FechaHora'],
+            y=series_df['Valor'],
+            name=config['title'],
+            mode='lines+markers',
+            line=dict(color=config['colors'].get('ECOWITT', config['accent']), width=2.7),
+            marker=dict(size=5),
+            connectgaps=False,
+            hovertemplate=(
+                "<b>%{x|%Y-%m-%d %H:%M}</b><br>"
+                + config['title']
+                + ": %{y:.2f} "
+                + config['unit']
+                + "<extra></extra>"
+            ),
+        )
+    )
+    fig.update_layout(
+        title=dict(text=f"{config['title']} - ECOWITT", x=0, xanchor='left'),
+        height=305,
+        margin=dict(l=24, r=18, t=54, b=42),
+        paper_bgcolor="rgba(255,255,255,0)",
+        plot_bgcolor="rgba(250,248,243,0.72)",
+        hovermode='x unified',
+        template='plotly_white',
+        showlegend=False,
+        xaxis=dict(
+            title=time_axis['title'],
+            showgrid=True,
+            gridcolor="rgba(76, 70, 120, 0.07)",
+            zeroline=False,
+            tickformat=time_axis['tickformat'],
+            dtick=time_axis['dtick'],
+            range=[pd.Timestamp(start_date), pd.Timestamp(end_date) + MARLEY_AXIS_END_OFFSET],
+        ),
+        yaxis=dict(
+            title=y_axis['title'],
+            showgrid=True,
+            gridcolor="rgba(76, 70, 120, 0.07)",
+            zeroline=False,
+            range=y_axis.get('range'),
+            dtick=y_axis.get('dtick'),
+            ticksuffix=y_axis.get('ticksuffix', ''),
+        ),
+    )
+    return fig
+
+
+def _render_ponderosa_ecowitt_individual_charts(filtered_df, selected_range):
+    rendered_charts = []
+    for variable in PONDEROSA_ECOWITT_VARIABLES:
+        chart = _make_ponderosa_ecowitt_individual_chart(filtered_df, variable, selected_range)
+        if chart is not None:
+            rendered_charts.append(chart)
+
+    if not rendered_charts:
+        return
+
+    st.markdown("### Variables individuales ECOWITT Ponderosa")
+    _render_chart_explanation(
+        'Lectura individual ECOWITT',
+        'Estas gráficas muestran las cuatro variables medidas por ECOWITT, incluyendo LUX, sin mezclarlas con WIGA.',
+        accent=BRAND_COLORS['hero']
+    )
+
+    for start in range(0, len(rendered_charts), 2):
+        cols = st.columns(2)
+        for offset, chart in enumerate(rendered_charts[start:start + 2]):
+            with cols[offset]:
+                _plotly_chart(chart)
+
+
+def _render_ponderosa_comparison_metric_cards(overlap, selected_variable):
+    config = PONDEROSA_COMPARISON_VARIABLES[selected_variable]
+    avg_abs_diff = overlap['DiffValue'].mean() if not overlap.empty else None
+    avg_signed_diff = overlap['SignedDiff'].mean() if not overlap.empty else None
+    std_diff = overlap['SignedDiff'].std() if not overlap.empty else None
+    unit = config['unit']
+
+    if pd.isna(avg_signed_diff):
+        signed_interpretation = "No hay suficientes lecturas simultáneas para identificar cuál sensor quedó por encima."
+    elif avg_signed_diff > 0:
+        signed_interpretation = "En promedio, WIGA estuvo por encima de ECOWITT en esta variable."
+    elif avg_signed_diff < 0:
+        signed_interpretation = "En promedio, ECOWITT estuvo por encima de WIGA en esta variable."
+    else:
+        signed_interpretation = "En promedio, ambos sensores quedaron prácticamente alineados."
+
+    if pd.isna(std_diff):
+        std_interpretation = "No hay suficientes lecturas comparables para evaluar estabilidad."
+    elif std_diff <= 0.3:
+        std_interpretation = "La diferencia entre sensores fue bastante estable a lo largo del tiempo."
+    elif std_diff <= 0.8:
+        std_interpretation = "La diferencia entre sensores tuvo una variación moderada entre franjas."
+    else:
+        std_interpretation = "La diferencia entre sensores cambió bastante entre bloques de 30 minutos."
+
+    metric_cards = [
+        {
+            'title': 'Diferencia absoluta media',
+            'value': f"{avg_abs_diff:.2f} {unit}" if pd.notna(avg_abs_diff) else "Sin datos",
+            'accent': config['colors']['WIGA'],
+            'description': "Mide qué tan separados estuvieron WIGA y ECOWITT en promedio, sin importar cuál quedó por encima.",
+            'insight': (
+                "Mientras más bajo sea este valor, más parecidas fueron las lecturas entre ambos sensores."
+                if pd.notna(avg_abs_diff) else
+                "Necesitamos más datos simultáneos para medir qué tan separados estuvieron ambos sensores."
+            ),
+        },
+        {
+            'title': 'Diferencia media WIGA - ECOWITT',
+            'value': f"{avg_signed_diff:+.2f} {unit}" if pd.notna(avg_signed_diff) else "Sin datos",
+            'accent': config['colors']['ECOWITT'],
+            'description': "Conserva el signo de la diferencia. Nos dice si uno de los sensores tiende a leer más alto que el otro.",
+            'insight': signed_interpretation,
+        },
+        {
+            'title': 'Desviación estándar',
+            'value': f"{std_diff:.2f} {unit}" if pd.notna(std_diff) else "Sin datos",
+            'accent': config['accent'],
+            'description': "Muestra qué tan estable fue la diferencia entre ambos sensores a lo largo del tiempo.",
+            'insight': std_interpretation,
+        },
+    ]
+
+    metric_cols = st.columns(3)
+    for idx, metric in enumerate(metric_cards):
+        with metric_cols[idx]:
+            st.markdown(
+                f"""
+                <div style="
+                    background: linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(247,244,238,0.96) 100%);
+                    border: 1px solid rgba(84, 83, 134, 0.10);
+                    border-top: 4px solid {metric['accent']};
+                    border-radius: 24px;
+                    padding: 1.15rem 1.1rem 1rem 1.1rem;
+                    box-shadow: 0 18px 36px rgba(44, 46, 42, 0.08);
+                    min-height: 255px;
+                ">
+                    <div style="
+                        font-family: 'Manrope', sans-serif;
+                        font-size: 0.82rem;
+                        font-weight: 800;
+                        letter-spacing: 0.03em;
+                        text-transform: uppercase;
+                        color: {metric['accent']};
+                        margin-bottom: 0.7rem;
+                    ">
+                        {html.escape(metric['title'])}
+                    </div>
+                    <div style="
+                        font-family: 'Manrope', sans-serif;
+                        font-size: 2.35rem;
+                        line-height: 1;
+                        font-weight: 800;
+                        color: {BRAND_COLORS['graphite']};
+                        margin-bottom: 0.95rem;
+                    ">
+                        {html.escape(metric['value'])}
+                    </div>
+                    <div style="
+                        font-family: 'Manrope', sans-serif;
+                        font-size: 0.94rem;
+                        line-height: 1.55;
+                        color: rgba(56, 58, 53, 0.82);
+                        margin-bottom: 0.85rem;
+                    ">
+                        {html.escape(metric['description'])}
+                    </div>
+                    <div style="
+                        background: rgba(84, 83, 134, 0.05);
+                        border: 1px solid rgba(84, 83, 134, 0.08);
+                        border-radius: 16px;
+                        padding: 0.8rem 0.85rem;
+                    ">
+                        <div style="
+                            font-family: 'Manrope', sans-serif;
+                            font-size: 0.76rem;
+                            font-weight: 800;
+                            letter-spacing: 0.04em;
+                            text-transform: uppercase;
+                            color: {BRAND_COLORS['hero']};
+                            margin-bottom: 0.35rem;
+                        ">
+                            Cómo leerlo
+                        </div>
+                        <div style="
+                            font-family: 'Manrope', sans-serif;
+                            font-size: 0.9rem;
+                            line-height: 1.55;
+                            color: {BRAND_COLORS['ink']};
+                        ">
+                            {html.escape(metric['insight'])}
+                        </div>
+                    </div>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+
+
+def _render_ponderosa_ecowitt_dashboard(df_variables_all, df_cortinas_all, selected_finca):
+    try:
+        ecowitt_df = _load_ponderosa_ecowitt_data()
+    except Exception as error:
+        st.error(f"No fue posible cargar ECOWITT Ponderosa. Detalle: {error}")
+        st.stop()
+
+    if ecowitt_df.empty:
+        st.warning("No hay datos disponibles para ECOWITT Ponderosa.")
+        st.stop()
+
+    block_codes, variable_block_map, _ = _get_block_options(
+        df_variables_all,
+        df_cortinas_all,
+        selected_finca=selected_finca
+    )
+    if PONDEROSA_ECOWITT_BLOCK_CODE not in block_codes:
+        st.warning("No hay datos WIGA del Bloque 35 disponibles para comparar con ECOWITT Ponderosa.")
+        st.stop()
+
+    with st.sidebar.expander("Fuente WIGA", expanded=True):
+        _sidebar_field_label("location", "Fuente comparada")
+        st.markdown(
+            f"""
+            <div class="sidebar-helper-text">
+                ECOWITT Ponderosa corresponde al {_format_block_display_name(PONDEROSA_ECOWITT_BLOCK_CODE)}.
+                La comparación se fija contra ese mismo bloque en Datos_Variables.
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+        selected_source_code = PONDEROSA_ECOWITT_BLOCK_CODE
+
+    bloque_variables = variable_block_map.get(selected_source_code)
+    comparison_df, source_frames = _build_ponderosa_comparison_dataset(
+        df_variables_all,
+        ecowitt_df,
+        bloque_variables
+    )
+    if comparison_df.empty:
+        st.warning("No fue posible construir la comparación entre WIGA y ECOWITT Ponderosa.")
+        st.stop()
+
+    wiga_dates = set(source_frames['WIGA']['Fecha_Filtro'].dropna().unique()) if not source_frames['WIGA'].empty else set()
+    eco_dates = set(source_frames['ECOWITT']['Fecha_Filtro'].dropna().unique()) if not source_frames['ECOWITT'].empty else set()
+    available_dates = sorted(wiga_dates & eco_dates)
+    if not available_dates:
+        st.warning("No hay fechas comunes entre la fuente WIGA seleccionada y ECOWITT Ponderosa.")
+        st.stop()
+
+    min_date = available_dates[0]
+    max_date = available_dates[-1]
+    navigation_state_key = None
+    date_state_defaults = {
+        "ponderosa_ecowitt_fecha_unica": max_date,
+        "ponderosa_ecowitt_fecha_un_dia": max_date,
+        "ponderosa_ecowitt_fecha_inicio": min_date,
+        "ponderosa_ecowitt_fecha_fin": max_date,
+    }
+    for state_key in date_state_defaults:
+        if state_key in st.session_state and st.session_state[state_key] not in available_dates:
+            del st.session_state[state_key]
+
+    with st.sidebar.expander("Periodo", expanded=True):
+        if min_date == max_date:
+            fecha_unica = st.selectbox(
+                "Seleccionar fecha:",
+                options=available_dates,
+                index=0,
+                key="ponderosa_ecowitt_fecha_unica",
+                format_func=lambda value: value.strftime('%Y/%m/%d'),
+                help=FILTER_HELP_TEXTS['fecha']
+            )
+            selected_range = (fecha_unica, fecha_unica)
+        else:
+            modo_fechas = st.radio(
+                "Modo de fechas:",
+                options=["Un día", "Varios días"],
+                horizontal=True,
+                key="ponderosa_ecowitt_modo_fechas",
+                help=FILTER_HELP_TEXTS['modo_fechas']
+            )
+            if modo_fechas == "Un día":
+                fecha_unica_default = _coerce_sidebar_date(
+                    st.session_state.get("ponderosa_ecowitt_fecha_un_dia", max_date),
+                    max_date
+                )
+                fecha_unica_index = available_dates.index(fecha_unica_default) if fecha_unica_default in available_dates else len(available_dates) - 1
+                _sidebar_field_label("calendar", "Seleccionar fecha")
+                fecha_unica = st.selectbox(
+                    "Seleccionar fecha:",
+                    options=available_dates,
+                    index=fecha_unica_index,
+                    key="ponderosa_ecowitt_fecha_un_dia",
+                    format_func=lambda value: value.strftime('%Y/%m/%d'),
+                    help=FILTER_HELP_TEXTS['fecha']
+                )
+                selected_range = (fecha_unica, fecha_unica)
+            else:
+                default_range_end = _get_sidebar_default_range_end(min_date, max_date, default_days=5)
+                fecha_inicio_default = _coerce_sidebar_date(
+                    st.session_state.get("ponderosa_ecowitt_fecha_inicio", min_date),
+                    min_date
+                )
+                fecha_fin_default = _coerce_sidebar_date(
+                    st.session_state.get("ponderosa_ecowitt_fecha_fin", default_range_end),
+                    default_range_end
+                )
+                fecha_inicio_index = available_dates.index(fecha_inicio_default) if fecha_inicio_default in available_dates else 0
+                fecha_fin_index = available_dates.index(fecha_fin_default) if fecha_fin_default in available_dates else len(available_dates) - 1
+                _sidebar_field_label("calendar", "Fecha inicio")
+                fecha_inicio = st.selectbox(
+                    "Fecha inicio:",
+                    options=available_dates,
+                    index=fecha_inicio_index,
+                    key="ponderosa_ecowitt_fecha_inicio",
+                    format_func=lambda value: value.strftime('%Y/%m/%d'),
+                    help=FILTER_HELP_TEXTS['fecha']
+                )
+                _sidebar_field_label("calendar", "Fecha fin")
+                fecha_fin = st.selectbox(
+                    "Fecha fin:",
+                    options=available_dates,
+                    index=fecha_fin_index,
+                    key="ponderosa_ecowitt_fecha_fin",
+                    format_func=lambda value: value.strftime('%Y/%m/%d'),
+                    help=FILTER_HELP_TEXTS['fecha']
+                )
+                selected_range = _normalize_sidebar_date_range(fecha_inicio, fecha_fin, min_date, max_date)
+
+    filtered_df = comparison_df[comparison_df['Fecha_Filtro'].between(*selected_range)].copy()
+    if filtered_df.empty:
+        st.warning("No hay datos disponibles en el periodo seleccionado.")
+        st.stop()
+
+    _render_selected_period_banner(
+        selected_range,
+        min_fecha=min_date,
+        max_fecha=max_date,
+        navigation_state_key=navigation_state_key,
+        title_text='Periodo Ponderosa WIGA / ECOWITT'
+    )
+
+    block_label = _format_block_display_name(selected_source_code)
+    st.markdown("## La Ponderosa - Comparativa WIGA / ECOWITT")
+    st.caption(f"Comparación entre {block_label} en Datos_Variables y la estación ECOWITT Ponderosa.")
+    _render_chart_explanation(
+        'Cómo usar esta comparación',
+        'Selecciona una variable para comparar la fuente WIGA elegida contra ECOWITT. Las lecturas se agrupan en franjas de 30 minutos para que ambos equipos queden sobre la misma línea de tiempo.',
+        accent=BRAND_COLORS['hero'],
+        kicker='Orientación'
+    )
+
+    selected_variable = st.segmented_control(
+        "Variable comparada",
+        options=list(PONDEROSA_COMPARISON_VARIABLES.keys()),
+        format_func=lambda value: PONDEROSA_COMPARISON_VARIABLES[value]['title'].replace("Comparativa de ", "").capitalize(),
+        default=list(PONDEROSA_COMPARISON_VARIABLES.keys())[0],
+        key="ponderosa_ecowitt_variable",
+    )
+    show_details = st.checkbox(
+        "Cargar variables individuales de ECOWITT",
+        key="mostrar_ponderosa_ecowitt_detalles",
+        help=FILTER_HELP_TEXTS['graficas_detalladas']
+    )
+
+    comparison = _build_ponderosa_hourly_comparison(filtered_df, selected_variable, selected_range)
+    overlap = comparison.dropna(subset=list(PONDEROSA_SENSOR_NAMES)).copy()
+    _render_ponderosa_comparison_metric_cards(overlap, selected_variable)
+
+    _render_chart_explanation(
+        'Comparación directa WIGA vs ECOWITT',
+        'Aquí se superponen ambos sensores para la variable elegida. Si las líneas viajan cerca, las lecturas son similares; si se separan, hay diferencia entre equipos en esa franja.',
+        accent=PONDEROSA_COMPARISON_VARIABLES[selected_variable]['accent']
+    )
+    _plotly_chart(_make_ponderosa_comparison_chart(comparison, selected_variable, selected_range))
+
+    difference_chart = _make_ponderosa_difference_chart(comparison, selected_variable, selected_range)
+    if difference_chart is not None:
+        _render_chart_explanation(
+            'Diferencia WIGA - ECOWITT',
+            'Valores sobre cero significan que WIGA midió más alto; valores bajo cero significan que ECOWITT midió más alto.',
+            accent=PONDEROSA_COMPARISON_VARIABLES[selected_variable]['colors']['ECOWITT']
+        )
+        _plotly_chart(difference_chart)
+
+    scatter_chart = _make_ponderosa_scatter_chart(comparison, selected_variable)
+    if scatter_chart is not None:
+        _render_chart_explanation(
+            'Dispersión entre sensores',
+            'Cada punto cruza una lectura simultánea de WIGA y ECOWITT. Mientras más cerca esté de la línea diagonal, más parecidos fueron ambos sensores.',
+            accent=PONDEROSA_COMPARISON_VARIABLES[selected_variable]['colors']['WIGA']
+        )
+        _plotly_chart(scatter_chart)
+    else:
+        st.info("No hay suficientes datos simultáneos entre WIGA y ECOWITT para construir la dispersión.")
+
+    if show_details:
+        _render_ponderosa_ecowitt_individual_charts(filtered_df, selected_range)
+
+    if st.checkbox(
+        "Cargar registros consolidados de Ponderosa",
+        key="mostrar_ponderosa_ecowitt_registros",
+        help=FILTER_HELP_TEXTS['registros']
+    ):
+        _dataframe(filtered_df.drop(columns=['Fecha_Filtro'], errors='ignore'), hide_index=True)
+        summary_rows = []
+        for source_name, source_df in source_frames.items():
+            current = source_df[source_df['Fecha_Filtro'].between(*selected_range)] if not source_df.empty else pd.DataFrame()
+            summary_rows.append({
+                'Equipo': source_name,
+                'Registros': len(current),
+                'Inicio': current['FechaHora'].min().strftime('%Y-%m-%d %H:%M') if not current.empty else '-',
+                'Fin': current['FechaHora'].max().strftime('%Y-%m-%d %H:%M') if not current.empty else '-',
+            })
+        _dataframe(pd.DataFrame(summary_rows), hide_index=True)
+
+    st.stop()
+
+
 def _filter_cortinas_range(df_cortinas_all, bloque_seleccionado, fecha_inicio, fecha_fin):
     if (
         df_cortinas_all.empty or
@@ -5775,6 +6672,10 @@ if 'mostrar_marley_detalles' not in st.session_state:
     st.session_state.mostrar_marley_detalles = MARLEY_DETAIL_CHARTS_DEFAULT
 if 'mostrar_marley_registros' not in st.session_state:
     st.session_state.mostrar_marley_registros = MARLEY_RECORDS_DEFAULT
+if 'mostrar_ponderosa_ecowitt_detalles' not in st.session_state:
+    st.session_state.mostrar_ponderosa_ecowitt_detalles = PONDEROSA_ECOWITT_DETAILS_DEFAULT
+if 'mostrar_ponderosa_ecowitt_registros' not in st.session_state:
+    st.session_state.mostrar_ponderosa_ecowitt_registros = PONDEROSA_ECOWITT_RECORDS_DEFAULT
 
 st.sidebar.markdown(
     f"""
@@ -5798,7 +6699,7 @@ with st.sidebar.expander("Finca", expanded=True):
 dashboard_view_options = (
     ["Comparativa", "Varianza"]
     if selected_finca == 'Marley' else
-    ["Correlación", "Varianza Y Promedio"]
+    ["Correlación", "Varianza Y Promedio", "Comparativa WIGA / ECOWITT"]
 )
 if st.session_state.get("modo_dashboard") not in dashboard_view_options:
     st.session_state["modo_dashboard"] = dashboard_view_options[0]
@@ -5815,7 +6716,7 @@ with st.sidebar.expander("Vista", expanded=True):
         help=(
             "Elige cómo quieres analizar los sensores WIGA y ECOWITT de Marley."
             if selected_finca == 'Marley' else
-            FILTER_HELP_TEXTS['modo_dashboard']
+            "Elige la vista de Ponderosa: correlación por bloque, varianza y promedio, o comparación WIGA / ECOWITT."
         )
     )
 
@@ -5828,6 +6729,14 @@ if selected_finca == 'Marley':
     st.stop()
 
 _df_variables_all, _df_cortinas_all = cargar_dashboard_completo()
+
+if dashboard_mode == "Comparativa WIGA / ECOWITT":
+    with _loading_context(
+        st.session_state.get("ponderosa_ecowitt_modo_fechas") == "Varios días",
+        "Cargando comparativa WIGA / ECOWITT de Ponderosa..."
+    ):
+        _render_ponderosa_ecowitt_dashboard(_df_variables_all, _df_cortinas_all, selected_finca)
+    st.stop()
 
 if dashboard_mode == "Varianza Y Promedio":
     analysis_block_codes, analysis_variable_map, _ = _get_block_options(
