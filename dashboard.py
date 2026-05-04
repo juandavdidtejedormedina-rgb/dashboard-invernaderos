@@ -3438,6 +3438,7 @@ def _make_marley_comparison_chart(comparison, variable, selected_range):
         variable
     )
     start_date, end_date = selected_range
+    multi_day_view = start_date != end_date
 
     for source_name in MARLEY_SENSOR_NAMES:
         source_df = comparison[['FechaHora', source_name, 'SignedDiffLabel', 'DiffValueLabel', 'DiffPctLabel']].copy()
@@ -4294,10 +4295,10 @@ def _resolve_plot_resample_rule(total_days, total_points):
     if total_days <= 7:
         return '30min'
     if total_days <= 21:
-        return '1H'
+        return '1h'
     if total_days <= 60:
-        return '3H'
-    return '6H'
+        return '3h'
+    return '6h'
 
 
 def _prepare_sensor_series_for_plot(serie, value_col, multi_day_view=False):
@@ -4325,13 +4326,16 @@ def _prepare_sensor_series_for_plot(serie, value_col, multi_day_view=False):
     if not resample_rule:
         return _add_day_breaks_to_series(working, value_col), None
 
-    resampled = (
-        working.set_index('DateTime')[[value_col]]
-        .resample(resample_rule)
-        .mean()
-        .dropna()
-        .reset_index()
-    )
+    try:
+        resampled = (
+            working.set_index('DateTime')[[value_col]]
+            .resample(resample_rule)
+            .mean()
+            .dropna()
+            .reset_index()
+        )
+    except ValueError:
+        return _add_day_breaks_to_series(working, value_col), None
     if resampled.empty:
         return _add_day_breaks_to_series(working, value_col), None
 
