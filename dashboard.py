@@ -4032,20 +4032,32 @@ def _prepare_marley_hourly_metric_table(grouped_df):
     return table.round(2)
 
 
-def _build_marley_individual_series(df, variable, source_name, selected_range):
+def _build_marley_individual_series(df, variable, source_name, selected_range, resolution_label=COMPARISON_RESOLUTION_OPTIONS[0]):
     column_name = f"{variable} - {source_name}"
     if df.empty or column_name not in df.columns:
         return pd.DataFrame()
 
-    series_df = _build_marley_hourly_series(df, column_name, selected_range)
+    if resolution_label == COMPARISON_RESOLUTION_OPTIONS[1]:
+        series_df = df[['FechaHora', column_name]].dropna(subset=[column_name]).copy()
+        series_df['FechaHora'] = pd.to_datetime(series_df['FechaHora'], errors='coerce')
+        series_df[column_name] = pd.to_numeric(series_df[column_name], errors='coerce')
+        series_df = (
+            series_df
+            .dropna(subset=['FechaHora', column_name])
+            .sort_values('FechaHora')
+            .reset_index(drop=True)
+        )
+    else:
+        series_df = _build_marley_hourly_series(df, column_name, selected_range)
+
     if series_df.empty or series_df[column_name].dropna().empty:
         return pd.DataFrame()
 
     return series_df.rename(columns={column_name: 'Valor'})
 
 
-def _make_marley_individual_variable_chart(df, variable, source_name, selected_range):
-    series_df = _build_marley_individual_series(df, variable, source_name, selected_range)
+def _make_marley_individual_variable_chart(df, variable, source_name, selected_range, resolution_label=COMPARISON_RESOLUTION_OPTIONS[0]):
+    series_df = _build_marley_individual_series(df, variable, source_name, selected_range, resolution_label)
     if series_df.empty:
         return None
 
@@ -4053,16 +4065,19 @@ def _make_marley_individual_variable_chart(df, variable, source_name, selected_r
     time_axis = _get_marley_time_axis_config(series_df)
     start_date, end_date = selected_range
     variable_title = config['title'].replace('Comparativa de ', '').capitalize()
+    point_mode = resolution_label == COMPARISON_RESOLUTION_OPTIONS[1]
+    trace_type = go.Scattergl if point_mode and len(series_df) > 250 else go.Scatter
 
     fig = go.Figure()
     fig.add_trace(
-        go.Scatter(
+        trace_type(
             x=series_df['FechaHora'],
             y=series_df['Valor'],
             name=f"{variable_title} - {source_name}",
             mode='lines+markers',
-            line=dict(color=config['colors'][source_name], width=2.7),
-            marker=dict(size=5),
+            line=dict(color=config['colors'][source_name], width=2.1 if point_mode else 2.7),
+            marker=dict(size=3.5 if point_mode else 5),
+            opacity=0.86 if point_mode else 1,
             connectgaps=False,
             hovertemplate=(
                 "<b>%{x|%Y-%m-%d %H:%M}</b><br>"
@@ -4074,7 +4089,11 @@ def _make_marley_individual_variable_chart(df, variable, source_name, selected_r
         )
     )
     fig.update_layout(
-        title=dict(text=f"{variable_title} - {source_name}", x=0, xanchor='left'),
+        title=dict(
+            text=f"{variable_title} - {source_name}" + (" - punto por punto" if point_mode else ""),
+            x=0,
+            xanchor='left'
+        ),
         height=285,
         margin=dict(l=24, r=18, t=54, b=42),
         paper_bgcolor="rgba(255,255,255,0)",
@@ -4113,10 +4132,11 @@ def _make_source_all_variables_chart(
     source_name,
     series_builder,
     title,
+    resolution_label=COMPARISON_RESOLUTION_OPTIONS[0],
 ):
     rendered_series = []
     for variable in variables:
-        series_df = series_builder(filtered_df, variable, source_name, selected_range)
+        series_df = series_builder(filtered_df, variable, source_name, selected_range, resolution_label)
         if series_df.empty or series_df['Valor'].dropna().empty:
             continue
         rendered_series.append((variable, series_df))
@@ -4135,19 +4155,22 @@ def _make_source_all_variables_chart(
         ],
     )
     start_date, end_date = selected_range
+    point_mode = resolution_label == COMPARISON_RESOLUTION_OPTIONS[1]
 
     for row_index, (variable, series_df) in enumerate(rendered_series, start=1):
         config = variable_configs[variable]
         variable_title = config['title'].replace('Comparativa de ', '').capitalize()
         color = config['colors'].get(source_name, config.get('accent', BRAND_COLORS['hero']))
+        trace_type = go.Scattergl if point_mode and len(series_df) > 250 else go.Scatter
         fig.add_trace(
-            go.Scatter(
+            trace_type(
                 x=series_df['FechaHora'],
                 y=series_df['Valor'],
                 name=variable_title,
                 mode='lines+markers',
-                line=dict(color=color, width=2.35),
-                marker=dict(size=4),
+                line=dict(color=color, width=1.9 if point_mode else 2.35),
+                marker=dict(size=3 if point_mode else 4),
+                opacity=0.86 if point_mode else 1,
                 connectgaps=False,
                 hovertemplate=(
                     "<b>%{x|%Y-%m-%d %H:%M}</b><br>"
@@ -4181,7 +4204,7 @@ def _make_source_all_variables_chart(
     )
     fig.update_xaxes(title_text=time_axis['title'], row=len(rendered_series), col=1)
     fig.update_layout(
-        title=dict(text=title, x=0, xanchor='left'),
+        title=dict(text=title + (" - punto por punto" if point_mode else ""), x=0, xanchor='left'),
         height=max(540, 235 * len(rendered_series)),
         margin=dict(l=36, r=28, t=82, b=48),
         paper_bgcolor="rgba(255,255,255,0)",
@@ -4194,11 +4217,23 @@ def _make_source_all_variables_chart(
     return fig
 
 
-def _render_marley_individual_variable_charts(filtered_df, selected_range, source_names=MARLEY_SENSOR_NAMES, heading="Variables individuales Marley"):
+def _render_marley_individual_variable_charts(
+    filtered_df,
+    selected_range,
+    source_names=MARLEY_SENSOR_NAMES,
+    heading="Variables individuales Marley",
+    resolution_label=COMPARISON_RESOLUTION_OPTIONS[0],
+):
     rendered_charts = []
     for variable in MARLEY_VARIABLES:
         for source_name in source_names:
-            chart = _make_marley_individual_variable_chart(filtered_df, variable, source_name, selected_range)
+            chart = _make_marley_individual_variable_chart(
+                filtered_df,
+                variable,
+                source_name,
+                selected_range,
+                resolution_label
+            )
             if chart is not None:
                 rendered_charts.append(chart)
 
@@ -4330,6 +4365,13 @@ def _render_marley_dashboard(dashboard_mode):
             accent=BRAND_COLORS['hero'],
             kicker='Orientación'
         )
+        source_resolution = st.radio(
+            f"Resolución de las gráficas {source_name}:",
+            options=COMPARISON_RESOLUTION_OPTIONS,
+            horizontal=True,
+            key=f"marley_{source_name.lower()}_source_resolution",
+            help="Usa el promedio para una lectura limpia por media hora, o punto por punto para ver las lecturas reales sin agrupar."
+        )
 
         combined_chart = _make_source_all_variables_chart(
             filtered_df,
@@ -4339,6 +4381,7 @@ def _render_marley_dashboard(dashboard_mode):
             source_name,
             _build_marley_individual_series,
             f"Variables {source_name} - Marley",
+            source_resolution,
         )
         if combined_chart is None:
             st.warning(f"No hay datos suficientes para graficar las variables de {source_name} en el periodo seleccionado.")
@@ -4349,7 +4392,8 @@ def _render_marley_dashboard(dashboard_mode):
             filtered_df,
             selected_range,
             source_names=(source_name,),
-            heading=f"Variables individuales {source_name} - Marley"
+            heading=f"Variables individuales {source_name} - Marley",
+            resolution_label=source_resolution
         )
 
         if st.checkbox(
@@ -4406,7 +4450,18 @@ def _render_marley_dashboard(dashboard_mode):
         with st.expander(f"Ver tabla dinámica de {dashboard_mode.lower()}", expanded=False):
             _dataframe(_prepare_marley_hourly_metric_table(grouped_metric), hide_index=True)
         if show_marley_details:
-            _render_marley_individual_variable_charts(filtered_df, selected_range)
+            detail_resolution = st.radio(
+                "Resolución de las gráficas individuales:",
+                options=COMPARISON_RESOLUTION_OPTIONS,
+                horizontal=True,
+                key="marley_varianza_detail_resolution",
+                help="La varianza se mantiene por franja horaria; este control aplica solo a las gráficas individuales."
+            )
+            _render_marley_individual_variable_charts(
+                filtered_df,
+                selected_range,
+                resolution_label=detail_resolution
+            )
         st.stop()
 
     comparison_resolution = st.radio(
@@ -4602,7 +4657,11 @@ def _render_marley_dashboard(dashboard_mode):
         st.info("No hay suficientes datos simultáneos entre WIGA y ECOWITT para construir la dispersión.")
 
     if show_marley_details:
-        _render_marley_individual_variable_charts(filtered_df, selected_range)
+        _render_marley_individual_variable_charts(
+            filtered_df,
+            selected_range,
+            resolution_label=comparison_resolution
+        )
 
     if st.checkbox(
         "Cargar registros consolidados de Marley",
@@ -5027,25 +5086,39 @@ def _make_ponderosa_scatter_chart(comparison, variable):
     return fig
 
 
-def _build_ponderosa_ecowitt_individual_series(df, variable, selected_range):
+def _build_ponderosa_ecowitt_individual_series(df, variable, selected_range, resolution_label=COMPARISON_RESOLUTION_OPTIONS[0]):
     column_name = f"{variable} - ECOWITT"
     if df.empty or column_name not in df.columns:
         return pd.DataFrame()
 
-    series_df = _build_ponderosa_hourly_series(df, column_name, selected_range)
+    if resolution_label == COMPARISON_RESOLUTION_OPTIONS[1]:
+        series_df = df[['FechaHora', column_name]].dropna(subset=[column_name]).copy()
+        series_df['FechaHora'] = pd.to_datetime(series_df['FechaHora'], errors='coerce')
+        series_df[column_name] = pd.to_numeric(series_df[column_name], errors='coerce')
+        series_df = (
+            series_df
+            .dropna(subset=['FechaHora', column_name])
+            .sort_values('FechaHora')
+            .reset_index(drop=True)
+        )
+    else:
+        series_df = _build_ponderosa_hourly_series(df, column_name, selected_range)
+
     if series_df.empty or series_df[column_name].dropna().empty:
         return pd.DataFrame()
     return series_df.rename(columns={column_name: 'Valor'})
 
 
-def _make_ponderosa_ecowitt_individual_chart(df, variable, selected_range):
-    series_df = _build_ponderosa_ecowitt_individual_series(df, variable, selected_range)
+def _make_ponderosa_ecowitt_individual_chart(df, variable, selected_range, resolution_label=COMPARISON_RESOLUTION_OPTIONS[0]):
+    series_df = _build_ponderosa_ecowitt_individual_series(df, variable, selected_range, resolution_label)
     if series_df.empty:
         return None
 
     config = PONDEROSA_ECOWITT_VARIABLES[variable]
     time_axis = _get_marley_time_axis_config(series_df)
     start_date, end_date = selected_range
+    point_mode = resolution_label == COMPARISON_RESOLUTION_OPTIONS[1]
+    trace_type = go.Scattergl if point_mode and len(series_df) > 250 else go.Scatter
     y_axis = _get_ponderosa_y_axis_config(
         series_df.rename(columns={'Valor': f"{variable} - ECOWITT"}),
         variable
@@ -5053,13 +5126,14 @@ def _make_ponderosa_ecowitt_individual_chart(df, variable, selected_range):
 
     fig = go.Figure()
     fig.add_trace(
-        go.Scatter(
+        trace_type(
             x=series_df['FechaHora'],
             y=series_df['Valor'],
             name=config['title'],
             mode='lines+markers',
-            line=dict(color=config['colors'].get('ECOWITT', config['accent']), width=2.7),
-            marker=dict(size=5),
+            line=dict(color=config['colors'].get('ECOWITT', config['accent']), width=2.1 if point_mode else 2.7),
+            marker=dict(size=3.5 if point_mode else 5),
+            opacity=0.86 if point_mode else 1,
             connectgaps=False,
             hovertemplate=(
                 "<b>%{x|%Y-%m-%d %H:%M}</b><br>"
@@ -5071,7 +5145,11 @@ def _make_ponderosa_ecowitt_individual_chart(df, variable, selected_range):
         )
     )
     fig.update_layout(
-        title=dict(text=f"{config['title']} - ECOWITT", x=0, xanchor='left'),
+        title=dict(
+            text=f"{config['title']} - ECOWITT" + (" - punto por punto" if point_mode else ""),
+            x=0,
+            xanchor='left'
+        ),
         height=305,
         margin=dict(l=24, r=18, t=54, b=42),
         paper_bgcolor="rgba(255,255,255,0)",
@@ -5102,10 +5180,10 @@ def _make_ponderosa_ecowitt_individual_chart(df, variable, selected_range):
     return fig
 
 
-def _render_ponderosa_ecowitt_individual_charts(filtered_df, selected_range):
+def _render_ponderosa_ecowitt_individual_charts(filtered_df, selected_range, resolution_label=COMPARISON_RESOLUTION_OPTIONS[0]):
     rendered_charts = []
     for variable in PONDEROSA_ECOWITT_VARIABLES:
-        chart = _make_ponderosa_ecowitt_individual_chart(filtered_df, variable, selected_range)
+        chart = _make_ponderosa_ecowitt_individual_chart(filtered_df, variable, selected_range, resolution_label)
         if chart is not None:
             rendered_charts.append(chart)
 
@@ -5248,6 +5326,13 @@ def _render_ponderosa_ecowitt_values_dashboard():
         accent=BRAND_COLORS['hero'],
         kicker='Orientación'
     )
+    ecowitt_resolution = st.radio(
+        "Resolución de las gráficas ECOWITT:",
+        options=COMPARISON_RESOLUTION_OPTIONS,
+        horizontal=True,
+        key="ponderosa_ecowitt_only_resolution",
+        help="Usa el promedio para una lectura limpia por media hora, o punto por punto para ver las lecturas reales sin agrupar."
+    )
 
     combined_chart = _make_source_all_variables_chart(
         filtered_df,
@@ -5255,15 +5340,21 @@ def _render_ponderosa_ecowitt_values_dashboard():
         list(PONDEROSA_ECOWITT_VARIABLES.keys()),
         PONDEROSA_ECOWITT_VARIABLES,
         "ECOWITT",
-        lambda df, variable, source_name, current_range: _build_ponderosa_ecowitt_individual_series(df, variable, current_range),
+        lambda df, variable, source_name, current_range, resolution: _build_ponderosa_ecowitt_individual_series(
+            df,
+            variable,
+            current_range,
+            resolution
+        ),
         "Variables ECOWITT - La Ponderosa",
+        ecowitt_resolution,
     )
     if combined_chart is None:
         st.warning("No hay datos suficientes para graficar las variables de ECOWITT Ponderosa.")
         st.stop()
 
     _plotly_chart(combined_chart)
-    _render_ponderosa_ecowitt_individual_charts(filtered_df, selected_range)
+    _render_ponderosa_ecowitt_individual_charts(filtered_df, selected_range, ecowitt_resolution)
 
     if st.checkbox(
         "Cargar registros ECOWITT Ponderosa",
@@ -5625,7 +5716,7 @@ def _render_ponderosa_ecowitt_dashboard(df_variables_all, df_cortinas_all, selec
         st.info("No hay suficientes datos simultáneos entre WIGA y ECOWITT para construir la dispersión.")
 
     if show_details:
-        _render_ponderosa_ecowitt_individual_charts(filtered_df, selected_range)
+        _render_ponderosa_ecowitt_individual_charts(filtered_df, selected_range, comparison_resolution)
 
     if st.checkbox(
         "Cargar registros consolidados de Ponderosa",
