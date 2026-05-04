@@ -1814,6 +1814,21 @@ def _clamp_sidebar_date(value, min_date, max_date):
     return value
 
 
+def _get_sidebar_default_range_end(fecha_inicio, max_date, default_days=7):
+    default_span_days = max(1, int(default_days))
+    return min(fecha_inicio + timedelta(days=default_span_days - 1), max_date)
+
+
+def _normalize_sidebar_date_range(fecha_inicio, fecha_fin, min_date, max_date):
+    fecha_inicio = _clamp_sidebar_date(fecha_inicio, min_date, max_date)
+    fecha_fin = _clamp_sidebar_date(fecha_fin, min_date, max_date)
+
+    if fecha_fin < fecha_inicio:
+        fecha_inicio, fecha_fin = fecha_fin, fecha_inicio
+
+    return fecha_inicio, fecha_fin
+
+
 def _format_selected_period_label(fecha_inicio, fecha_fin):
     if fecha_inicio is None or fecha_fin is None:
         return "Sin periodo seleccionado"
@@ -3429,7 +3444,7 @@ def _make_marley_comparison_chart(comparison, variable, selected_range):
                 x=source_df['FechaHora'],
                 y=source_df[source_name],
                 name=source_name,
-                mode='lines+markers',
+                mode='lines' if multi_day_view else 'lines+markers',
                 line=dict(color=config['colors'][source_name], width=3),
                 marker=dict(size=6),
                 connectgaps=False,
@@ -3496,7 +3511,7 @@ def _make_marley_difference_chart(comparison, variable, selected_range):
 
     fig = go.Figure()
     fig.add_trace(
-        go.Scatter(
+        (go.Scattergl if multi_day_view else go.Scatter)(
             x=diff_df['FechaHora'],
             y=diff_df['SignedDiff'],
             name='WIGA - ECOWITT',
@@ -3857,6 +3872,7 @@ def _render_marley_dashboard(dashboard_mode):
                 selected_range = (fecha_unica, fecha_unica)
                 marley_navigation_state_key = "marley_fecha_un_dia"
             else:
+                default_range_end = _get_sidebar_default_range_end(min_date, max_date, default_days=7)
                 _sidebar_field_label("calendar", "Fecha inicio")
                 fecha_inicio = st.date_input(
                     "Fecha inicio:",
@@ -3869,14 +3885,18 @@ def _render_marley_dashboard(dashboard_mode):
                 _sidebar_field_label("calendar", "Fecha fin")
                 fecha_fin = st.date_input(
                     "Fecha fin:",
-                    value=max_date,
+                    value=default_range_end,
                     key="marley_fecha_fin",
                     min_value=min_date,
                     max_value=max_date,
                     help=FILTER_HELP_TEXTS['fecha']
                 )
-                if fecha_fin < fecha_inicio:
-                    fecha_inicio, fecha_fin = fecha_fin, fecha_inicio
+                fecha_inicio, fecha_fin = _normalize_sidebar_date_range(
+                    fecha_inicio,
+                    fecha_fin,
+                    min_date,
+                    max_date
+                )
                 selected_range = (fecha_inicio, fecha_fin)
 
     filtered_df = marley_df[marley_df['FechaHora'].dt.date.between(*selected_range)].copy()
@@ -4261,6 +4281,62 @@ def _add_day_breaks_to_series(serie, value_col):
     return pd.DataFrame(rows)
 
 
+def _resolve_plot_resample_rule(total_days, total_points):
+    if total_points <= 1200 and total_days <= 3:
+        return None
+    if total_points <= 2500 and total_days <= 7:
+        return None
+    if total_days <= 7:
+        return '30min'
+    if total_days <= 21:
+        return '1H'
+    if total_days <= 60:
+        return '3H'
+    return '6H'
+
+
+def _prepare_sensor_series_for_plot(serie, value_col, multi_day_view=False):
+    if serie.empty or 'DateTime' not in serie.columns or value_col not in serie.columns:
+        return serie, None
+
+    working = (
+        serie[['DateTime', value_col]]
+        .dropna(subset=['DateTime', value_col])
+        .sort_values('DateTime')
+        .copy()
+    )
+    if working.empty:
+        return working, None
+
+    if not multi_day_view:
+        return working, None
+
+    total_points = len(working)
+    min_dt = pd.Timestamp(working['DateTime'].min())
+    max_dt = pd.Timestamp(working['DateTime'].max())
+    total_days = max(((max_dt - min_dt).total_seconds() / 86400.0) + 1, 1)
+    resample_rule = _resolve_plot_resample_rule(total_days, total_points)
+
+    if not resample_rule:
+        return _add_day_breaks_to_series(working, value_col), None
+
+    resampled = (
+        working.set_index('DateTime')[[value_col]]
+        .resample(resample_rule)
+        .mean()
+        .dropna()
+        .reset_index()
+    )
+    if resampled.empty:
+        return _add_day_breaks_to_series(working, value_col), None
+
+    return _add_day_breaks_to_series(resampled, value_col), {
+        'rule': resample_rule,
+        'original_points': total_points,
+        'display_points': len(resampled)
+    }
+
+
 @st.cache_data
 def cargar_cortinas(ruta_bytes):
     if not ruta_bytes:
@@ -4402,13 +4478,18 @@ def _render_correlacion(
     cortina_axis_max = 100.0 if not use_cortina_area else 0.0
     sensor_legend_title_added = False
     cortina_legend_title_added = False
+    plot_compaction_messages = []
 
     for order, var_name in enumerate(selected_vars):
         if var_name in selected_sensors:
             serie = df_plot[['DateTime', var_name]].dropna(subset=[var_name]).copy()
             if serie.empty:
                 continue
-            serie_plot = _add_day_breaks_to_series(serie, var_name) if multi_day_view else serie
+            serie_plot, compaction_meta = _prepare_sensor_series_for_plot(serie, var_name, multi_day_view=multi_day_view)
+            if compaction_meta:
+                plot_compaction_messages.append(
+                    f"{VARIABLE_SELECTOR_LABELS.get(var_name, var_name)}: {compaction_meta['original_points']} registros resumidos a {compaction_meta['display_points']} puntos en bloques de {compaction_meta['rule']}."
+                )
             if not multi_day_view:
                 single_day_trace_times.extend(pd.to_datetime(serie_plot['DateTime'], errors='coerce').dropna().tolist())
             trace = dict(
@@ -4447,14 +4528,14 @@ def _render_correlacion(
             if var_name in compare_sensor_vars and not df_plot_almacen.empty:
                 serie_almacen = df_plot_almacen[['DateTime', var_name]].dropna(subset=[var_name]).copy()
                 if not serie_almacen.empty:
-                    serie_almacen_plot = _add_day_breaks_to_series(serie_almacen, var_name) if multi_day_view else serie_almacen
+                    serie_almacen_plot, _ = _prepare_sensor_series_for_plot(serie_almacen, var_name, multi_day_view=multi_day_view)
                     if not multi_day_view:
                         single_day_trace_times.extend(pd.to_datetime(serie_almacen_plot['DateTime'], errors='coerce').dropna().tolist())
                     almacen_trace = dict(
                         x=serie_almacen_plot['DateTime'],
                         y=serie_almacen_plot[var_name],
                         name=f'{var_name} - Estación externa',
-                        mode='lines+markers',
+                        mode='lines' if multi_day_view else 'lines+markers',
                         line=dict(
                             color=VARIABLE_COLORS.get(var_name, palette[order % len(palette)]),
                             width=2,
@@ -4633,7 +4714,7 @@ def _render_correlacion(
         axis_name = sensor_axis_names[idx] if idx < len(sensor_axis_names) else f'y{idx + 2}'
         sensor_axis_map[var_name] = axis_name
         trace['yaxis'] = None if axis_name == 'y' else axis_name
-        fig_corr.add_trace(go.Scatter(**trace))
+        fig_corr.add_trace((go.Scattergl if multi_day_view else go.Scatter)(**trace))
 
         axis_var_name = var_name.replace('_almacen', '')
         series_for_axis = []
@@ -4702,7 +4783,7 @@ def _render_correlacion(
         base_var_name = var_name.replace('_almacen', '')
         axis_name = sensor_axis_map.get(base_var_name, 'y')
         trace['yaxis'] = None if axis_name == 'y' else axis_name
-        fig_corr.add_trace(go.Scatter(**trace))
+        fig_corr.add_trace((go.Scattergl if multi_day_view else go.Scatter)(**trace))
 
     if cortina_traces:
         for var_name, trace, color in cortina_traces:
@@ -4827,6 +4908,8 @@ def _render_correlacion(
         'Esta gráfica pone todas las variables seleccionadas sobre la misma línea de tiempo. Cada color tiene su propia escala a la derecha; pasa el cursor por la gráfica para ver la hora exacta y el valor de cada serie.' + cortina_help,
         accent=BRAND_COLORS['hero']
     )
+    if plot_compaction_messages:
+        st.caption("Para mantener fluida la página, las series largas se muestran resumidas automáticamente por franjas de tiempo.")
     st.plotly_chart(fig_corr, width='stretch')
 
     if selected_cortinas and not cortina_traces and selected_sensors:
@@ -4843,6 +4926,7 @@ def _build_focus_variable_chart(df_variables, fecha_variables, variable_name, ch
 
     fecha_inicio, fecha_fin = fecha_variables
     multi_day_view = fecha_inicio != fecha_fin
+    chart_df, _ = _prepare_sensor_series_for_plot(chart_df, variable_name, multi_day_view=multi_day_view)
     hover_time_format = '%d/%m %H:%M' if multi_day_view else '%H:%M'
     xaxis_tickformat = '%d/%m' if multi_day_view else '%H:%M'
     xaxis_title = 'Fecha' if multi_day_view else 'Hora del día'
@@ -4864,7 +4948,7 @@ def _build_focus_variable_chart(df_variables, fecha_variables, variable_name, ch
             x=chart_df['DateTime'],
             y=chart_df[variable_name],
             name=variable_name,
-            mode='lines+markers',
+            mode='lines' if multi_day_view else 'lines+markers',
             line=dict(color=color, width=2.5),
             marker=dict(size=5, color=color),
             hovertemplate=(
@@ -5897,22 +5981,31 @@ if dashboard_mode == "Varianza Y Promedio":
                         fecha_analisis = (fecha_unica, fecha_unica)
                         analysis_navigation_state_key = "fecha_analisis_un_dia"
                     else:
+                        default_range_end = _get_sidebar_default_range_end(min_fecha, max_fecha, default_days=7)
                         _sidebar_field_label("calendar", "Fecha inicio")
                         fecha_inicio_analisis = st.date_input(
                             "Fecha inicio del análisis:",
                             value=min_fecha,
                             key="fecha_inicio_analisis",
+                            min_value=min_fecha,
+                            max_value=max_fecha,
                             help=FILTER_HELP_TEXTS['fecha']
                         )
                         _sidebar_field_label("calendar", "Fecha fin")
                         fecha_fin_analisis = st.date_input(
                             "Fecha fin del análisis:",
-                            value=max_fecha,
+                            value=default_range_end,
                             key="fecha_fin_analisis",
+                            min_value=min_fecha,
+                            max_value=max_fecha,
                             help=FILTER_HELP_TEXTS['fecha']
                         )
-                        if fecha_fin_analisis < fecha_inicio_analisis:
-                            fecha_inicio_analisis, fecha_fin_analisis = fecha_fin_analisis, fecha_inicio_analisis
+                        fecha_inicio_analisis, fecha_fin_analisis = _normalize_sidebar_date_range(
+                            fecha_inicio_analisis,
+                            fecha_fin_analisis,
+                            min_fecha,
+                            max_fecha
+                        )
                         fecha_analisis = (fecha_inicio_analisis, fecha_fin_analisis)
 
     with st.sidebar.expander("Bloques comparados", expanded=True):
@@ -6076,22 +6169,31 @@ with st.sidebar.expander("Periodo", expanded=True):
                     fecha_cortinas = (fecha_unica, fecha_unica)
                     correlation_navigation_state_key = "fecha_calendario_un_dia"
                 else:
+                    default_range_end = _get_sidebar_default_range_end(min_fecha, max_fecha, default_days=7)
                     _sidebar_field_label("calendar", "Fecha inicio")
                     fecha_inicio = st.date_input(
                         "Fecha inicio:",
                         value=min_fecha,
                         key="fecha_inicio_compartida",
+                        min_value=min_fecha,
+                        max_value=max_fecha,
                         help=FILTER_HELP_TEXTS['fecha']
                     )
                     _sidebar_field_label("calendar", "Fecha fin")
                     fecha_fin = st.date_input(
                         "Fecha fin:",
-                        value=max_fecha,
+                        value=default_range_end,
                         key="fecha_fin_compartida",
+                        min_value=min_fecha,
+                        max_value=max_fecha,
                         help=FILTER_HELP_TEXTS['fecha']
                     )
-                    if fecha_fin < fecha_inicio:
-                        fecha_inicio, fecha_fin = fecha_fin, fecha_inicio
+                    fecha_inicio, fecha_fin = _normalize_sidebar_date_range(
+                        fecha_inicio,
+                        fecha_fin,
+                        min_fecha,
+                        max_fecha
+                    )
                     fecha_variables = (fecha_inicio, fecha_fin)
                     fecha_cortinas = (fecha_inicio, fecha_fin)
 
