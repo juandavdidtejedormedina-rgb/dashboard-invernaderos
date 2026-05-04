@@ -1,5 +1,4 @@
 import streamlit as st
-import streamlit.components.v1 as components
 import pandas as pd
 import plotly.graph_objects as go
 import io
@@ -54,7 +53,7 @@ def _render_autoplay_video(video_url, height=430):
     first_url = safe_urls[0]
     playlist_js = "[" + ",".join(f'"{url}"' for url in safe_urls) + "]"
 
-    components.html(
+    st.html(
         f"""
         <video
             autoplay
@@ -89,8 +88,7 @@ def _render_autoplay_video(video_url, height=430):
             }}
         </script>
         """,
-        height=height + 8,
-        scrolling=False
+        unsafe_allow_javascript=True
     )
 
 SENSOR_VARIABLES = ['Temperatura', 'Humedad Relativa', 'Radiación PAR', 'Gramos de agua']
@@ -1635,7 +1633,7 @@ if DASHBOARD_VIDEO_URL:
             youtube_source_url = DASHBOARD_VIDEO_URL[0] if isinstance(DASHBOARD_VIDEO_URL, (list, tuple)) else DASHBOARD_VIDEO_URL
             youtube_embed_url = _youtube_embed_url(youtube_source_url)
             if youtube_embed_url:
-                components.iframe(youtube_embed_url, height=430, scrolling=False)
+                st.iframe(youtube_embed_url, height=430)
             else:
                 _render_autoplay_video(DASHBOARD_VIDEO_URL)
         else:
@@ -1644,10 +1642,9 @@ if DASHBOARD_VIDEO_URL:
 if DASHBOARD_LOCATION_QUERY.strip():
     with st.expander("Ubicación", expanded=True):
         if not LAZY_LOAD_MEDIA or st.checkbox("Cargar mapa", key="cargar_mapa_dashboard"):
-            components.iframe(
+            st.iframe(
                 _google_maps_embed_url(DASHBOARD_LOCATION_QUERY),
-                height=430,
-                scrolling=False
+                height=430
             )
         else:
             st.caption("Carga el mapa solo cuando lo necesites.")
@@ -1655,6 +1652,8 @@ if DASHBOARD_LOCATION_QUERY.strip():
 # --- Configuracion de URLs (Mover aqui para evitar NameError) ---
 URL_VARIABLES = "https://raw.githubusercontent.com/juandavdidtejedormedina-rgb/dashboard-invernaderos/main/Datos_variables.xlsx"
 URL_CORTINAS = "https://raw.githubusercontent.com/juandavdidtejedormedina-rgb/dashboard-invernaderos/main/Registro_Cortinas_Final.xlsx"
+LOCAL_VARIABLES_PATH = APP_DIR / "Datos_variables.xlsx"
+LOCAL_CORTINAS_PATH = APP_DIR / "Registro_Cortinas_Final.xlsx"
 
 # Definición de la función de descarga
 @st.cache_data(show_spinner="Descargando datos desde el repositorio...")
@@ -1665,6 +1664,17 @@ def descargar_desde_github(url):
         return response.content
     except Exception as e:
         st.error(f"Error al conectar con GitHub: {e}")
+        return None
+
+
+def _read_local_file_bytes(path):
+    path = Path(path)
+    if not path.exists():
+        return None
+    try:
+        return path.read_bytes()
+    except OSError as error:
+        st.warning(f"No fue posible leer el respaldo local {path.name}: {error}")
         return None
 
 # 3. Funciones de carga de datos con corrección de FECHAS
@@ -2008,16 +2018,15 @@ def _render_dashboard_media(selected_finca):
             youtube_source_url = video_url[0] if isinstance(video_url, (list, tuple)) else video_url
             youtube_embed_url = _youtube_embed_url(youtube_source_url)
             if youtube_embed_url:
-                components.iframe(youtube_embed_url, height=430, scrolling=False)
+                st.iframe(youtube_embed_url, height=430)
             else:
                 _render_autoplay_video(video_url)
 
     if location_query:
         with st.expander("Ubicación", expanded=True):
-            components.iframe(
+            st.iframe(
                 _google_maps_embed_url(location_query),
-                height=430,
-                scrolling=False
+                height=430
             )
 
 
@@ -4400,6 +4409,11 @@ def cargar_dashboard_completo():
     archivo_variables_bytes = descargar_desde_github(URL_VARIABLES)
     archivo_cortinas_bytes = descargar_desde_github(URL_CORTINAS)
 
+    if archivo_variables_bytes is None:
+        archivo_variables_bytes = _read_local_file_bytes(LOCAL_VARIABLES_PATH)
+    if archivo_cortinas_bytes is None:
+        archivo_cortinas_bytes = _read_local_file_bytes(LOCAL_CORTINAS_PATH)
+
     df_variables = cargar_datos(archivo_variables_bytes) if archivo_variables_bytes else pd.DataFrame()
     df_cortinas = cargar_cortinas(archivo_cortinas_bytes) if archivo_cortinas_bytes else pd.DataFrame()
     return df_variables, df_cortinas
@@ -5912,10 +5926,11 @@ with st.sidebar.expander("Vista", expanded=True):
 
 if selected_finca == 'Marley':
     with _loading_context(
-        st.session_state.get("marley_modo_fechas") == "Varios dÃ­as",
-        "Cargando grÃ¡ficas de Marley..."
+        st.session_state.get("marley_modo_fechas") == "Varios días",
+        "Cargando gráficas de Marley..."
     ):
         _render_marley_dashboard(dashboard_mode)
+    st.stop()
 
 _df_variables_all, _df_cortinas_all = cargar_dashboard_completo()
 
@@ -6084,8 +6099,8 @@ if dashboard_mode == "Varianza Y Promedio":
             if estacion_externa_name else pd.DataFrame()
         )
         with _loading_context(
-            st.session_state.get("modo_fechas_analisis") == "Varios dÃ­as",
-            "Cargando anÃ¡lisis de varios dÃ­as..."
+            st.session_state.get("modo_fechas_analisis") == "Varios días",
+            "Cargando análisis de varios días..."
         ):
             _render_hourly_analysis_view(
                 df_variables_analisis,
@@ -6393,8 +6408,8 @@ with tab_correlacion:
                     st.warning('Selecciona al menos una variable para mostrar la correlación.')
                 else:
                     with _loading_context(
-                        st.session_state.get("modo_fechas_compartidas") == "Varios dÃ­as",
-                        "Cargando grÃ¡ficas de correlaciÃ³n..."
+                        st.session_state.get("modo_fechas_compartidas") == "Varios días",
+                        "Cargando gráficas de correlación..."
                     ):
                         _render_correlacion(
                             df_variables_corr,
