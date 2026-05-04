@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 import io
 import warnings
 import requests
@@ -4104,10 +4105,99 @@ def _make_marley_individual_variable_chart(df, variable, source_name, selected_r
     return fig
 
 
-def _render_marley_individual_variable_charts(filtered_df, selected_range):
+def _make_source_all_variables_chart(
+    filtered_df,
+    selected_range,
+    variables,
+    variable_configs,
+    source_name,
+    series_builder,
+    title,
+):
+    rendered_series = []
+    for variable in variables:
+        series_df = series_builder(filtered_df, variable, source_name, selected_range)
+        if series_df.empty or series_df['Valor'].dropna().empty:
+            continue
+        rendered_series.append((variable, series_df))
+
+    if not rendered_series:
+        return None
+
+    fig = make_subplots(
+        rows=len(rendered_series),
+        cols=1,
+        shared_xaxes=True,
+        vertical_spacing=0.045,
+        subplot_titles=[
+            variable_configs[variable]['title'].replace('Comparativa de ', '').capitalize()
+            for variable, _ in rendered_series
+        ],
+    )
+    start_date, end_date = selected_range
+
+    for row_index, (variable, series_df) in enumerate(rendered_series, start=1):
+        config = variable_configs[variable]
+        variable_title = config['title'].replace('Comparativa de ', '').capitalize()
+        color = config['colors'].get(source_name, config.get('accent', BRAND_COLORS['hero']))
+        fig.add_trace(
+            go.Scatter(
+                x=series_df['FechaHora'],
+                y=series_df['Valor'],
+                name=variable_title,
+                mode='lines+markers',
+                line=dict(color=color, width=2.35),
+                marker=dict(size=4),
+                connectgaps=False,
+                hovertemplate=(
+                    "<b>%{x|%Y-%m-%d %H:%M}</b><br>"
+                    + f"{variable_title}: "
+                    + "%{y:.2f} "
+                    + config['unit']
+                    + "<extra></extra>"
+                ),
+            ),
+            row=row_index,
+            col=1,
+        )
+        fig.update_yaxes(
+            title_text=config['unit'],
+            showgrid=True,
+            gridcolor="rgba(76, 70, 120, 0.07)",
+            zeroline=False,
+            row=row_index,
+            col=1,
+        )
+
+    time_axis = _get_marley_time_axis_config(rendered_series[0][1])
+    fig.update_xaxes(
+        showgrid=True,
+        gridcolor="rgba(76, 70, 120, 0.07)",
+        zeroline=False,
+        tickformat=time_axis['tickformat'],
+        tickmode=time_axis.get('tickmode', 'linear'),
+        dtick=time_axis['dtick'],
+        range=[pd.Timestamp(start_date), pd.Timestamp(end_date) + MARLEY_AXIS_END_OFFSET],
+    )
+    fig.update_xaxes(title_text=time_axis['title'], row=len(rendered_series), col=1)
+    fig.update_layout(
+        title=dict(text=title, x=0, xanchor='left'),
+        height=max(540, 235 * len(rendered_series)),
+        margin=dict(l=36, r=28, t=82, b=48),
+        paper_bgcolor="rgba(255,255,255,0)",
+        plot_bgcolor="rgba(250,248,243,0.72)",
+        hovermode='x unified',
+        template='plotly_white',
+        showlegend=False,
+        font=dict(family='Manrope, sans-serif', color=BRAND_COLORS['graphite']),
+    )
+    return fig
+
+
+def _render_marley_individual_variable_charts(filtered_df, selected_range, source_names=MARLEY_SENSOR_NAMES, heading="Variables individuales Marley"):
     rendered_charts = []
     for variable in MARLEY_VARIABLES:
-        for source_name in MARLEY_SENSOR_NAMES:
+        for source_name in source_names:
             chart = _make_marley_individual_variable_chart(filtered_df, variable, source_name, selected_range)
             if chart is not None:
                 rendered_charts.append(chart)
@@ -4115,7 +4205,7 @@ def _render_marley_individual_variable_charts(filtered_df, selected_range):
     if not rendered_charts:
         return
 
-    st.markdown("### Variables individuales Marley")
+    st.markdown(f"### {heading}")
     _render_chart_explanation(
         'Lectura individual por sensor',
         'Cada gráfica muestra una sola variable de un solo equipo. Sirve para revisar patrones puntuales de WIGA y ECOWITT sin mezclar las líneas en una misma visual.',
@@ -4140,8 +4230,16 @@ def _render_marley_dashboard(dashboard_mode):
         st.warning("No hay datos disponibles para Marley.")
         st.stop()
 
-    min_date = marley_df['FechaHora'].min().date()
-    max_date = marley_df['FechaHora'].max().date()
+    date_source_df = marley_df
+    if dashboard_mode in ("Solo WIGA", "Solo ECOWITT"):
+        date_source_name = "WIGA" if dashboard_mode == "Solo WIGA" else "ECOWITT"
+        date_source_df = marley_source_data.get(date_source_name, marley_df)
+        if date_source_df.empty:
+            st.warning(f"No hay datos disponibles para {date_source_name} en Marley.")
+            st.stop()
+
+    min_date = date_source_df['FechaHora'].min().date()
+    max_date = date_source_df['FechaHora'].max().date()
     marley_navigation_state_key = None
 
     with st.sidebar.expander("Periodo", expanded=True):
@@ -4221,6 +4319,51 @@ def _render_marley_dashboard(dashboard_mode):
         navigation_state_key=marley_navigation_state_key,
         title_text='Periodo Marley'
     )
+
+    if dashboard_mode in ("Solo WIGA", "Solo ECOWITT"):
+        source_name = "WIGA" if dashboard_mode == "Solo WIGA" else "ECOWITT"
+        st.markdown(f"## Marley - {source_name}")
+        st.caption(f"Lectura de todas las variables medidas por {source_name}, sin superponer el otro sensor.")
+        _render_chart_explanation(
+            f'Variables {source_name}',
+            f'Primero se muestran todas las variables de {source_name} en una sola visual apilada para comparar tendencias en el mismo periodo. Luego se muestran las gráficas individuales para revisar cada variable con más detalle.',
+            accent=BRAND_COLORS['hero'],
+            kicker='Orientación'
+        )
+
+        combined_chart = _make_source_all_variables_chart(
+            filtered_df,
+            selected_range,
+            list(MARLEY_VARIABLES.keys()),
+            MARLEY_VARIABLES,
+            source_name,
+            _build_marley_individual_series,
+            f"Variables {source_name} - Marley",
+        )
+        if combined_chart is None:
+            st.warning(f"No hay datos suficientes para graficar las variables de {source_name} en el periodo seleccionado.")
+            st.stop()
+
+        _plotly_chart(combined_chart)
+        _render_marley_individual_variable_charts(
+            filtered_df,
+            selected_range,
+            source_names=(source_name,),
+            heading=f"Variables individuales {source_name} - Marley"
+        )
+
+        if st.checkbox(
+            f"Cargar registros consolidados de Marley - {source_name}",
+            key=f"mostrar_marley_{source_name.lower()}_registros",
+            help=FILTER_HELP_TEXTS['registros']
+        ):
+            source_columns = [
+                column
+                for column in filtered_df.columns
+                if column == 'FechaHora' or column.endswith(f" - {source_name}")
+            ]
+            _dataframe(filtered_df[source_columns].dropna(how='all', subset=source_columns[1:]), hide_index=True)
+        st.stop()
 
     st.markdown(f"## Marley - {dashboard_mode}")
     st.caption("Lectura comparativa entre los sensores WIGA y ECOWITT, con opción de promedio por franja o lectura punto por punto.")
@@ -4981,6 +5124,155 @@ def _render_ponderosa_ecowitt_individual_charts(filtered_df, selected_range):
         for offset, chart in enumerate(rendered_charts[start:start + 2]):
             with cols[offset]:
                 _plotly_chart(chart)
+
+
+def _render_ponderosa_ecowitt_values_dashboard():
+    try:
+        ecowitt_df = _load_ponderosa_ecowitt_data()
+    except Exception as error:
+        st.error(f"No fue posible cargar ECOWITT Ponderosa. Detalle: {error}")
+        st.stop()
+
+    if ecowitt_df.empty:
+        st.warning("No hay datos disponibles para ECOWITT Ponderosa.")
+        st.stop()
+
+    source_df = _build_ponderosa_ecowitt_source(ecowitt_df)
+    available_dates = sorted(source_df['Fecha_Filtro'].dropna().unique())
+    if not available_dates:
+        st.warning("No hay fechas disponibles para ECOWITT Ponderosa.")
+        st.stop()
+
+    min_date = available_dates[0]
+    max_date = available_dates[-1]
+    navigation_state_key = None
+    date_state_keys = (
+        "ponderosa_ecowitt_only_fecha_unica",
+        "ponderosa_ecowitt_only_fecha_un_dia",
+        "ponderosa_ecowitt_only_fecha_inicio",
+        "ponderosa_ecowitt_only_fecha_fin",
+    )
+    for state_key in date_state_keys:
+        if state_key in st.session_state and st.session_state[state_key] not in available_dates:
+            del st.session_state[state_key]
+
+    with st.sidebar.expander("Periodo", expanded=True):
+        if min_date == max_date:
+            fecha_unica = _date_input_with_state(
+                "Seleccionar fecha:",
+                default_value=max_date,
+                key="ponderosa_ecowitt_only_fecha_unica",
+                min_value=min_date,
+                max_value=max_date,
+                help_text=FILTER_HELP_TEXTS['fecha']
+            )
+            fecha_unica = _get_nearest_available_date(fecha_unica, available_dates)
+            selected_range = (fecha_unica, fecha_unica)
+            navigation_state_key = "ponderosa_ecowitt_only_fecha_unica"
+        else:
+            modo_fechas = st.radio(
+                "Modo de fechas:",
+                options=["Un día", "Varios días"],
+                horizontal=True,
+                key="ponderosa_ecowitt_only_modo_fechas",
+                help=FILTER_HELP_TEXTS['modo_fechas']
+            )
+            if modo_fechas == "Un día":
+                fecha_unica_default = _get_nearest_available_date(
+                    st.session_state.get("ponderosa_ecowitt_only_fecha_un_dia", max_date),
+                    available_dates
+                )
+                _sidebar_field_label("calendar", "Seleccionar fecha")
+                fecha_unica = _date_input_with_state(
+                    "Seleccionar fecha:",
+                    default_value=fecha_unica_default,
+                    key="ponderosa_ecowitt_only_fecha_un_dia",
+                    min_value=min_date,
+                    max_value=max_date,
+                    help_text=FILTER_HELP_TEXTS['fecha']
+                )
+                fecha_unica = _get_nearest_available_date(fecha_unica, available_dates)
+                selected_range = (fecha_unica, fecha_unica)
+                navigation_state_key = "ponderosa_ecowitt_only_fecha_un_dia"
+            else:
+                default_range_end = _get_sidebar_default_range_end(min_date, max_date, default_days=5)
+                fecha_inicio_default = _get_nearest_available_date(
+                    st.session_state.get("ponderosa_ecowitt_only_fecha_inicio", min_date),
+                    available_dates
+                )
+                fecha_fin_default = _get_nearest_available_date(
+                    st.session_state.get("ponderosa_ecowitt_only_fecha_fin", default_range_end),
+                    available_dates
+                )
+                _sidebar_field_label("calendar", "Fecha inicio")
+                fecha_inicio = _date_input_with_state(
+                    "Fecha inicio:",
+                    default_value=fecha_inicio_default,
+                    key="ponderosa_ecowitt_only_fecha_inicio",
+                    min_value=min_date,
+                    max_value=max_date,
+                    help_text=FILTER_HELP_TEXTS['fecha']
+                )
+                _sidebar_field_label("calendar", "Fecha fin")
+                fecha_fin = _date_input_with_state(
+                    "Fecha fin:",
+                    default_value=fecha_fin_default,
+                    key="ponderosa_ecowitt_only_fecha_fin",
+                    min_value=min_date,
+                    max_value=max_date,
+                    help_text=FILTER_HELP_TEXTS['fecha']
+                )
+                fecha_inicio = _get_nearest_available_date(fecha_inicio, available_dates)
+                fecha_fin = _get_nearest_available_date(fecha_fin, available_dates)
+                selected_range = _normalize_sidebar_date_range(fecha_inicio, fecha_fin, min_date, max_date)
+
+    filtered_df = source_df[source_df['Fecha_Filtro'].between(*selected_range)].copy()
+    if filtered_df.empty:
+        st.warning("No hay datos ECOWITT Ponderosa en el periodo seleccionado.")
+        st.stop()
+
+    _render_selected_period_banner(
+        selected_range,
+        min_fecha=min_date,
+        max_fecha=max_date,
+        navigation_state_key=navigation_state_key,
+        title_text='Periodo ECOWITT Ponderosa',
+        available_dates=available_dates
+    )
+
+    st.markdown("## La Ponderosa - ECOWITT")
+    st.caption("Lectura de temperatura, humedad, radiación PAR y LUX medidas por ECOWITT en el Bloque 35.")
+    _render_chart_explanation(
+        'Variables ECOWITT',
+        'Primero se muestran las cuatro variables juntas en una visual apilada con el mismo eje de tiempo. Después se muestran las gráficas individuales para revisar cada variable con su propia escala.',
+        accent=BRAND_COLORS['hero'],
+        kicker='Orientación'
+    )
+
+    combined_chart = _make_source_all_variables_chart(
+        filtered_df,
+        selected_range,
+        list(PONDEROSA_ECOWITT_VARIABLES.keys()),
+        PONDEROSA_ECOWITT_VARIABLES,
+        "ECOWITT",
+        lambda df, variable, source_name, current_range: _build_ponderosa_ecowitt_individual_series(df, variable, current_range),
+        "Variables ECOWITT - La Ponderosa",
+    )
+    if combined_chart is None:
+        st.warning("No hay datos suficientes para graficar las variables de ECOWITT Ponderosa.")
+        st.stop()
+
+    _plotly_chart(combined_chart)
+    _render_ponderosa_ecowitt_individual_charts(filtered_df, selected_range)
+
+    if st.checkbox(
+        "Cargar registros ECOWITT Ponderosa",
+        key="mostrar_ponderosa_ecowitt_only_registros",
+        help=FILTER_HELP_TEXTS['registros']
+    ):
+        _dataframe(filtered_df.drop(columns=['Fecha_Filtro'], errors='ignore'), hide_index=True)
+
+    st.stop()
 
 
 def _render_ponderosa_comparison_metric_cards(overlap, selected_variable):
@@ -6897,9 +7189,9 @@ with st.sidebar.expander("Finca", expanded=True):
     )
 
 dashboard_view_options = (
-    ["Comparativa", "Varianza"]
+    ["Comparativa", "Varianza", "Solo WIGA", "Solo ECOWITT"]
     if selected_finca == 'Marley' else
-    ["Correlación", "Varianza Y Promedio", "Comparativa WIGA / ECOWITT"]
+    ["Correlación", "Varianza Y Promedio", "Comparativa WIGA / ECOWITT", "Solo ECOWITT"]
 )
 if st.session_state.get("modo_dashboard") not in dashboard_view_options:
     st.session_state["modo_dashboard"] = dashboard_view_options[0]
@@ -6914,9 +7206,9 @@ with st.sidebar.expander("Vista", expanded=True):
         options=dashboard_view_options,
         key="modo_dashboard",
         help=(
-            "Elige cómo quieres analizar los sensores WIGA y ECOWITT de Marley."
+            "Elige cómo quieres analizar Marley: comparativa, varianza o lecturas individuales por sensor."
             if selected_finca == 'Marley' else
-            "Elige la vista de Ponderosa: correlación por bloque, varianza y promedio, o comparación WIGA / ECOWITT."
+            "Elige la vista de Ponderosa: correlación por bloque, varianza y promedio, comparación WIGA / ECOWITT o lectura solo ECOWITT."
         )
     )
 
@@ -6936,6 +7228,14 @@ if dashboard_mode == "Comparativa WIGA / ECOWITT":
         "Cargando comparativa WIGA / ECOWITT de Ponderosa..."
     ):
         _render_ponderosa_ecowitt_dashboard(_df_variables_all, _df_cortinas_all, selected_finca)
+    st.stop()
+
+if dashboard_mode == "Solo ECOWITT":
+    with _loading_context(
+        st.session_state.get("ponderosa_ecowitt_only_modo_fechas") == "Varios días",
+        "Cargando variables ECOWITT de Ponderosa..."
+    ):
+        _render_ponderosa_ecowitt_values_dashboard()
     st.stop()
 
 if dashboard_mode == "Varianza Y Promedio":
