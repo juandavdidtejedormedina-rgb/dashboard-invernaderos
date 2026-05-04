@@ -102,7 +102,7 @@ def _render_dashboard_media(selected_finca, lazy_load=False):
     location_query = str(media_config.get('location_query', '')).strip()
 
     if video_url:
-        with st.expander("Video introductorio", expanded=True):
+        with st.expander("Video introductorio", expanded=not lazy_load):
             if not lazy_load or st.checkbox("Cargar video", key="cargar_video_dashboard"):
                 youtube_source_url = video_url[0] if isinstance(video_url, (list, tuple)) else video_url
                 youtube_embed_url = _youtube_embed_url(youtube_source_url)
@@ -114,7 +114,7 @@ def _render_dashboard_media(selected_finca, lazy_load=False):
                 st.caption("Carga el video solo cuando lo necesites.")
 
     if location_query:
-        with st.expander("Ubicación", expanded=True):
+        with st.expander("Ubicación", expanded=not lazy_load):
             if not lazy_load or st.checkbox("Cargar mapa", key="cargar_mapa_dashboard"):
                 st.iframe(_google_maps_embed_url(location_query), height=430)
             else:
@@ -171,7 +171,9 @@ FILTER_HELP_TEXTS = {
     'bloques_comparados': 'Activa o desactiva los bloques que quieres incluir en la comparación de varianza y promedio.',
     'series_visibles': 'Activa las variables ambientales y operativas que deseas mostrar en la gráfica.',
     'comparar_almacen': 'Muestra la serie equivalente de la Estación externa para cada variable ambiental seleccionada.',
-    'aperturas_ideales': 'Superpone la apertura ideal calculada sobre las series de frentes y puertas cuando exista la referencia del bloque.'
+    'aperturas_ideales': 'Superpone la apertura ideal calculada sobre las series de frentes y puertas cuando exista la referencia del bloque.',
+    'graficas_detalladas': 'Carga las gráficas secundarias solo cuando necesites revisar cada variable por separado.',
+    'registros': 'Carga las tablas de registros solo cuando necesites inspeccionar los datos crudos.'
 }
 VARIABLE_FILTER_HELP = {
     'Temperatura': 'Muestra la temperatura del bloque seleccionado.',
@@ -283,7 +285,10 @@ DASHBOARD_MEDIA = {
         'location_query': "Finca Marly - The Elite Flower SAS CI Madrid Road Facatativa Cundinamarca Colombia",
     }
 }
-LAZY_LOAD_MEDIA = False
+LAZY_LOAD_MEDIA = True
+DETAIL_CHARTS_DEFAULT = False
+MARLEY_DETAIL_CHARTS_DEFAULT = False
+MARLEY_RECORDS_DEFAULT = False
 FINCA_OPTIONS = ['La Ponderosa', 'Marley']
 BLOCK_FARMS = {
     '27': 'La Ponderosa',
@@ -2440,19 +2445,31 @@ def _render_summary_cards_selector(df_variables, fecha_variables, df_reference=N
         accent=BRAND_COLORS['hero'],
         kicker='Resumen del análisis'
     )
-    tab_promedio, tab_maximo, tab_minimo = st.tabs(["Promedio", "Máximo", "Mínimo"])
-
-    with tab_promedio:
-        _render_summary_cards(df_variables, fecha_variables, summary_mode='Promedio', df_reference=df_reference, reference_label=reference_label)
-        _render_reference_summary_cards(df_reference, fecha_variables, 'Promedio', reference_label, df_base=df_variables, base_label=base_label)
-
-    with tab_maximo:
-        _render_summary_cards(df_variables, fecha_variables, summary_mode='Máximo', df_reference=df_reference, reference_label=reference_label)
-        _render_reference_summary_cards(df_reference, fecha_variables, 'Máximo', reference_label, df_base=df_variables, base_label=base_label)
-
-    with tab_minimo:
-        _render_summary_cards(df_variables, fecha_variables, summary_mode='Mínimo', df_reference=df_reference, reference_label=reference_label)
-        _render_reference_summary_cards(df_reference, fecha_variables, 'Mínimo', reference_label, df_base=df_variables, base_label=base_label)
+    summary_modes = ["Promedio", "Máximo", "Mínimo"]
+    if st.session_state.get("resumen_metric_option") not in summary_modes:
+        st.session_state["resumen_metric_option"] = summary_modes[0]
+    summary_mode = st.segmented_control(
+        "Métrica del resumen",
+        options=summary_modes,
+        key="resumen_metric_option",
+        help="Calcula solo el resumen visible para mantener la carga más liviana.",
+        width="stretch"
+    )
+    _render_summary_cards(
+        df_variables,
+        fecha_variables,
+        summary_mode=summary_mode,
+        df_reference=df_reference,
+        reference_label=reference_label
+    )
+    _render_reference_summary_cards(
+        df_reference,
+        fecha_variables,
+        summary_mode,
+        reference_label,
+        df_base=df_variables,
+        base_label=base_label
+    )
 
 
 def _info_panel_icon_svg(icon_name):
@@ -3958,6 +3975,11 @@ def _render_marley_dashboard(dashboard_mode):
         default=list(MARLEY_VARIABLES.keys())[0],
         key="marley_variable",
     )
+    show_marley_details = st.checkbox(
+        "Cargar variables individuales",
+        key="mostrar_marley_detalles",
+        help=FILTER_HELP_TEXTS['graficas_detalladas']
+    )
 
     if dashboard_mode == "Varianza":
         if selected_range[0] == selected_range[1]:
@@ -3977,7 +3999,8 @@ def _render_marley_dashboard(dashboard_mode):
         _plotly_chart(_make_marley_hourly_metric_chart(grouped_metric, selected_variable, dashboard_mode))
         with st.expander(f"Ver tabla dinámica de {dashboard_mode.lower()}", expanded=False):
             _dataframe(_prepare_marley_hourly_metric_table(grouped_metric), hide_index=True)
-        _render_marley_individual_variable_charts(filtered_df, selected_range)
+        if show_marley_details:
+            _render_marley_individual_variable_charts(filtered_df, selected_range)
         st.stop()
 
     comparison = _build_marley_hourly_comparison(filtered_df, selected_variable, selected_range)
@@ -4156,9 +4179,14 @@ def _render_marley_dashboard(dashboard_mode):
     else:
         st.info("No hay suficientes datos simultáneos entre WIGA y ECOWITT para construir la dispersión.")
 
-    _render_marley_individual_variable_charts(filtered_df, selected_range)
+    if show_marley_details:
+        _render_marley_individual_variable_charts(filtered_df, selected_range)
 
-    with st.expander("Ver registros consolidados de Marley", expanded=False):
+    if st.checkbox(
+        "Cargar registros consolidados de Marley",
+        key="mostrar_marley_registros",
+        help=FILTER_HELP_TEXTS['registros']
+    ):
         _dataframe(filtered_df.drop(columns=['Fecha_Filtro'], errors='ignore'), hide_index=True)
         summary_rows = []
         for source_name, source_df in marley_source_data.items():
@@ -5584,85 +5612,91 @@ def _render_hourly_analysis_view(df_variables, fecha_variables, selected_blocks,
 
     single_day_analysis = fecha_inicio == fecha_fin
 
-    # Selector para Promedio y Varianza
-    metric_tabs = st.tabs(["Promedio", "Varianza"])
-    
-    for tab_idx, tab in enumerate(metric_tabs):
-        tab_label = "Promedio" if tab_idx == 0 else "Varianza"
-        with tab:
-            metrics_data = _collect_analysis_metrics(df_variables, tab_label)
-            _render_analysis_metric_cards_row(metrics_data, tab_label, single_day_analysis)
+    metric_options = ["Promedio", "Varianza"]
+    if st.session_state.get("analisis_metric_option") not in metric_options:
+        st.session_state["analisis_metric_option"] = metric_options[0]
+    tab_label = st.segmented_control(
+        "Métrica del análisis",
+        options=metric_options,
+        key="analisis_metric_option",
+        help="Calcula solo la métrica visible para mantener esta vista más rápida.",
+        width="stretch"
+    )
 
-            external_metrics_data = _collect_analysis_metrics(df_external_station, tab_label)
-            _render_analysis_metric_cards_row(
-                external_metrics_data,
-                tab_label,
-                single_day_analysis,
-                heading='Estación externa'
-            )
+    metrics_data = _collect_analysis_metrics(df_variables, tab_label)
+    _render_analysis_metric_cards_row(metrics_data, tab_label, single_day_analysis)
 
-            if len(selected_blocks) == 1 and tab_label == "Promedio":
-                _render_chart_explanation(
-                    'Promedio general del bloque',
-                    'Este resumen muestra el promedio consolidado del bloque seleccionado dentro del periodo filtrado y los extremos observados para cada variable.',
-                    accent=BRAND_COLORS['hero'],
-                    kicker='Cómo leer este análisis'
-                )
-            elif len(selected_blocks) == 1 and tab_label == "Varianza":
-                _render_chart_explanation(
-                    'Varianza general del bloque',
-                    'La varianza resume qué tanto cambian las mediciones dentro del periodo. Con un solo día no hay dispersión temporal suficiente para una varianza útil por franja.',
-                    accent=BRAND_COLORS['hero'],
-                    kicker='Cómo leer este análisis'
-                )
-            else:
-                if tab_label == "Promedio":
-                    _render_chart_explanation(
-                        'Promedio comparativo entre bloques',
-                        'Explora cada variable para ver el valor promedio por franja horaria y comparar el comportamiento típico de los bloques seleccionados.',
-                        accent=BRAND_COLORS['hero'],
-                        kicker='Cómo leer este análisis'
-                    )
-                else:
-                    _render_chart_explanation(
-                        'Varianza comparativa entre bloques',
-                        'Explora cada variable para ver qué tanto fluctúa cada bloque por franja horaria. Valores más altos indican mayor variabilidad dentro del periodo analizado.',
-                        accent=BRAND_COLORS['hero'],
-                        kicker='Cómo leer este análisis'
-                    )
+    external_metrics_data = _collect_analysis_metrics(df_external_station, tab_label)
+    _render_analysis_metric_cards_row(
+        external_metrics_data,
+        tab_label,
+        single_day_analysis,
+        heading='Estación externa'
+    )
 
-            # Mostrar tabs de variables dentro del tab de métrica seleccionado
-            variable_tabs = st.tabs([
-                VARIABLE_SELECTOR_LABELS.get(variable_name, VARIABLE_LABELS.get(variable_name, variable_name))
-                for variable_name in SENSOR_VARIABLES
-            ])
+    if len(selected_blocks) == 1 and tab_label == "Promedio":
+        _render_chart_explanation(
+            'Promedio general del bloque',
+            'Este resumen muestra el promedio consolidado del bloque seleccionado dentro del periodo filtrado y los extremos observados para cada variable.',
+            accent=BRAND_COLORS['hero'],
+            kicker='Cómo leer este análisis'
+        )
+    elif len(selected_blocks) == 1 and tab_label == "Varianza":
+        _render_chart_explanation(
+            'Varianza general del bloque',
+            'La varianza resume qué tanto cambian las mediciones dentro del periodo. Con un solo día no hay dispersión temporal suficiente para una varianza útil por franja.',
+            accent=BRAND_COLORS['hero'],
+            kicker='Cómo leer este análisis'
+        )
+    elif tab_label == "Promedio":
+        _render_chart_explanation(
+            'Promedio comparativo entre bloques',
+            'Explora cada variable para ver el valor promedio por franja horaria y comparar el comportamiento típico de los bloques seleccionados.',
+            accent=BRAND_COLORS['hero'],
+            kicker='Cómo leer este análisis'
+        )
+    else:
+        _render_chart_explanation(
+            'Varianza comparativa entre bloques',
+            'Explora cada variable para ver qué tanto fluctúa cada bloque por franja horaria. Valores más altos indican mayor variabilidad dentro del periodo analizado.',
+            accent=BRAND_COLORS['hero'],
+            kicker='Cómo leer este análisis'
+        )
 
-            for variable_name, variable_tab in zip(SENSOR_VARIABLES, variable_tabs):
-                with variable_tab:
-                    grouped_df, pivot_promedio, pivot_varianza = _build_hourly_block_analysis(df_variables, variable_name)
-                    if grouped_df.empty:
-                        st.info(f'No se encontraron datos para {variable_name} en el rango seleccionado.')
-                        continue
+    if st.session_state.get("analisis_variable_option") not in SENSOR_VARIABLES:
+        st.session_state["analisis_variable_option"] = SENSOR_VARIABLES[0]
+    variable_name = st.segmented_control(
+        "Variable del análisis",
+        options=SENSOR_VARIABLES,
+        format_func=lambda value: VARIABLE_SELECTOR_LABELS.get(value, VARIABLE_LABELS.get(value, value)),
+        key="analisis_variable_option",
+        help="Calcula solo la variable seleccionada para evitar cargar todas las gráficas a la vez.",
+        width="stretch"
+    )
 
-                    if tab_label == "Promedio":
-                        _render_hourly_metric_chart(grouped_df, variable_name, 'Promedio')
-                        with st.expander('Ver tabla dinámica de promedio', expanded=False):
-                            _dataframe(_prepare_hourly_pivot_display(pivot_promedio))
-                    else:  # Varianza
-                        if single_day_analysis:
-                            _render_chart_explanation(
-                                f'Varianza por franja horaria - {VARIABLE_SELECTOR_LABELS.get(variable_name, variable_name)}',
-                                'La varianza necesita al menos dos días para comparar la misma franja horaria entre días. Con un solo día se muestra la aclaración, pero no se grafica una variación representativa.',
-                                accent=VARIABLE_COLORS.get(variable_name, BRAND_COLORS['hero'])
-                            )
-                            st.info(
-                                f'Varianza de un solo día para {VARIABLE_SELECTOR_LABELS.get(variable_name, variable_name)}: '
-                                'se muestra en 0 porque con un único día no hay suficiente repetición por franja horaria para calcular una dispersión representativa.'
-                            )
-                        else:
-                            _render_hourly_metric_chart(grouped_df, variable_name, 'Varianza')
-                            with st.expander('Ver tabla dinámica de varianza', expanded=False):
-                                _dataframe(_prepare_hourly_pivot_display(pivot_varianza))
+    grouped_df, pivot_promedio, pivot_varianza = _build_hourly_block_analysis(df_variables, variable_name)
+    if grouped_df.empty:
+        st.info(f'No se encontraron datos para {variable_name} en el rango seleccionado.')
+        return
+
+    if tab_label == "Promedio":
+        _render_hourly_metric_chart(grouped_df, variable_name, 'Promedio')
+        with st.expander('Ver tabla dinámica de promedio', expanded=False):
+            _dataframe(_prepare_hourly_pivot_display(pivot_promedio))
+    elif single_day_analysis:
+        _render_chart_explanation(
+            f'Varianza por franja horaria - {VARIABLE_SELECTOR_LABELS.get(variable_name, variable_name)}',
+            'La varianza necesita al menos dos días para comparar la misma franja horaria entre días. Con un solo día se muestra la aclaración, pero no se grafica una variación representativa.',
+            accent=VARIABLE_COLORS.get(variable_name, BRAND_COLORS['hero'])
+        )
+        st.info(
+            f'Varianza de un solo día para {VARIABLE_SELECTOR_LABELS.get(variable_name, variable_name)}: '
+            'se muestra en 0 porque con un único día no hay suficiente repetición por franja horaria para calcular una dispersión representativa.'
+        )
+    else:
+        _render_hourly_metric_chart(grouped_df, variable_name, 'Varianza')
+        with st.expander('Ver tabla dinámica de varianza', expanded=False):
+            _dataframe(_prepare_hourly_pivot_display(pivot_varianza))
 
 
 _df_variables_all = pd.DataFrame()
@@ -5672,6 +5706,12 @@ if 'mostrar_aperturas_ideales' not in st.session_state:
     st.session_state.mostrar_aperturas_ideales = False
 if 'comparar_con_almacen' not in st.session_state:
     st.session_state.comparar_con_almacen = False
+if 'mostrar_graficas_detalladas' not in st.session_state:
+    st.session_state.mostrar_graficas_detalladas = DETAIL_CHARTS_DEFAULT
+if 'mostrar_marley_detalles' not in st.session_state:
+    st.session_state.mostrar_marley_detalles = MARLEY_DETAIL_CHARTS_DEFAULT
+if 'mostrar_marley_registros' not in st.session_state:
+    st.session_state.mostrar_marley_registros = MARLEY_RECORDS_DEFAULT
 
 st.sidebar.markdown(
     f"""
@@ -6112,6 +6152,11 @@ with st.sidebar.expander("Series visibles", expanded=True):
             key="mostrar_aperturas_ideales",
             help=FILTER_HELP_TEXTS['aperturas_ideales']
         )
+        st.checkbox(
+            "Gráficas detalladas",
+            key="mostrar_graficas_detalladas",
+            help=FILTER_HELP_TEXTS['graficas_detalladas']
+        )
 
 # Vista principal
 tab_correlacion = st.container()
@@ -6173,9 +6218,18 @@ with tab_correlacion:
                 culatas_by_day=culatas_by_day
             )
 
-        tab_corr_graf, tab_corr_regs = st.tabs(["Correlación", "Registros"])
+        corr_content_options = ["Correlación", "Registros"]
+        if st.session_state.get("vista_correlacion_contenido") not in corr_content_options:
+            st.session_state["vista_correlacion_contenido"] = corr_content_options[0]
+        selected_corr_content = st.segmented_control(
+            "Contenido de la vista",
+            options=corr_content_options,
+            key="vista_correlacion_contenido",
+            help="Muestra solo la sección seleccionada para mantener la página ligera.",
+            width="stretch"
+        )
 
-        with tab_corr_graf:
+        if selected_corr_content == "Correlación":
             selected_vars = selected_vars_sidebar or st.session_state.get('variables_correlacion', available_correlacion_vars.copy())
 
             if df_variables_corr.empty:
@@ -6204,24 +6258,33 @@ with tab_correlacion:
                             df_variables_almacen=df_variables_almacen_corr,
                             compare_with_almacen=st.session_state.get('comparar_con_almacen', False)
                         )
-                        _render_temperature_focus_chart(
-                            df_variables_corr,
-                            fecha_variables,
-                            block_label=block_label,
-                            df_external=df_variables_almacen_corr,
-                            datos_cortinas_sel=datos_cortinas_sel
-                        )
+                        if st.session_state.get("mostrar_graficas_detalladas", DETAIL_CHARTS_DEFAULT):
+                            _render_temperature_focus_chart(
+                                df_variables_corr,
+                                fecha_variables,
+                                block_label=block_label,
+                                df_external=df_variables_almacen_corr,
+                                datos_cortinas_sel=datos_cortinas_sel
+                            )
 
-        with tab_corr_regs:
-            reg_sensores_tab, reg_cortinas_tab = st.tabs(["Registros sensores", "Registros cortinas"])
+        elif selected_corr_content == "Registros":
+            record_content_options = ["Sensores", "Cortinas"]
+            if st.session_state.get("vista_registros_correlacion") not in record_content_options:
+                st.session_state["vista_registros_correlacion"] = record_content_options[0]
+            selected_record_content = st.segmented_control(
+                "Tipo de registros",
+                options=record_content_options,
+                key="vista_registros_correlacion",
+                help=FILTER_HELP_TEXTS['registros'],
+                width="stretch"
+            )
 
-            with reg_sensores_tab:
+            if selected_record_content == "Sensores":
                 if datos_sensores_corr.empty:
                     st.info("No hay registros de sensores para los filtros seleccionados.")
                 else:
                     _dataframe(datos_sensores_corr)
-
-            with reg_cortinas_tab:
+            else:
                 if datos_cortinas_sel.empty:
                     st.info("No hay registros de cortinas para los filtros seleccionados.")
                 else:
