@@ -2079,11 +2079,11 @@ def _hex_to_rgba(hex_color, alpha):
 
 def _resolve_correlacion_axis_layout(num_sensor_axes, has_cortina_axis):
     total_right_axes = max(1, num_sensor_axes + (1 if has_cortina_axis else 0))
-    right_axis_step = 0.045
+    right_axis_step = 0.043
     axis_end = 0.985
     axis_start = axis_end - right_axis_step * (total_right_axes - 1)
-    x_domain_end = max(0.72, axis_start - 0.035)
-    right_margin = 76 + total_right_axes * 24
+    x_domain_end = max(0.74, axis_start - 0.02)
+    right_margin = 70 + total_right_axes * 22
 
     return {
         'x_domain_end': x_domain_end,
@@ -4852,7 +4852,7 @@ def _render_correlacion(
             xanchor='left',
             y=0.98,
             yanchor='top',
-            pad=dict(b=20),
+            pad=dict(b=8),
             font=dict(size=22, color=BRAND_COLORS['graphite'], family='Manrope, sans-serif')
         ),
         xaxis=dict(
@@ -4880,11 +4880,11 @@ def _render_correlacion(
             bordercolor='rgba(76, 70, 120, 0.16)',
             font=dict(family='Manrope, sans-serif', color=BRAND_COLORS['graphite'], size=12)
         ),
-        height=620,
+        height=600,
         legend=dict(
             orientation='h',
             yanchor='bottom',
-            y=1.08,
+            y=1.055,
             xanchor='left',
             x=0,
             traceorder='normal',
@@ -4894,7 +4894,7 @@ def _render_correlacion(
             bordercolor='rgba(76, 70, 120, 0.08)',
             borderwidth=1
         ),
-        margin=dict(l=50, r=right_margin, t=122, b=68),
+        margin=dict(l=50, r=right_margin, t=104, b=70),
         **{f'yaxis{axis_name[1:]}': config for axis_name, config in axis_configs.items()}
     )
 
