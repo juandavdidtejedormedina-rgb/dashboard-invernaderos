@@ -4289,10 +4289,10 @@ def _resolve_plot_resample_rule(total_days, total_points):
     if total_days <= 7:
         return '30min'
     if total_days <= 21:
-        return '1h'
+        return '1H'
     if total_days <= 60:
-        return '3h'
-    return '6h'
+        return '3H'
+    return '6H'
 
 
 def _prepare_sensor_series_for_plot(serie, value_col, multi_day_view=False):
