@@ -164,7 +164,7 @@ VARIABLE_SELECTOR_LABELS = {
     'PUERTA 2': 'Puerta 2'
 }
 FILTER_HELP_TEXTS = {
-    'modo_dashboard': 'Elige la lectura que quieres revisar: sensor individual, comparación WIGA / ECOWITT, correlación por bloques o análisis de bloques.',
+    'modo_dashboard': 'Elige entre correlación por bloque, varianza y promedio por franja horaria, o comparativa WIGA / ECOWITT cuando esté disponible.',
     'finca': 'Selecciona la finca que quieres explorar en el dashboard. Los bloques y fechas disponibles se ajustan según esa finca.',
     'modo_fechas': 'Define si quieres analizar un solo día o un rango de varios días.',
     'fecha': 'Selecciona la fecha o el rango que se usará para filtrar los registros visibles en la vista actual.',
@@ -7142,7 +7142,7 @@ def _render_analysis_metric_cards_row(metrics_data, tab_label, single_day_analys
             st.markdown(metric_card_html, unsafe_allow_html=True)
 
 
-def _render_hourly_analysis_view(df_variables, fecha_variables, selected_blocks, df_external_station=None, forced_metric=None):
+def _render_hourly_analysis_view(df_variables, fecha_variables, selected_blocks, df_external_station=None):
     if df_variables.empty:
         fecha_inicio, fecha_fin = fecha_variables
         fecha_label = (
@@ -7166,18 +7166,15 @@ def _render_hourly_analysis_view(df_variables, fecha_variables, selected_blocks,
     single_day_analysis = fecha_inicio == fecha_fin
 
     metric_options = ["Promedio", "Varianza"]
-    if forced_metric in metric_options:
-        tab_label = forced_metric
-    else:
-        if st.session_state.get("analisis_metric_option") not in metric_options:
-            st.session_state["analisis_metric_option"] = metric_options[0]
-        tab_label = st.segmented_control(
-            "Métrica del análisis",
-            options=metric_options,
-            key="analisis_metric_option",
-            help="Calcula solo la métrica visible para mantener esta vista más rápida.",
-            width="stretch"
-        )
+    if st.session_state.get("analisis_metric_option") not in metric_options:
+        st.session_state["analisis_metric_option"] = metric_options[0]
+    tab_label = st.segmented_control(
+        "Métrica del análisis",
+        options=metric_options,
+        key="analisis_metric_option",
+        help="Calcula solo la métrica visible para mantener esta vista más rápida.",
+        width="stretch"
+    )
 
     metrics_data = _collect_analysis_metrics(df_variables, tab_label)
     _render_analysis_metric_cards_row(metrics_data, tab_label, single_day_analysis)
@@ -7292,20 +7289,10 @@ with st.sidebar.expander("Finca", expanded=True):
         help=FILTER_HELP_TEXTS['finca']
     )
 
-DASHBOARD_VIEW_LABELS = {
-    "Solo WIGA": "WIGA",
-    "Solo ECOWITT": "ECOWITT",
-    "Comparativa": "WIGA vs ECOWITT",
-    "Comparativa WIGA / ECOWITT": "WIGA vs ECOWITT",
-    "Correlación": "Correlación WIGA / Bloques",
-    "Bloques - Promedio": "Bloques - Promedio",
-    "Bloques - Varianza": "Bloques - Varianza",
-    "Varianza": "Varianza",
-}
 dashboard_view_options = (
-    ["Solo WIGA", "Solo ECOWITT", "Comparativa", "Varianza"]
+    ["Comparativa", "Solo WIGA", "Solo ECOWITT", "Varianza"]
     if selected_finca == 'Marley' else
-    ["Solo ECOWITT", "Comparativa WIGA / ECOWITT", "Correlación", "Bloques - Promedio", "Bloques - Varianza"]
+    ["Correlación", "Comparativa WIGA / ECOWITT", "Solo ECOWITT", "Varianza Y Promedio"]
 )
 if st.session_state.get("modo_dashboard") not in dashboard_view_options:
     st.session_state["modo_dashboard"] = dashboard_view_options[0]
@@ -7315,17 +7302,16 @@ with st.sidebar.expander("Vista", expanded=True):
         "filter",
         "Seleccionar análisis" if selected_finca == 'Marley' else "Seleccionar vista"
     )
-dashboard_mode = st.radio(
-    "Seleccionar análisis:" if selected_finca == 'Marley' else "Seleccionar vista:",
-    options=dashboard_view_options,
-    format_func=lambda value: DASHBOARD_VIEW_LABELS.get(value, value),
-    key="modo_dashboard",
-    help=(
-        "Elige entre WIGA, ECOWITT, comparación WIGA / ECOWITT o varianza."
-        if selected_finca == 'Marley' else
-        "Elige entre ECOWITT, WIGA vs ECOWITT, correlación WIGA / bloques, bloques - promedio o bloques - varianza."
+    dashboard_mode = st.radio(
+        "Seleccionar análisis:" if selected_finca == 'Marley' else "Seleccionar vista:",
+        options=dashboard_view_options,
+        key="modo_dashboard",
+        help=(
+            "Elige cómo quieres analizar Marley: comparativa, varianza o lecturas individuales por sensor."
+            if selected_finca == 'Marley' else
+            "Elige la vista de Ponderosa: correlación por bloque, varianza y promedio, comparación WIGA / ECOWITT o lectura solo ECOWITT."
+        )
     )
-)
 
 if selected_finca == 'Marley':
     with _loading_context(
@@ -7353,7 +7339,7 @@ if dashboard_mode == "Solo ECOWITT":
         _render_ponderosa_ecowitt_values_dashboard()
     st.stop()
 
-if dashboard_mode in ("Bloques - Promedio", "Bloques - Varianza"):
+if dashboard_mode == "Varianza Y Promedio":
     analysis_block_codes, analysis_variable_map, _ = _get_block_options(
         _df_variables_all,
         _df_cortinas_all,
@@ -7525,8 +7511,7 @@ if dashboard_mode in ("Bloques - Promedio", "Bloques - Varianza"):
                 df_variables_analisis,
                 fecha_analisis,
                 analysis_block_names,
-                df_external_station=df_estacion_externa_analisis,
-                forced_metric="Promedio" if dashboard_mode == "Bloques - Promedio" else "Varianza"
+                df_external_station=df_estacion_externa_analisis
             )
     st.stop()
 
