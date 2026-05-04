@@ -1860,115 +1860,6 @@ def _normalize_sidebar_date_range(fecha_inicio, fecha_fin, min_date, max_date):
     return fecha_inicio, fecha_fin
 
 
-def _normalize_available_dates(available_dates):
-    normalized_dates = []
-    if available_dates is None:
-        return normalized_dates
-
-    try:
-        date_candidates = iter(available_dates)
-    except TypeError:
-        date_candidates = (available_dates,)
-
-    for value in date_candidates:
-        coerced = _coerce_sidebar_date(value, None)
-        if coerced is not None:
-            normalized_dates.append(coerced)
-    return sorted(set(normalized_dates))
-
-
-def _nearest_available_date(value, available_dates, fallback=None):
-    available_dates = _normalize_available_dates(available_dates)
-    if not available_dates:
-        return fallback
-
-    value = _coerce_sidebar_date(value, fallback or available_dates[-1])
-    if value in available_dates:
-        return value
-
-    previous_dates = [candidate for candidate in available_dates if candidate <= value]
-    if previous_dates:
-        return previous_dates[-1]
-
-    next_dates = [candidate for candidate in available_dates if candidate >= value]
-    return next_dates[0] if next_dates else available_dates[-1]
-
-
-def _format_available_date_option(value):
-    return value.strftime('%Y/%m/%d') if isinstance(value, date) else str(value)
-
-
-def _available_date_select(label, available_dates, key, default_date=None, help_text=None):
-    available_dates = _normalize_available_dates(available_dates)
-    if not available_dates:
-        return None
-
-    default_date = _nearest_available_date(default_date, available_dates, available_dates[-1])
-    selectbox_options = {
-        "label": label,
-        "options": available_dates,
-        "key": key,
-        "format_func": _format_available_date_option,
-        "help": help_text,
-    }
-
-    if key in st.session_state:
-        stored_value = st.session_state[key]
-        current_value = _nearest_available_date(stored_value, available_dates, default_date)
-        if stored_value == current_value:
-            return st.selectbox(**selectbox_options)
-
-        del st.session_state[key]
-    else:
-        current_value = default_date
-
-    return st.selectbox(
-        **selectbox_options,
-        index=available_dates.index(current_value),
-    )
-
-
-def _available_date_range_select(
-    start_label,
-    end_label,
-    available_dates,
-    start_key,
-    end_key,
-    default_start=None,
-    default_end=None,
-    help_text=None,
-):
-    available_dates = _normalize_available_dates(available_dates)
-    if not available_dates:
-        return None, None
-
-    default_start = _nearest_available_date(default_start, available_dates, available_dates[0])
-    fecha_inicio = _available_date_select(
-        start_label,
-        available_dates,
-        start_key,
-        default_date=default_start,
-        help_text=help_text,
-    )
-
-    end_options = [candidate for candidate in available_dates if candidate >= fecha_inicio]
-    if not end_options:
-        end_options = [fecha_inicio]
-
-    if default_end is None:
-        default_end = _get_sidebar_default_range_end(fecha_inicio, available_dates[-1], default_days=7)
-    default_end = _nearest_available_date(default_end, end_options, end_options[-1])
-    fecha_fin = _available_date_select(
-        end_label,
-        end_options,
-        end_key,
-        default_date=default_end,
-        help_text=help_text,
-    )
-
-    return fecha_inicio, fecha_fin
-
-
 def _format_selected_period_label(fecha_inicio, fecha_fin):
     if fecha_inicio is None or fecha_fin is None:
         return "Sin periodo seleccionado"
@@ -1977,19 +1868,9 @@ def _format_selected_period_label(fecha_inicio, fecha_fin):
     return f"{fecha_inicio.strftime('%d/%m/%Y')} a {fecha_fin.strftime('%d/%m/%Y')}"
 
 
-def _shift_selected_period_day(navigation_state_key, current_date, delta_days, min_fecha, max_fecha, available_dates=None):
-    available_dates = _normalize_available_dates(available_dates)
-    if available_dates and current_date in available_dates:
-        current_index = available_dates.index(current_date)
-        next_index = max(0, min(len(available_dates) - 1, current_index + delta_days))
-        st.session_state[navigation_state_key] = available_dates[next_index]
-        return
-
+def _shift_selected_period_day(navigation_state_key, current_date, delta_days, min_fecha, max_fecha):
     shifted_date = current_date + timedelta(days=delta_days)
-    if available_dates:
-        st.session_state[navigation_state_key] = _nearest_available_date(shifted_date, available_dates, current_date)
-    else:
-        st.session_state[navigation_state_key] = _clamp_sidebar_date(shifted_date, min_fecha, max_fecha)
+    st.session_state[navigation_state_key] = _clamp_sidebar_date(shifted_date, min_fecha, max_fecha)
 
 
 def _render_selected_period_banner(
@@ -1997,8 +1878,7 @@ def _render_selected_period_banner(
     min_fecha=None,
     max_fecha=None,
     navigation_state_key=None,
-    title_text='Periodo visible',
-    available_dates=None
+    title_text='Periodo visible'
 ):
     if not fecha_periodo:
         return
@@ -2056,20 +1936,14 @@ def _render_selected_period_banner(
             unsafe_allow_html=True
         )
 
-    available_dates = _normalize_available_dates(available_dates)
     can_navigate = bool(
         single_day and
         navigation_state_key and
         min_fecha is not None and
         max_fecha is not None
     )
-    if can_navigate and available_dates and fecha_inicio in available_dates:
-        current_date_index = available_dates.index(fecha_inicio)
-        prev_disabled = current_date_index <= 0
-        next_disabled = current_date_index >= len(available_dates) - 1
-    else:
-        prev_disabled = (not can_navigate) or fecha_inicio <= min_fecha
-        next_disabled = (not can_navigate) or fecha_inicio >= max_fecha
+    prev_disabled = (not can_navigate) or fecha_inicio <= min_fecha
+    next_disabled = (not can_navigate) or fecha_inicio >= max_fecha
 
     with col_prev:
         st.button(
@@ -2078,7 +1952,7 @@ def _render_selected_period_banner(
             disabled=prev_disabled,
             width="stretch",
             on_click=_shift_selected_period_day if can_navigate else None,
-            args=(navigation_state_key, fecha_inicio, -1, min_fecha, max_fecha, available_dates) if can_navigate else None
+            args=(navigation_state_key, fecha_inicio, -1, min_fecha, max_fecha) if can_navigate else None
         )
 
     with col_next:
@@ -2088,7 +1962,7 @@ def _render_selected_period_banner(
             disabled=next_disabled,
             width="stretch",
             on_click=_shift_selected_period_day if can_navigate else None,
-            args=(navigation_state_key, fecha_inicio, 1, min_fecha, max_fecha, available_dates) if can_navigate else None
+            args=(navigation_state_key, fecha_inicio, 1, min_fecha, max_fecha) if can_navigate else None
         )
 
 
@@ -4003,23 +3877,19 @@ def _render_marley_dashboard(dashboard_mode):
         st.warning("No hay datos disponibles para Marley.")
         st.stop()
 
-    marley_available_dates = _normalize_available_dates(marley_df['Fecha_Filtro'].dropna().unique())
-    if not marley_available_dates:
-        st.warning("No hay fechas disponibles para Marley.")
-        st.stop()
-
-    min_date = marley_available_dates[0]
-    max_date = marley_available_dates[-1]
+    min_date = marley_df['FechaHora'].min().date()
+    max_date = marley_df['FechaHora'].max().date()
     marley_navigation_state_key = None
 
     with st.sidebar.expander("Periodo", expanded=True):
         if min_date == max_date:
-            fecha_unica = _available_date_select(
+            fecha_unica = st.date_input(
                 "Seleccionar fecha:",
-                marley_available_dates,
+                value=max_date,
                 key="marley_fecha_unica",
-                default_date=max_date,
-                help_text=FILTER_HELP_TEXTS['fecha']
+                min_value=min_date,
+                max_value=max_date,
+                help=FILTER_HELP_TEXTS['fecha']
             )
             selected_range = (fecha_unica, fecha_unica)
             marley_navigation_state_key = "marley_fecha_unica"
@@ -4032,27 +3902,47 @@ def _render_marley_dashboard(dashboard_mode):
                 help=FILTER_HELP_TEXTS['modo_fechas']
             )
             if modo_fechas == "Un día":
+                fecha_unica_default = _clamp_sidebar_date(
+                    _coerce_sidebar_date(st.session_state.get("marley_fecha_un_dia", max_date), max_date),
+                    min_date,
+                    max_date
+                )
                 _sidebar_field_label("calendar", "Seleccionar fecha")
-                fecha_unica = _available_date_select(
+                fecha_unica = st.date_input(
                     "Seleccionar fecha:",
-                    marley_available_dates,
+                    value=fecha_unica_default,
                     key="marley_fecha_un_dia",
-                    default_date=max_date,
-                    help_text=FILTER_HELP_TEXTS['fecha']
+                    min_value=min_date,
+                    max_value=max_date,
+                    help=FILTER_HELP_TEXTS['fecha']
                 )
                 selected_range = (fecha_unica, fecha_unica)
                 marley_navigation_state_key = "marley_fecha_un_dia"
             else:
+                default_range_end = _get_sidebar_default_range_end(min_date, max_date, default_days=7)
                 _sidebar_field_label("calendar", "Fecha inicio")
-                fecha_inicio, fecha_fin = _available_date_range_select(
+                fecha_inicio = st.date_input(
                     "Fecha inicio:",
+                    value=min_date,
+                    key="marley_fecha_inicio",
+                    min_value=min_date,
+                    max_value=max_date,
+                    help=FILTER_HELP_TEXTS['fecha']
+                )
+                _sidebar_field_label("calendar", "Fecha fin")
+                fecha_fin = st.date_input(
                     "Fecha fin:",
-                    marley_available_dates,
-                    start_key="marley_fecha_inicio",
-                    end_key="marley_fecha_fin",
-                    default_start=min_date,
-                    default_end=_get_sidebar_default_range_end(min_date, max_date, default_days=7),
-                    help_text=FILTER_HELP_TEXTS['fecha']
+                    value=default_range_end,
+                    key="marley_fecha_fin",
+                    min_value=min_date,
+                    max_value=max_date,
+                    help=FILTER_HELP_TEXTS['fecha']
+                )
+                fecha_inicio, fecha_fin = _normalize_sidebar_date_range(
+                    fecha_inicio,
+                    fecha_fin,
+                    min_date,
+                    max_date
                 )
                 selected_range = (fecha_inicio, fecha_fin)
 
@@ -4066,8 +3956,7 @@ def _render_marley_dashboard(dashboard_mode):
         min_fecha=min_date,
         max_fecha=max_date,
         navigation_state_key=marley_navigation_state_key,
-        title_text='Periodo Marley',
-        available_dates=marley_available_dates
+        title_text='Periodo Marley'
     )
 
     st.markdown(f"## Marley - {dashboard_mode}")
@@ -5908,13 +5797,20 @@ if dashboard_mode == "Varianza Y Promedio":
                 analysis_max_fecha = max_fecha
 
                 if min_fecha == max_fecha:
+                    fecha_unica_default = _clamp_sidebar_date(
+                        _coerce_sidebar_date(
+                            st.session_state.get("fecha_analisis_unica", max_fecha),
+                            max_fecha
+                        ),
+                        min_fecha,
+                        max_fecha
+                    )
                     _sidebar_field_label("calendar", "Seleccionar fecha")
-                    fecha_unica = _available_date_select(
+                    fecha_unica = st.date_input(
                         "Seleccionar fecha para el análisis:",
-                        fechas_disponibles,
+                        value=fecha_unica_default,
                         key="fecha_analisis_unica",
-                        default_date=max_fecha,
-                        help_text=FILTER_HELP_TEXTS['fecha']
+                        help=FILTER_HELP_TEXTS['fecha']
                     )
                     fecha_analisis = (fecha_unica, fecha_unica)
                     analysis_navigation_state_key = "fecha_analisis_unica"
@@ -5928,27 +5824,48 @@ if dashboard_mode == "Varianza Y Promedio":
                     )
 
                     if modo_fechas_analisis == "Un día":
+                        fecha_unica_default = _clamp_sidebar_date(
+                            _coerce_sidebar_date(
+                                st.session_state.get("fecha_analisis_un_dia", max_fecha),
+                                max_fecha
+                            ),
+                            min_fecha,
+                            max_fecha
+                        )
                         _sidebar_field_label("calendar", "Seleccionar fecha")
-                        fecha_unica = _available_date_select(
+                        fecha_unica = st.date_input(
                             "Seleccionar fecha para el análisis:",
-                            fechas_disponibles,
+                            value=fecha_unica_default,
                             key="fecha_analisis_un_dia",
-                            default_date=max_fecha,
-                            help_text=FILTER_HELP_TEXTS['fecha']
+                            help=FILTER_HELP_TEXTS['fecha']
                         )
                         fecha_analisis = (fecha_unica, fecha_unica)
                         analysis_navigation_state_key = "fecha_analisis_un_dia"
                     else:
+                        default_range_end = _get_sidebar_default_range_end(min_fecha, max_fecha, default_days=7)
                         _sidebar_field_label("calendar", "Fecha inicio")
-                        fecha_inicio_analisis, fecha_fin_analisis = _available_date_range_select(
+                        fecha_inicio_analisis = st.date_input(
                             "Fecha inicio del análisis:",
+                            value=min_fecha,
+                            key="fecha_inicio_analisis",
+                            min_value=min_fecha,
+                            max_value=max_fecha,
+                            help=FILTER_HELP_TEXTS['fecha']
+                        )
+                        _sidebar_field_label("calendar", "Fecha fin")
+                        fecha_fin_analisis = st.date_input(
                             "Fecha fin del análisis:",
-                            fechas_disponibles,
-                            start_key="fecha_inicio_analisis",
-                            end_key="fecha_fin_analisis",
-                            default_start=min_fecha,
-                            default_end=_get_sidebar_default_range_end(min_fecha, max_fecha, default_days=7),
-                            help_text=FILTER_HELP_TEXTS['fecha']
+                            value=default_range_end,
+                            key="fecha_fin_analisis",
+                            min_value=min_fecha,
+                            max_value=max_fecha,
+                            help=FILTER_HELP_TEXTS['fecha']
+                        )
+                        fecha_inicio_analisis, fecha_fin_analisis = _normalize_sidebar_date_range(
+                            fecha_inicio_analisis,
+                            fecha_fin_analisis,
+                            min_fecha,
+                            max_fecha
                         )
                         fecha_analisis = (fecha_inicio_analisis, fecha_fin_analisis)
 
@@ -5994,8 +5911,7 @@ if dashboard_mode == "Varianza Y Promedio":
             min_fecha=analysis_min_fecha,
             max_fecha=analysis_max_fecha,
             navigation_state_key=analysis_navigation_state_key,
-            title_text='Periodo del análisis',
-            available_dates=fechas_disponibles
+            title_text='Periodo del análisis'
         )
         fecha_inicio_analisis, fecha_fin_analisis = fecha_analisis
         df_variables_analisis = _filter_variables_multi_block_range(
@@ -6070,14 +5986,21 @@ with st.sidebar.expander("Periodo", expanded=True):
             correlation_max_fecha = max_fecha
 
             if min_fecha == max_fecha:
-                st.caption("Solo hay una fecha con datos disponibles para este bloque.")
+                st.caption("Solo hay una fecha con datos en variables para este bloque, pero puedes consultar cualquier día desde el calendario.")
+                fecha_unica_default = _clamp_sidebar_date(
+                    _coerce_sidebar_date(
+                        st.session_state.get("fecha_calendario_unica", max_fecha),
+                        max_fecha
+                    ),
+                    min_fecha,
+                    max_fecha
+                )
                 _sidebar_field_label("calendar", "Seleccionar fecha")
-                fecha_unica = _available_date_select(
+                fecha_unica = st.date_input(
                     "Seleccionar fecha:",
-                    fechas_disponibles,
+                    value=fecha_unica_default,
                     key="fecha_calendario_unica",
-                    default_date=max_fecha,
-                    help_text=FILTER_HELP_TEXTS['fecha']
+                    help=FILTER_HELP_TEXTS['fecha']
                 )
                 fecha_variables = (fecha_unica, fecha_unica)
                 fecha_cortinas = (fecha_unica, fecha_unica)
@@ -6092,28 +6015,49 @@ with st.sidebar.expander("Periodo", expanded=True):
                 )
 
                 if modo_fechas == "Un día":
+                    fecha_unica_default = _clamp_sidebar_date(
+                        _coerce_sidebar_date(
+                            st.session_state.get("fecha_calendario_un_dia", max_fecha),
+                            max_fecha
+                        ),
+                        min_fecha,
+                        max_fecha
+                    )
                     _sidebar_field_label("calendar", "Seleccionar fecha")
-                    fecha_unica = _available_date_select(
+                    fecha_unica = st.date_input(
                         "Seleccionar fecha:",
-                        fechas_disponibles,
+                        value=fecha_unica_default,
                         key="fecha_calendario_un_dia",
-                        default_date=max_fecha,
-                        help_text=FILTER_HELP_TEXTS['fecha']
+                        help=FILTER_HELP_TEXTS['fecha']
                     )
                     fecha_variables = (fecha_unica, fecha_unica)
                     fecha_cortinas = (fecha_unica, fecha_unica)
                     correlation_navigation_state_key = "fecha_calendario_un_dia"
                 else:
+                    default_range_end = _get_sidebar_default_range_end(min_fecha, max_fecha, default_days=7)
                     _sidebar_field_label("calendar", "Fecha inicio")
-                    fecha_inicio, fecha_fin = _available_date_range_select(
+                    fecha_inicio = st.date_input(
                         "Fecha inicio:",
+                        value=min_fecha,
+                        key="fecha_inicio_compartida",
+                        min_value=min_fecha,
+                        max_value=max_fecha,
+                        help=FILTER_HELP_TEXTS['fecha']
+                    )
+                    _sidebar_field_label("calendar", "Fecha fin")
+                    fecha_fin = st.date_input(
                         "Fecha fin:",
-                        fechas_disponibles,
-                        start_key="fecha_inicio_compartida",
-                        end_key="fecha_fin_compartida",
-                        default_start=min_fecha,
-                        default_end=_get_sidebar_default_range_end(min_fecha, max_fecha, default_days=7),
-                        help_text=FILTER_HELP_TEXTS['fecha']
+                        value=default_range_end,
+                        key="fecha_fin_compartida",
+                        min_value=min_fecha,
+                        max_value=max_fecha,
+                        help=FILTER_HELP_TEXTS['fecha']
+                    )
+                    fecha_inicio, fecha_fin = _normalize_sidebar_date_range(
+                        fecha_inicio,
+                        fecha_fin,
+                        min_fecha,
+                        max_fecha
                     )
                     fecha_variables = (fecha_inicio, fecha_fin)
                     fecha_cortinas = (fecha_inicio, fecha_fin)
@@ -6228,8 +6172,7 @@ with tab_correlacion:
             min_fecha=correlation_min_fecha,
             max_fecha=correlation_max_fecha,
             navigation_state_key=correlation_navigation_state_key,
-            title_text='Periodo del bloque',
-            available_dates=fechas_disponibles
+            title_text='Periodo del bloque'
         )
         fecha_inicio, fecha_fin = fecha_variables
         rango_multiple = fecha_inicio != fecha_fin
