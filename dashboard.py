@@ -2077,6 +2077,25 @@ def _hex_to_rgba(hex_color, alpha):
     return f'rgba({red}, {green}, {blue}, {alpha})'
 
 
+def _resolve_correlacion_axis_layout(num_sensor_axes, has_cortina_axis):
+    total_right_axes = max(1, num_sensor_axes + (1 if has_cortina_axis else 0))
+    right_axis_step = 0.045
+    axis_end = 0.985
+    axis_start = axis_end - right_axis_step * (total_right_axes - 1)
+    x_domain_end = max(0.72, axis_start - 0.035)
+    right_margin = 76 + total_right_axes * 24
+
+    return {
+        'x_domain_end': x_domain_end,
+        'sensor_positions': [
+            axis_start + right_axis_step * index
+            for index in range(num_sensor_axes)
+        ],
+        'cortina_position': axis_end if has_cortina_axis else None,
+        'right_margin': right_margin,
+    }
+
+
 def _format_summary_number(value, decimals):
     if decimals <= 0:
         return f"{round(value):,.0f}".replace(',', '.')
@@ -4681,50 +4700,11 @@ def _render_correlacion(
     axis_configs = {}
     num_axes = len(sensor_traces)
     has_cortina_axis = bool(cortina_traces)
-
-    if has_cortina_axis:
-        if num_axes >= 4:
-            x_domain_end = 0.76
-            axis_start = 0.80
-            axis_end = 0.92
-            cortina_axis_position = 0.965
-            right_margin = 250
-        elif num_axes == 3:
-            x_domain_end = 0.80
-            axis_start = 0.84
-            axis_end = 0.93
-            cortina_axis_position = 0.97
-            right_margin = 220
-        else:
-            x_domain_end = 0.84
-            axis_start = 0.87
-            axis_end = 0.94
-            cortina_axis_position = 0.98
-            right_margin = 190
-    else:
-        if num_axes >= 4:
-            x_domain_end = 0.79
-            axis_start = 0.84
-            axis_end = 0.98
-            right_margin = 255
-        elif num_axes == 3:
-            x_domain_end = 0.86
-            axis_start = 0.90
-            axis_end = 0.96
-            right_margin = 190
-        elif num_axes == 2:
-            x_domain_end = 0.90
-            axis_start = 0.93
-            axis_end = 0.97
-            right_margin = 160
-        else:
-            x_domain_end = 0.93
-            axis_start = 0.95
-            axis_end = 0.98
-            right_margin = 130
-        cortina_axis_position = None
-
-    right_positions = [axis_start + i * ((axis_end - axis_start) / max(1, num_axes - 1)) for i in range(num_axes)]
+    axis_layout = _resolve_correlacion_axis_layout(num_axes, has_cortina_axis)
+    x_domain_end = axis_layout['x_domain_end']
+    right_positions = axis_layout['sensor_positions']
+    cortina_axis_position = axis_layout['cortina_position']
+    right_margin = axis_layout['right_margin']
     sensor_axis_names = ['y', 'y3', 'y4', 'y5']
     sensor_axis_map = {}
 
@@ -4780,7 +4760,7 @@ def _render_correlacion(
             zeroline=False,
             tickmode='auto',
             automargin=True,
-            title_standoff=16
+            title_standoff=10
         )
 
         if axis_name == 'y':
@@ -4837,7 +4817,7 @@ def _render_correlacion(
                 tick0=0,
                 dtick=cortina_dtick,
                 automargin=True,
-                title_standoff=18
+                title_standoff=10
             )
         else:
             axis_configs['y2'] = dict(
@@ -4862,7 +4842,7 @@ def _render_correlacion(
                 tickvals=[0, 25, 50, 75, 100],
                 ticksuffix='%',
                 automargin=True,
-                title_standoff=18
+                title_standoff=10
             )
 
     fig_corr.update_layout(
@@ -4904,7 +4884,7 @@ def _render_correlacion(
         legend=dict(
             orientation='h',
             yanchor='bottom',
-            y=1.10,
+            y=1.08,
             xanchor='left',
             x=0,
             traceorder='normal',
@@ -4914,7 +4894,7 @@ def _render_correlacion(
             bordercolor='rgba(76, 70, 120, 0.08)',
             borderwidth=1
         ),
-        margin=dict(l=50, r=right_margin, t=142, b=55),
+        margin=dict(l=50, r=right_margin, t=122, b=68),
         **{f'yaxis{axis_name[1:]}': config for axis_name, config in axis_configs.items()}
     )
 
