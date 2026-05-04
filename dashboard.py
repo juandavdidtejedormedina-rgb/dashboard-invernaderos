@@ -2079,11 +2079,11 @@ def _hex_to_rgba(hex_color, alpha):
 
 def _resolve_correlacion_axis_layout(num_sensor_axes, has_cortina_axis):
     total_right_axes = max(1, num_sensor_axes + (1 if has_cortina_axis else 0))
-    right_axis_step = 0.043
-    axis_end = 0.985
+    right_axis_step = 0.041
+    axis_end = 0.997
     axis_start = axis_end - right_axis_step * (total_right_axes - 1)
-    x_domain_end = max(0.74, axis_start - 0.02)
-    right_margin = 70 + total_right_axes * 22
+    x_domain_end = max(0.76, axis_start - 0.014)
+    right_margin = 58 + total_right_axes * 18
 
     return {
         'x_domain_end': x_domain_end,
