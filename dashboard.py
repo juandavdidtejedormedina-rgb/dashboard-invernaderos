@@ -1,6 +1,5 @@
 import streamlit as st
 import pandas as pd
-import streamlit.components.v1 as components
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import io
@@ -45,22 +44,19 @@ def _google_maps_embed_url(location_query):
 
 def _render_autoplay_video(video_url, height=430):
     video_urls = video_url if isinstance(video_url, (list, tuple)) else [video_url]
-
     safe_urls = [
         html.escape(str(url or "").strip(), quote=True)
         for url in video_urls
         if str(url or "").strip()
     ]
-
     if not safe_urls:
         return
-
+    first_url = safe_urls[0]
     playlist_js = "[" + ",".join(f'"{url}"' for url in safe_urls) + "]"
 
-    components.html(
+    st.html(
         f"""
         <video
-            id="dashboardVideo"
             autoplay
             muted
             playsinline
@@ -74,34 +70,26 @@ def _render_autoplay_video(video_url, height=430):
                 border-radius: 18px;
                 background: #111;
             "
-        ></video>
-
+        >
+            <source src="{first_url}" type="video/mp4">
+        </video>
         <script>
-            const video = document.getElementById("dashboardVideo");
+            const video = document.currentScript.previousElementSibling;
             const playlist = {playlist_js};
             let currentIndex = 0;
-
-            function playVideo(index) {{
-                video.src = playlist[index];
-                video.load();
-                video.playbackRate = 0.7;
+            if (video) {{
+                video.muted = true;
+                video.addEventListener("ended", () => {{
+                    currentIndex = (currentIndex + 1) % playlist.length;
+                    video.src = playlist[currentIndex];
+                    video.load();
+                    video.play().catch(() => {{}});
+                }});
                 video.play().catch(() => {{}});
             }}
-
-            video.addEventListener("ended", () => {{
-                currentIndex = (currentIndex + 1) % playlist.length;
-                playVideo(currentIndex);
-            }});
-
-            video.addEventListener("error", () => {{
-                currentIndex = (currentIndex + 1) % playlist.length;
-                playVideo(currentIndex);
-            }});
-
-            playVideo(currentIndex);
         </script>
         """,
-        height=height + 20,
+        unsafe_allow_javascript=True
     )
 
 
@@ -115,24 +103,23 @@ def _render_dashboard_media(selected_finca, lazy_load=False):
     location_query = str(media_config.get('location_query', '')).strip()
 
     if video_url:
-        with st.expander("Video introductorio", expanded=True):
-
-            # Si hay varios videos, los reproduce en secuencia
-            if isinstance(video_url, (list, tuple)):
-                _render_autoplay_video(video_url, height=430)
-
-            # Si hay un solo video, lo reproduce normal
-            else:
-                youtube_embed_url = _youtube_embed_url(video_url)
-
+        with st.expander("Video introductorio", expanded=not lazy_load):
+            if not lazy_load or st.checkbox("Cargar video", key="cargar_video_dashboard"):
+                youtube_source_url = video_url[0] if isinstance(video_url, (list, tuple)) else video_url
+                youtube_embed_url = _youtube_embed_url(youtube_source_url)
                 if youtube_embed_url:
                     st.iframe(youtube_embed_url, height=430)
                 else:
-                    _render_autoplay_video(video_url, height=430)
+                    _render_autoplay_video(video_url)
+            else:
+                st.caption("Carga el video solo cuando lo necesites.")
 
     if location_query:
-        with st.expander("Ubicación", expanded=False):
-            st.iframe(_google_maps_embed_url(location_query), height=430)
+        with st.expander("Ubicación", expanded=not lazy_load):
+            if not lazy_load or st.checkbox("Cargar mapa", key="cargar_mapa_dashboard"):
+                st.iframe(_google_maps_embed_url(location_query), height=430)
+            else:
+                st.caption("Carga el mapa solo cuando lo necesites.")
 
 SENSOR_VARIABLES = ['Temperatura', 'Humedad Relativa', 'Radiación PAR', 'Gramos de agua']
 VARIABLE_LABELS = {
@@ -191,7 +178,7 @@ FILTER_HELP_TEXTS = {
     'comparar_almacen': 'Muestra la serie equivalente de la Estación externa para cada variable ambiental seleccionada.',
     'aperturas_ideales': 'Superpone la apertura ideal calculada sobre las series de frentes y puertas cuando exista la referencia del bloque.',
     'graficas_detalladas': 'Carga las gráficas secundarias solo cuando necesites revisar cada variable por separado.',
-    'registros': 'Carga las tablas de registros cuando necesites inspeccionar los datos crudos.'
+    'registros': 'Carga las tablas de registros solo cuando necesites inspeccionar los datos crudos.'
 }
 VARIABLE_FILTER_HELP = {
     'Temperatura': 'Muestra la temperatura del bloque seleccionado.',
@@ -224,8 +211,8 @@ MARLEY_REMOTE_EXCEL_URLS = [
     (
         "https://raw.githubusercontent.com/"
         "juandavdidtejedormedina-rgb/dashboard-invernaderos/"
-        "23fbfd8c6f37df4b801a04d60b96f1ef45da3ce9/"
-        "Datos%20Final%20Marley.xlsx"
+        "89ab929cbeba025053c07941988fc5366e9727bd/"
+        "Datos%20Final%20marley.xlsx"
     )
 ]
 MARLEY_SENSOR_NAMES = ("WIGA", "ECOWITT")
@@ -233,7 +220,12 @@ MARLEY_TIME_BUCKET = "30min"
 MARLEY_SERIES_END_OFFSET = pd.Timedelta(hours=23, minutes=30)
 MARLEY_AXIS_END_OFFSET = pd.Timedelta(hours=23, minutes=59)
 POINT_COMPARISON_TOLERANCE = pd.Timedelta(minutes=15)
-COMPARISON_RESOLUTION_OPTIONS = ("Promedio cada 30 min", "Punto por punto")
+COMPARISON_RESOLUTION_OPTIONS = (
+    "Promedio cada 30 min",
+    "Punto por punto",
+    "WIGA 30 min + ECOWITT cercano",
+)
+SOURCE_RESOLUTION_OPTIONS = COMPARISON_RESOLUTION_OPTIONS[:2]
 PONDEROSA_ECOWITT_LOCAL_EXCEL_PATHS = [
     APP_DIR / 'ECOWITT Ponderosa.xlsx'
 ]
@@ -385,18 +377,18 @@ DASHBOARD_MEDIA = {
         'location_query': "La Ponderosa - The Elite Flower SAS CI Madrid Cundinamarca Colombia",
     },
     'Marly': {
-    'video_urls': [
-        "https://raw.githubusercontent.com/juandavdidtejedormedina-rgb/dashboard-invernaderos/222d523cb7c0e71fbc5385ab4be100e2d2eb7d2a/video%201.mp4",
-        "https://raw.githubusercontent.com/juandavdidtejedormedina-rgb/dashboard-invernaderos/222d523cb7c0e71fbc5385ab4be100e2d2eb7d2a/video%202.mp4",
-        "https://raw.githubusercontent.com/juandavdidtejedormedina-rgb/dashboard-invernaderos/222d523cb7c0e71fbc5385ab4be100e2d2eb7d2a/video%203.mp4",
-        "https://raw.githubusercontent.com/juandavdidtejedormedina-rgb/dashboard-invernaderos/222d523cb7c0e71fbc5385ab4be100e2d2eb7d2a/video%204.mp4",
-        "https://raw.githubusercontent.com/juandavdidtejedormedina-rgb/dashboard-invernaderos/222d523cb7c0e71fbc5385ab4be100e2d2eb7d2a/video%205.mp4",
-        "https://raw.githubusercontent.com/juandavdidtejedormedina-rgb/dashboard-invernaderos/222d523cb7c0e71fbc5385ab4be100e2d2eb7d2a/video%206.mp4",
-    ],
-    'location_query': "Finca Marly - The Elite Flower SAS CI Madrid Road Facatativa Cundinamarca Colombia",
+        'video_urls': [
+            "https://raw.githubusercontent.com/juandavdidtejedormedina-rgb/dashboard-invernaderos/277ebb73478df2c61271154170df491f8375f103/video%201.mp4",
+            "https://raw.githubusercontent.com/juandavdidtejedormedina-rgb/dashboard-invernaderos/277ebb73478df2c61271154170df491f8375f103/video%202.mp4",
+            "https://raw.githubusercontent.com/juandavdidtejedormedina-rgb/dashboard-invernaderos/277ebb73478df2c61271154170df491f8375f103/video%203.mp4",
+            "https://raw.githubusercontent.com/juandavdidtejedormedina-rgb/dashboard-invernaderos/277ebb73478df2c61271154170df491f8375f103/video%204.mp4",
+            "https://raw.githubusercontent.com/juandavdidtejedormedina-rgb/dashboard-invernaderos/277ebb73478df2c61271154170df491f8375f103/video%205.mp4",
+            "https://raw.githubusercontent.com/juandavdidtejedormedina-rgb/dashboard-invernaderos/277ebb73478df2c61271154170df491f8375f103/video%206.mp4",
+        ],
+        'location_query': "Finca Marly - The Elite Flower SAS CI Madrid Road Facatativa Cundinamarca Colombia",
+    }
 }
-}
-LAZY_LOAD_MEDIA = False
+LAZY_LOAD_MEDIA = True
 DETAIL_CHARTS_DEFAULT = False
 MARLEY_DETAIL_CHARTS_DEFAULT = False
 MARLEY_RECORDS_DEFAULT = False
@@ -2655,7 +2647,7 @@ def _render_reference_summary_cards(df_reference, fecha_variables, summary_mode,
 def _render_summary_cards_selector(df_variables, fecha_variables, df_reference=None, reference_label='Estación externa', base_label='Bloque seleccionado'):
     _render_chart_explanation(
         'Resumen rápido del periodo',
-        'Estas tarjetas condensan las variables ambientales del periodo filtrado. Cambia entre promedio, máximo y mínimo para entender el comportamiento general.',
+        'Estas tarjetas condensan las variables ambientales del periodo filtrado. Cambia entre promedio, máximo y mínimo para entender el comportamiento general antes de revisar las gráficas.',
         accent=BRAND_COLORS['hero'],
         kicker='Resumen del análisis'
     )
@@ -2666,7 +2658,7 @@ def _render_summary_cards_selector(df_variables, fecha_variables, df_reference=N
         "Métrica del resumen",
         options=summary_modes,
         key="resumen_metric_option",
-        help="Calcula el resumen visible.",
+        help="Calcula solo el resumen visible para mantener la carga más liviana.",
         width="stretch"
     )
     _render_summary_cards(
@@ -3798,6 +3790,67 @@ def _build_point_comparison(df, variable, sensor_names, tolerance=POINT_COMPARIS
     return _finalize_sensor_comparison(comparison, sensor_names)
 
 
+def _build_wiga_anchor_nearest_comparison(
+    df,
+    variable,
+    sensor_names,
+    selected_range,
+    hourly_builder,
+    tolerance=POINT_COMPARISON_TOLERANCE
+):
+    if len(sensor_names) < 2:
+        return pd.DataFrame(columns=['FechaHora', *sensor_names, 'DiffPct', 'DiffValue', 'SignedDiff'])
+
+    first_source, second_source = sensor_names[:2]
+    first_col = f"{variable} - {first_source}"
+    second_col = f"{variable} - {second_source}"
+    if df.empty or first_col not in df.columns or second_col not in df.columns:
+        return pd.DataFrame(columns=['FechaHora', *sensor_names, 'DiffPct', 'DiffValue', 'SignedDiff'])
+
+    first_df = hourly_builder(df, first_col, selected_range)
+    if first_df.empty or first_col not in first_df.columns:
+        return pd.DataFrame(columns=['FechaHora', *sensor_names, 'DiffPct', 'DiffValue', 'SignedDiff'])
+
+    first_df = (
+        first_df[['FechaHora', first_col]]
+        .dropna(subset=[first_col])
+        .sort_values('FechaHora')
+        .rename(columns={first_col: first_source})
+    )
+    if first_df.empty:
+        return pd.DataFrame(columns=['FechaHora', *sensor_names, 'DiffPct', 'DiffValue', 'SignedDiff'])
+
+    second_df = df[['FechaHora', second_col]].dropna(subset=[second_col]).copy()
+    if second_df.empty:
+        comparison = first_df.copy()
+        comparison[second_source] = pd.NA
+        return _finalize_sensor_comparison(comparison, sensor_names)
+
+    second_df['FechaHora'] = pd.to_datetime(second_df['FechaHora'], errors='coerce')
+    second_df[second_col] = pd.to_numeric(second_df[second_col], errors='coerce')
+    second_df = (
+        second_df
+        .dropna(subset=['FechaHora', second_col])
+        .groupby('FechaHora', as_index=False)[second_col]
+        .mean()
+        .sort_values('FechaHora')
+        .rename(columns={second_col: second_source})
+    )
+    if second_df.empty:
+        comparison = first_df.copy()
+        comparison[second_source] = pd.NA
+        return _finalize_sensor_comparison(comparison, sensor_names)
+
+    comparison = pd.merge_asof(
+        first_df,
+        second_df,
+        on='FechaHora',
+        direction='nearest',
+        tolerance=tolerance
+    )
+    return _finalize_sensor_comparison(comparison, sensor_names)
+
+
 def _get_marley_time_axis_config(df):
     min_time = df['FechaHora'].min()
     max_time = df['FechaHora'].max()
@@ -3863,7 +3916,13 @@ def _make_marley_comparison_chart(comparison, variable, selected_range, resoluti
     start_date, end_date = selected_range
     multi_day_view = start_date != end_date
     point_mode = resolution_label == COMPARISON_RESOLUTION_OPTIONS[1]
-    chart_title = config['title'] if not point_mode else f"{config['title']} - punto por punto"
+    nearest_wiga_mode = resolution_label == COMPARISON_RESOLUTION_OPTIONS[2]
+    if point_mode:
+        chart_title = f"{config['title']} - punto por punto"
+    elif nearest_wiga_mode:
+        chart_title = f"{config['title']} - WIGA 30 min / ECOWITT cercano"
+    else:
+        chart_title = config['title']
 
     for source_name in MARLEY_SENSOR_NAMES:
         source_df = comparison[['FechaHora', source_name, 'SignedDiffLabel', 'DiffValueLabel', 'DiffPctLabel']].copy()
@@ -3897,7 +3956,7 @@ def _make_marley_comparison_chart(comparison, variable, selected_range, resoluti
         )
 
     fig.update_layout(
-        title=dict(text=config['title'], x=0, xanchor='left'),
+        title=dict(text=chart_title, x=0, xanchor='left'),
         height=470,
         margin=dict(l=28, r=28, t=74, b=28),
         paper_bgcolor="rgba(255,255,255,0)",
@@ -3941,6 +4000,8 @@ def _make_marley_difference_chart(comparison, variable, selected_range, resoluti
     time_axis = _get_marley_time_axis_config(comparison)
     start_date, end_date = selected_range
     multi_day_view = start_date != end_date
+    point_mode = resolution_label == COMPARISON_RESOLUTION_OPTIONS[1]
+    nearest_wiga_mode = resolution_label == COMPARISON_RESOLUTION_OPTIONS[2]
     max_abs_diff = float(diff_df['SignedDiff'].abs().max())
     axis_limit = max(round(max_abs_diff * 1.15, 2), 0.5)
 
@@ -3958,7 +4019,17 @@ def _make_marley_difference_chart(comparison, variable, selected_range, resoluti
     )
     fig.add_hline(y=0, line_width=1.4, line_dash='dash', line_color="rgba(45, 48, 64, 0.45)")
     fig.update_layout(
-        title=dict(text="Diferencia entre sensores por bloque de 30 minutos", x=0, xanchor='left'),
+        title=dict(
+            text=(
+                "Diferencia entre sensores punto por punto"
+                if point_mode else
+                "Diferencia con ECOWITT cercano a WIGA"
+                if nearest_wiga_mode else
+                "Diferencia entre sensores por bloque de 30 minutos"
+            ),
+            x=0,
+            xanchor='left'
+        ),
         height=340,
         margin=dict(l=28, r=28, t=72, b=28),
         paper_bgcolor="rgba(255,255,255,0)",
@@ -4523,7 +4594,7 @@ def _render_marley_dashboard(dashboard_mode):
         )
         source_resolution = st.radio(
             f"Resolución de las gráficas {source_name}:",
-            options=COMPARISON_RESOLUTION_OPTIONS,
+            options=SOURCE_RESOLUTION_OPTIONS,
             horizontal=True,
             key=f"marley_{source_name.lower()}_source_resolution",
             help="Usa el promedio para una lectura limpia por media hora, o punto por punto para ver las lecturas reales sin agrupar."
@@ -4613,7 +4684,7 @@ def _render_marley_dashboard(dashboard_mode):
         if show_marley_details:
             detail_resolution = st.radio(
                 "Resolución de las gráficas individuales:",
-                options=COMPARISON_RESOLUTION_OPTIONS,
+                options=SOURCE_RESOLUTION_OPTIONS,
                 horizontal=True,
                 key="marley_varianza_detail_resolution",
                 help="La varianza se mantiene por franja horaria; este control aplica solo a las gráficas individuales."
@@ -4630,12 +4701,21 @@ def _render_marley_dashboard(dashboard_mode):
         options=COMPARISON_RESOLUTION_OPTIONS,
         horizontal=True,
         key="marley_comparison_resolution",
-        help="Usa el promedio para una lectura limpia por media hora, o punto por punto para comparar lecturas crudas alineadas al registro más cercano."
+        help="Promedio agrupa ambos sensores cada 30 minutos; punto por punto usa lecturas crudas; WIGA 30 min mantiene WIGA como base y toma el ECOWITT más cercano a cada hora WIGA."
     )
     point_mode = comparison_resolution == COMPARISON_RESOLUTION_OPTIONS[1]
+    nearest_wiga_mode = comparison_resolution == COMPARISON_RESOLUTION_OPTIONS[2]
     comparison = (
         _build_point_comparison(filtered_df, selected_variable, MARLEY_SENSOR_NAMES)
         if point_mode else
+        _build_wiga_anchor_nearest_comparison(
+            filtered_df,
+            selected_variable,
+            MARLEY_SENSOR_NAMES,
+            selected_range,
+            _build_marley_hourly_series
+        )
+        if nearest_wiga_mode else
         _build_marley_hourly_comparison(filtered_df, selected_variable, selected_range)
     )
     overlap = comparison.dropna(subset=list(MARLEY_SENSOR_NAMES)).copy()
@@ -4645,6 +4725,8 @@ def _render_marley_dashboard(dashboard_mode):
         (
             'Aquí se superponen las lecturas punto por punto. Cada punto WIGA se compara con la lectura ECOWITT más cercana en el tiempo para ver mejor la relación real entre sensores.'
             if point_mode else
+            'Aquí WIGA mantiene la lectura por franjas de 30 minutos y ECOWITT toma el registro más cercano a cada hora WIGA. Sirve para comparar contra el reloj de WIGA sin promediar ECOWITT.'
+            if nearest_wiga_mode else
             'Aquí se superponen ambos sensores para la variable elegida. Si las líneas viajan cerca, las lecturas son similares; si se separan, hay diferencia entre equipos en esa franja de 30 minutos.'
         ),
         accent=MARLEY_VARIABLES[selected_variable]['accent']
@@ -5085,7 +5167,13 @@ def _make_ponderosa_comparison_chart(comparison, variable, selected_range, resol
     start_date, end_date = selected_range
     multi_day_view = start_date != end_date
     point_mode = resolution_label == COMPARISON_RESOLUTION_OPTIONS[1]
-    chart_title = config['title'] if not point_mode else f"{config['title']} - punto por punto"
+    nearest_wiga_mode = resolution_label == COMPARISON_RESOLUTION_OPTIONS[2]
+    if point_mode:
+        chart_title = f"{config['title']} - punto por punto"
+    elif nearest_wiga_mode:
+        chart_title = f"{config['title']} - WIGA 30 min / ECOWITT cercano"
+    else:
+        chart_title = config['title']
 
     for source_name in PONDEROSA_SENSOR_NAMES:
         source_df = comparison[['FechaHora', source_name, 'SignedDiffLabel', 'DiffValueLabel', 'DiffPctLabel']].copy()
@@ -5161,6 +5249,7 @@ def _make_ponderosa_difference_chart(comparison, variable, selected_range, resol
     start_date, end_date = selected_range
     multi_day_view = start_date != end_date
     point_mode = resolution_label == COMPARISON_RESOLUTION_OPTIONS[1]
+    nearest_wiga_mode = resolution_label == COMPARISON_RESOLUTION_OPTIONS[2]
     max_abs_diff = float(diff_df['SignedDiff'].abs().max())
     axis_limit = max(round(max_abs_diff * 1.15, 2), 0.5)
 
@@ -5179,7 +5268,13 @@ def _make_ponderosa_difference_chart(comparison, variable, selected_range, resol
     fig.add_hline(y=0, line_width=1.4, line_dash='dash', line_color="rgba(45, 48, 64, 0.45)")
     fig.update_layout(
         title=dict(
-            text="Diferencia entre sensores punto por punto" if point_mode else "Diferencia entre sensores por bloque de 30 minutos",
+            text=(
+                "Diferencia entre sensores punto por punto"
+                if point_mode else
+                "Diferencia con ECOWITT cercano a WIGA"
+                if nearest_wiga_mode else
+                "Diferencia entre sensores por bloque de 30 minutos"
+            ),
             x=0,
             xanchor='left'
         ),
@@ -5647,7 +5742,7 @@ def _render_ponderosa_wiga_values_dashboard(df_variables_all, df_cortinas_all, s
     st.caption("Lectura de las cuatro variables de Datos_Variables para el bloque seleccionado.")
     wiga_resolution = st.radio(
         "Resolución de las gráficas WIGA:",
-        options=COMPARISON_RESOLUTION_OPTIONS,
+    options=SOURCE_RESOLUTION_OPTIONS,
         horizontal=True,
         key="ponderosa_wiga_only_resolution",
         help="Usa el promedio para una lectura limpia por media hora, o punto por punto para ver las lecturas reales sin agrupar."
@@ -6009,7 +6104,7 @@ def _render_ponderosa_ecowitt_values_dashboard():
     st.caption("Lectura de temperatura, humedad, radiación PAR y LUX medidas por ECOWITT en el Bloque 35.")
     ecowitt_resolution = st.radio(
         "Resolución de las gráficas ECOWITT:",
-        options=COMPARISON_RESOLUTION_OPTIONS,
+        options=SOURCE_RESOLUTION_OPTIONS,
         horizontal=True,
         key="ponderosa_ecowitt_only_resolution",
         help="Usa el promedio para una lectura limpia por media hora, o punto por punto para ver las lecturas reales sin agrupar."
@@ -6389,12 +6484,21 @@ def _render_ponderosa_ecowitt_dashboard(df_variables_all, df_cortinas_all, selec
         options=COMPARISON_RESOLUTION_OPTIONS,
         horizontal=True,
         key="ponderosa_ecowitt_comparison_resolution",
-        help="Usa el promedio para una lectura limpia por media hora, o punto por punto para comparar lecturas crudas alineadas al registro más cercano."
+        help="Promedio agrupa ambos sensores cada 30 minutos; punto por punto usa lecturas crudas; WIGA 30 min mantiene WIGA como base y toma el ECOWITT más cercano a cada hora WIGA."
     )
     point_mode = comparison_resolution == COMPARISON_RESOLUTION_OPTIONS[1]
+    nearest_wiga_mode = comparison_resolution == COMPARISON_RESOLUTION_OPTIONS[2]
     comparison = (
         _build_point_comparison(filtered_df, selected_variable, PONDEROSA_SENSOR_NAMES)
         if point_mode else
+        _build_wiga_anchor_nearest_comparison(
+            filtered_df,
+            selected_variable,
+            PONDEROSA_SENSOR_NAMES,
+            selected_range,
+            _build_ponderosa_hourly_series
+        )
+        if nearest_wiga_mode else
         _build_ponderosa_hourly_comparison(filtered_df, selected_variable, selected_range)
     )
     overlap = comparison.dropna(subset=list(PONDEROSA_SENSOR_NAMES)).copy()
@@ -6404,6 +6508,8 @@ def _render_ponderosa_ecowitt_dashboard(df_variables_all, df_cortinas_all, selec
         (
             'Aquí se superponen las lecturas punto por punto. Cada punto WIGA se compara con la lectura ECOWITT más cercana en el tiempo para revisar la relación real entre sensores.'
             if point_mode else
+            'Aquí WIGA conserva sus franjas de 30 minutos y ECOWITT toma el registro más cercano a cada hora WIGA. Es útil cuando quieres que el eje del día siga el reloj de WIGA sin promediar ECOWITT.'
+            if nearest_wiga_mode else
             'Aquí se superponen ambos sensores para la variable elegida. Si las líneas viajan cerca, las lecturas son similares; si se separan, hay diferencia entre equipos en esa franja.'
         ),
         accent=PONDEROSA_COMPARISON_VARIABLES[selected_variable]['accent']
@@ -8881,3 +8987,4 @@ with tab_correlacion:
                 st.info("No hay registros de cortinas para los filtros seleccionados.")
             else:
                 _dataframe(datos_cortinas_sel)
+
