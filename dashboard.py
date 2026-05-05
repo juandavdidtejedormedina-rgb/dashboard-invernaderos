@@ -3851,6 +3851,135 @@ def _build_wiga_anchor_nearest_comparison(
     return _finalize_sensor_comparison(comparison, sensor_names)
 
 
+def _build_difference_table_30min(
+    df,
+    variables,
+    sensor_names,
+    selected_range,
+    resolution_label,
+    hourly_comparison_builder,
+    hourly_series_builder,
+    variable_configs
+):
+    if df.empty or len(sensor_names) < 2:
+        return pd.DataFrame(), ""
+
+    first_source, second_source = sensor_names[:2]
+    use_nearest = resolution_label != COMPARISON_RESOLUTION_OPTIONS[0]
+    table_mode = (
+        "WIGA 30 min + ECOWITT cercano"
+        if use_nearest else
+        "Promedio cada 30 min"
+    )
+    rows = []
+
+    for variable in variables:
+        comparison = (
+            _build_wiga_anchor_nearest_comparison(
+                df,
+                variable,
+                sensor_names,
+                selected_range,
+                hourly_series_builder
+            )
+            if use_nearest else
+            hourly_comparison_builder(df, variable, selected_range)
+        )
+        if comparison.empty:
+            continue
+
+        comparison = comparison.copy()
+        comparison = comparison.dropna(how='all', subset=list(sensor_names))
+        if comparison.empty:
+            continue
+
+        config = variable_configs.get(variable, {})
+        unit = config.get('unit', VARIABLE_UNITS.get(variable, ''))
+        variable_label = config.get('title', VARIABLE_SELECTOR_LABELS.get(variable, variable))
+        variable_label = variable_label.replace('Comparativa de ', '').capitalize()
+
+        for _, row in comparison.iterrows():
+            timestamp = pd.to_datetime(row.get('FechaHora'), errors='coerce')
+            if pd.isna(timestamp):
+                continue
+            wiga_value = pd.to_numeric(pd.Series([row.get(first_source)]), errors='coerce').iloc[0]
+            ecowitt_value = pd.to_numeric(pd.Series([row.get(second_source)]), errors='coerce').iloc[0]
+            if pd.isna(wiga_value) and pd.isna(ecowitt_value):
+                continue
+
+            signed_diff = (
+                wiga_value - ecowitt_value
+                if pd.notna(wiga_value) and pd.notna(ecowitt_value) else
+                pd.NA
+            )
+            abs_diff = abs(signed_diff) if pd.notna(signed_diff) else pd.NA
+            pct_base = (
+                (abs(wiga_value) + abs(ecowitt_value)) / 2
+                if pd.notna(wiga_value) and pd.notna(ecowitt_value) else
+                pd.NA
+            )
+            diff_pct = (
+                abs_diff / pct_base * 100
+                if pd.notna(abs_diff) and pd.notna(pct_base) and pct_base != 0 else
+                pd.NA
+            )
+
+            rows.append({
+                'Fecha': timestamp.strftime('%Y-%m-%d'),
+                'Hora': timestamp.strftime('%H:%M'),
+                'Variable': variable_label,
+                'Unidad': unit,
+                first_source: round(float(wiga_value), 2) if pd.notna(wiga_value) else pd.NA,
+                second_source: round(float(ecowitt_value), 2) if pd.notna(ecowitt_value) else pd.NA,
+                'Diferencia WIGA - ECOWITT': round(float(signed_diff), 2) if pd.notna(signed_diff) else pd.NA,
+                'Diferencia absoluta': round(float(abs_diff), 2) if pd.notna(abs_diff) else pd.NA,
+                'Diferencia %': round(float(diff_pct), 2) if pd.notna(diff_pct) else pd.NA,
+            })
+
+    if not rows:
+        return pd.DataFrame(), table_mode
+
+    table = pd.DataFrame(rows)
+    return table.sort_values(['Fecha', 'Hora', 'Variable']).reset_index(drop=True), table_mode
+
+
+def _render_difference_table_30min(
+    df,
+    variables,
+    sensor_names,
+    selected_range,
+    resolution_label,
+    hourly_comparison_builder,
+    hourly_series_builder,
+    variable_configs,
+    state_key
+):
+    show_table = st.checkbox(
+        "Mostrar tabla de diferencias cada 30 min",
+        key=state_key,
+        help="Genera una tabla con WIGA, ECOWITT y la diferencia para temperatura, humedad y radiación en cada franja de 30 minutos."
+    )
+    if not show_table:
+        return
+
+    table, table_mode = _build_difference_table_30min(
+        df,
+        variables,
+        sensor_names,
+        selected_range,
+        resolution_label,
+        hourly_comparison_builder,
+        hourly_series_builder,
+        variable_configs
+    )
+    if table.empty:
+        st.info("No hay datos suficientes para construir la tabla de diferencias en el periodo seleccionado.")
+        return
+
+    st.caption(f"Tabla calculada con: {table_mode}. La diferencia se calcula como WIGA - ECOWITT.")
+    _dataframe(table, hide_index=True)
+
+
 def _get_marley_time_axis_config(df):
     min_time = df['FechaHora'].min()
     max_time = df['FechaHora'].max()
@@ -4793,6 +4922,21 @@ def _render_marley_dashboard(dashboard_mode):
         accent=MARLEY_VARIABLES[selected_variable]['accent']
     )
     _plotly_chart(_make_marley_comparison_chart(comparison, selected_variable, selected_range, comparison_resolution))
+    _render_difference_table_30min(
+        filtered_df,
+        [
+            "Temperatura (°C)",
+            "Humedad Relativa (%)",
+            "Radiación PAR (µmol m-2 s-1)",
+        ],
+        MARLEY_SENSOR_NAMES,
+        selected_range,
+        comparison_resolution,
+        _build_marley_hourly_comparison,
+        _build_marley_hourly_series,
+        MARLEY_VARIABLES,
+        "mostrar_marley_tabla_diferencias_30min"
+    )
 
     avg_abs_diff = overlap['DiffValue'].mean() if not overlap.empty else None
     avg_signed_diff = overlap['SignedDiff'].mean() if not overlap.empty else None
@@ -6579,6 +6723,17 @@ def _render_ponderosa_ecowitt_dashboard(df_variables_all, df_cortinas_all, selec
     )
     _plotly_chart(_make_ponderosa_comparison_chart(comparison, selected_variable, selected_range, comparison_resolution))
     _render_ponderosa_comparison_metric_cards(overlap, selected_variable)
+    _render_difference_table_30min(
+        filtered_df,
+        list(PONDEROSA_COMPARISON_VARIABLES.keys()),
+        PONDEROSA_SENSOR_NAMES,
+        selected_range,
+        comparison_resolution,
+        _build_ponderosa_hourly_comparison,
+        _build_ponderosa_hourly_series,
+        PONDEROSA_COMPARISON_VARIABLES,
+        "mostrar_ponderosa_tabla_diferencias_30min"
+    )
 
     difference_chart = _make_ponderosa_difference_chart(comparison, selected_variable, selected_range, comparison_resolution)
     if difference_chart is not None:
