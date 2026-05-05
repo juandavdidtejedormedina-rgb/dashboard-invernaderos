@@ -7559,6 +7559,19 @@ def _collect_analysis_metrics(df_source, tab_label, variable_options=None):
     return metrics_data
 
 
+def _format_metric_card_value(value, decimals=2, scientific_threshold=100000):
+    numeric_value = pd.to_numeric(pd.Series([value]), errors='coerce').iloc[0]
+    if pd.isna(numeric_value):
+        return "Sin dato"
+
+    numeric_value = float(numeric_value)
+    if abs(numeric_value) >= scientific_threshold:
+        mantissa, exponent = f"{numeric_value:.{decimals}e}".split("e")
+        return f"{mantissa} &times; 10<sup>{int(exponent)}</sup>"
+
+    return f"{numeric_value:.{decimals}f}"
+
+
 def _render_analysis_metric_cards_row(metrics_data, tab_label, single_day_analysis, heading=None, variable_options=None):
     if not metrics_data:
         return
@@ -7585,7 +7598,7 @@ def _render_analysis_metric_cards_row(metrics_data, tab_label, single_day_analys
             max_value = stats_payload['maximo']
 
             if tab_label == "Promedio":
-                display_value = f"{value:.1f}"
+                display_value = _format_metric_card_value(value, decimals=1)
                 if single_day_analysis:
                     descriptor = "Promedio general de todas las mediciones del día seleccionado."
                     footer_label = "Promedio general del día"
@@ -7593,16 +7606,13 @@ def _render_analysis_metric_cards_row(metrics_data, tab_label, single_day_analys
                     descriptor = "Promedio general de todas las mediciones del rango seleccionado."
                     footer_label = "Promedio general del periodo"
             else:
-                display_value = f"{value:.2f}"
+                display_value = _format_metric_card_value(value, decimals=2)
                 descriptor = "Varianza general calculada con todas las mediciones del rango seleccionado."
                 footer_label = "Varianza general del periodo"
                 if single_day_analysis:
                     display_value = "0.00"
                     descriptor = "En un solo día la varianza se reporta en 0 por consistencia analítica."
                     footer_label = "Varianza en un día"
-
-            if abs(float(value)) >= 100000:
-                display_value = f"{value:.2e}"
 
             metric_card_html = f'''
             <div style="
