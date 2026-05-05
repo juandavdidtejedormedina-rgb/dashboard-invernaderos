@@ -8881,4 +8881,3 @@ with tab_correlacion:
                 st.info("No hay registros de cortinas para los filtros seleccionados.")
             else:
                 _dataframe(datos_cortinas_sel)
-
