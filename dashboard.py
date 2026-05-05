@@ -365,7 +365,7 @@ DASHBOARD_MEDIA = {
         ),
         'location_query': "La Ponderosa - The Elite Flower SAS CI Madrid Cundinamarca Colombia",
     },
-    'Marley': {
+    'Marly': {
         'video_urls': [
             "https://raw.githubusercontent.com/juandavdidtejedormedina-rgb/dashboard-invernaderos/277ebb73478df2c61271154170df491f8375f103/video%201.mp4",
             "https://raw.githubusercontent.com/juandavdidtejedormedina-rgb/dashboard-invernaderos/277ebb73478df2c61271154170df491f8375f103/video%202.mp4",
@@ -381,7 +381,7 @@ LAZY_LOAD_MEDIA = True
 DETAIL_CHARTS_DEFAULT = False
 MARLEY_DETAIL_CHARTS_DEFAULT = False
 MARLEY_RECORDS_DEFAULT = False
-FINCA_OPTIONS = ['La Ponderosa', 'Marley']
+FINCA_OPTIONS = ['La Ponderosa', 'Marly']
 BLOCK_FARMS = {
     '27': 'La Ponderosa',
     '34': 'La Ponderosa',
@@ -3077,8 +3077,8 @@ def _extract_block_identifier(block_name):
 
 def _get_finca_for_block(block_name):
     normalized_key = _build_normalized_text_key(block_name)
-    if 'marley' in normalized_key:
-        return 'Marley'
+    if 'marley' in normalized_key or 'marly' in normalized_key:
+        return 'Marly'
 
     block_identifier = _extract_block_identifier(block_name)
     if block_identifier and block_identifier in BLOCK_FARMS:
@@ -3507,7 +3507,7 @@ def _open_marley_workbook(excel_source):
     return pd.ExcelFile(io.BytesIO(response.content))
 
 
-@st.cache_data(show_spinner="Cargando datos de Marley...")
+@st.cache_data(show_spinner="Cargando datos de Marly...")
 def _load_marley_data_from_source(excel_source, source_signature):
     _ = source_signature
     workbook = _open_marley_workbook(excel_source)
@@ -3538,7 +3538,7 @@ def _load_marley_data_from_source(excel_source, source_signature):
         merged = merge_frame if merged is None else merged.merge(merge_frame, on='FechaHora', how='outer')
 
     if merged is None:
-        raise ValueError("No fue posible construir la tabla consolidada de Marley.")
+        raise ValueError("No fue posible construir la tabla consolidada de Marly.")
 
     merged = merged.sort_values('FechaHora').reset_index(drop=True)
     merged['Fecha_Filtro'] = merged['FechaHora'].dt.date
@@ -3553,7 +3553,7 @@ def _load_marley_data():
         except Exception as error:
             errors.append(f"{excel_source}: {error}")
 
-    raise ValueError("No fue posible cargar los datos de Marley.\n" + "\n".join(errors))
+    raise ValueError("No fue posible cargar los datos de Marly.\n" + "\n".join(errors))
 
 
 def _build_marley_full_time_index(selected_range):
@@ -4251,7 +4251,7 @@ def _render_marley_individual_variable_charts(
     filtered_df,
     selected_range,
     source_names=MARLEY_SENSOR_NAMES,
-    heading="Variables individuales Marley",
+    heading="Variables individuales Marly",
     resolution_label=COMPARISON_RESOLUTION_OPTIONS[0],
 ):
     rendered_charts = []
@@ -4288,11 +4288,11 @@ def _render_marley_dashboard(dashboard_mode):
     try:
         marley_df, marley_source_data = _load_marley_data()
     except Exception as error:
-        st.error(f"No fue posible cargar los datos de Marley. Detalle: {error}")
+        st.error(f"No fue posible cargar los datos de Marly. Detalle: {error}")
         st.stop()
 
     if marley_df.empty or 'FechaHora' not in marley_df.columns:
-        st.warning("No hay datos disponibles para Marley.")
+        st.warning("No hay datos disponibles para Marly.")
         st.stop()
 
     date_source_df = marley_df
@@ -4300,7 +4300,7 @@ def _render_marley_dashboard(dashboard_mode):
         date_source_name = "WIGA" if dashboard_mode == "Solo WIGA" else "ECOWITT"
         date_source_df = marley_source_data.get(date_source_name, marley_df)
         if date_source_df.empty:
-            st.warning(f"No hay datos disponibles para {date_source_name} en Marley.")
+            st.warning(f"No hay datos disponibles para {date_source_name} en Marly.")
             st.stop()
 
     min_date = date_source_df['FechaHora'].min().date()
@@ -4374,7 +4374,7 @@ def _render_marley_dashboard(dashboard_mode):
 
     filtered_df = marley_df[marley_df['Fecha_Filtro'].between(*selected_range)].copy()
     if filtered_df.empty:
-        st.warning("No hay datos disponibles para Marley en el rango seleccionado.")
+        st.warning("No hay datos disponibles para Marly en el rango seleccionado.")
         st.stop()
 
     _render_selected_period_banner(
@@ -4382,12 +4382,12 @@ def _render_marley_dashboard(dashboard_mode):
         min_fecha=min_date,
         max_fecha=max_date,
         navigation_state_key=marley_navigation_state_key,
-        title_text='Periodo Marley'
+        title_text='Periodo Marly'
     )
 
     if dashboard_mode in ("Solo WIGA", "Solo ECOWITT"):
         source_name = "WIGA" if dashboard_mode == "Solo WIGA" else "ECOWITT"
-        st.markdown(f"## Marley - {source_name}")
+        st.markdown(f"## Marly - {source_name}")
         st.caption(f"Lectura de todas las variables medidas por {source_name}, sin superponer el otro sensor.")
         _render_chart_explanation(
             f'Variables {source_name}',
@@ -4410,7 +4410,7 @@ def _render_marley_dashboard(dashboard_mode):
             MARLEY_VARIABLES,
             source_name,
             _build_marley_individual_series,
-            f"Variables {source_name} - Marley",
+            f"Variables {source_name} - Marly",
             source_resolution,
         )
         if combined_chart is None:
@@ -4426,13 +4426,13 @@ def _render_marley_dashboard(dashboard_mode):
                 filtered_df,
                 selected_range,
                 source_names=(source_name,),
-                heading=f"Variables individuales {source_name} - Marley",
+                heading=f"Variables individuales {source_name} - Marly",
                 resolution_label=source_resolution
             )
 
         with tab_records:
             if st.checkbox(
-                f"Cargar registros consolidados de Marley - {source_name}",
+                f"Cargar registros consolidados de Marly - {source_name}",
                 key=f"mostrar_marley_{source_name.lower()}_registros",
                 help=FILTER_HELP_TEXTS['registros']
             ):
@@ -4444,17 +4444,17 @@ def _render_marley_dashboard(dashboard_mode):
                 _dataframe(filtered_df[source_columns].dropna(how='all', subset=source_columns[1:]), hide_index=True)
         st.stop()
 
-    st.markdown(f"## Marley - {dashboard_mode}")
+    st.markdown(f"## Marly - {dashboard_mode}")
     st.caption("Lectura comparativa entre los sensores WIGA y ECOWITT, con opción de promedio por franja o lectura punto por punto.")
     _render_chart_explanation(
-        'Cómo usar el análisis Marley',
+        'Cómo usar el análisis Marly',
         'Elige una variable para comparar ambos sensores. Las tarjetas explican la diferencia general y las gráficas muestran cuándo se parecen, cuándo se separan y qué sensor mide más alto.',
         accent=BRAND_COLORS['hero'],
         kicker='Orientación'
     )
 
     selected_variable = st.segmented_control(
-        "Variable Marley",
+        "Variable Marly",
         options=list(MARLEY_VARIABLES.keys()),
         format_func=lambda value: MARLEY_VARIABLES[value]['title'].replace("Comparativa de ", "").capitalize(),
         default=list(MARLEY_VARIABLES.keys())[0],
@@ -4468,12 +4468,12 @@ def _render_marley_dashboard(dashboard_mode):
 
     if dashboard_mode == "Varianza":
         if selected_range[0] == selected_range[1]:
-            st.warning("Para ver la varianza en Marley selecciona un rango de al menos 2 días.")
+            st.warning("Para ver la varianza en Marly selecciona un rango de al menos 2 días.")
             st.stop()
 
         grouped_metric = _build_marley_hourly_metric(filtered_df, selected_variable, dashboard_mode)
         if grouped_metric.empty:
-            st.warning("No hay datos suficientes para construir esta vista de Marley en el periodo seleccionado.")
+            st.warning("No hay datos suficientes para construir esta vista de Marly en el periodo seleccionado.")
             st.stop()
 
         _render_chart_explanation(
@@ -4699,7 +4699,7 @@ def _render_marley_dashboard(dashboard_mode):
         )
 
     if st.checkbox(
-        "Cargar registros consolidados de Marley",
+        "Cargar registros consolidados de Marly",
         key="mostrar_marley_registros",
         help=FILTER_HELP_TEXTS['registros']
     ):
@@ -8056,7 +8056,7 @@ with st.sidebar.expander("Finca", expanded=True):
 
 dashboard_view_options = (
     ["Comparativa", "Solo WIGA", "Solo ECOWITT", "Varianza"]
-    if selected_finca == 'Marley' else
+    if selected_finca == 'Marly' else
     ["Solo WIGA", "Solo bloques", "WIGA con bloques", "Solo ECOWITT", "WIGA vs ECOWITT", "Varianza", "Promedio"]
 )
 if st.session_state.get("modo_dashboard") not in dashboard_view_options:
@@ -8065,23 +8065,23 @@ if st.session_state.get("modo_dashboard") not in dashboard_view_options:
 with st.sidebar.expander("Vista", expanded=True):
     _sidebar_field_label(
         "filter",
-        "Seleccionar análisis" if selected_finca == 'Marley' else "Seleccionar vista"
+        "Seleccionar análisis" if selected_finca == 'Marly' else "Seleccionar vista"
     )
     dashboard_mode = st.radio(
-        "Seleccionar análisis:" if selected_finca == 'Marley' else "Seleccionar vista:",
+        "Seleccionar análisis:" if selected_finca == 'Marly' else "Seleccionar vista:",
         options=dashboard_view_options,
         key="modo_dashboard",
         help=(
-            "Elige cómo quieres analizar Marley: comparativa, varianza o lecturas individuales por sensor."
-            if selected_finca == 'Marley' else
+            "Elige cómo quieres analizar Marly: comparativa, varianza o lecturas individuales por sensor."
+            if selected_finca == 'Marly' else
             "Elige la vista de Ponderosa: WIGA, bloques, WIGA con bloques, ECOWITT, comparación, varianza o promedio."
         )
     )
 
-if selected_finca == 'Marley':
+if selected_finca == 'Marly':
     with _loading_context(
         st.session_state.get("marley_modo_fechas") == "Varios días",
-        "Cargando gráficas de Marley..."
+        "Cargando gráficas de Marly..."
     ):
         _render_marley_dashboard(dashboard_mode)
     st.stop()
@@ -8651,3 +8651,4 @@ with tab_correlacion:
                     st.info("No hay registros de cortinas para los filtros seleccionados.")
                 else:
                     _dataframe(datos_cortinas_sel)
+
