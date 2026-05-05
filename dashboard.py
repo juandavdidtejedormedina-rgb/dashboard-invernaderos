@@ -418,6 +418,7 @@ CORR_AXIS_TITLES = {
     'Humedad Relativa': 'Humedad',
     'Radiación PAR': 'Rad. PAR',
     'Gramos de agua': 'Gramos',
+    'LUX': 'LUX',
     '% Apertura Cortinas': 'Cortinas %'
 }
 CORTINAS_NUMERIC_COLUMNS = [
@@ -3320,8 +3321,9 @@ def _get_available_sensor_vars(df_variables):
     if df_variables.empty:
         return []
 
+    sensor_candidates = list(dict.fromkeys([*SENSOR_VARIABLES, 'LUX']))
     return [
-        var_name for var_name in SENSOR_VARIABLES
+        var_name for var_name in sensor_candidates
         if var_name in df_variables.columns and df_variables[var_name].notna().any()
     ]
 
@@ -4245,6 +4247,36 @@ def _make_source_all_variables_chart(
         font=dict(family='Manrope, sans-serif', color=BRAND_COLORS['graphite']),
     )
     return fig
+
+
+def _build_single_source_correlacion_frame(
+    filtered_df,
+    selected_range,
+    variables,
+    source_name,
+    series_builder,
+    resolution_label=COMPARISON_RESOLUTION_OPTIONS[0],
+):
+    merged = None
+    for variable in variables:
+        series_df = series_builder(filtered_df, variable, source_name, selected_range, resolution_label)
+        if series_df.empty or series_df['Valor'].dropna().empty:
+            continue
+
+        variable_frame = (
+            series_df[['FechaHora', 'Valor']]
+            .rename(columns={'FechaHora': 'DateTime', 'Valor': variable})
+            .dropna(subset=['DateTime'])
+            .copy()
+        )
+        merged = variable_frame if merged is None else merged.merge(variable_frame, on='DateTime', how='outer')
+
+    if merged is None or merged.empty:
+        return pd.DataFrame()
+
+    merged = merged.sort_values('DateTime').reset_index(drop=True)
+    merged['Fecha_Filtro'] = pd.to_datetime(merged['DateTime'], errors='coerce').dt.date
+    return merged
 
 
 def _render_marley_individual_variable_charts(
@@ -5519,42 +5551,51 @@ def _render_ponderosa_wiga_values_dashboard(df_variables_all, df_cortinas_all, s
         help="Usa el promedio para una lectura limpia por media hora, o punto por punto para ver las lecturas reales sin agrupar."
     )
 
-    combined_chart = _make_source_all_variables_chart(
+    wiga_variables = list(PONDEROSA_WIGA_VARIABLES.keys())
+    correlation_df = _build_single_source_correlacion_frame(
         filtered_df,
         selected_range,
-        list(PONDEROSA_WIGA_VARIABLES.keys()),
-        PONDEROSA_WIGA_VARIABLES,
+        wiga_variables,
         "WIGA",
         _build_ponderosa_source_individual_series,
-        "Variables WIGA - La Ponderosa",
         wiga_resolution,
     )
-    if combined_chart is None:
+    if correlation_df.empty:
         st.warning("No hay datos suficientes para graficar las variables WIGA.")
         st.stop()
 
-    tab_general, tab_detail, tab_records = st.tabs(["Vista general", "Detalle individual", "Registros"])
-    with tab_general:
-        _plotly_chart(combined_chart)
+    _render_correlacion(
+        correlation_df,
+        pd.DataFrame(),
+        selected_range,
+        variables_seleccionadas=wiga_variables,
+        block_label=block_label,
+        chart_title='Variables WIGA - La Ponderosa',
+        explanation_title='Variables WIGA',
+        explanation_text='Esta gráfica reúne las cuatro variables WIGA del bloque seleccionado sobre la misma línea de tiempo. Cada color conserva su propia escala a la derecha para comparar comportamiento sin separar la lectura.'
+    )
 
-    with tab_detail:
+    if st.checkbox(
+        "Cargar detalle individual WIGA",
+        key="mostrar_ponderosa_wiga_only_detalle",
+        help=FILTER_HELP_TEXTS['graficas_detalladas']
+    ):
         _render_ponderosa_source_individual_charts(
             filtered_df,
             selected_range,
-            list(PONDEROSA_WIGA_VARIABLES.keys()),
+            wiga_variables,
             ("WIGA",),
             "Variables individuales WIGA Ponderosa",
             "Cada gráfica muestra una variable WIGA de Datos_Variables con su propia escala.",
             wiga_resolution
         )
 
-    with tab_records:
-        if st.checkbox(
-            "Cargar registros WIGA Ponderosa",
-            key="mostrar_ponderosa_wiga_only_registros",
-            help=FILTER_HELP_TEXTS['registros']
-        ):
-            _dataframe(filtered_df.drop(columns=['Fecha_Filtro'], errors='ignore'), hide_index=True)
+    if st.checkbox(
+        "Cargar registros WIGA Ponderosa",
+        key="mostrar_ponderosa_wiga_only_registros",
+        help=FILTER_HELP_TEXTS['registros']
+    ):
+        _dataframe(filtered_df.drop(columns=['Fecha_Filtro'], errors='ignore'), hide_index=True)
 
     st.stop()
 
@@ -5845,12 +5886,6 @@ def _render_ponderosa_ecowitt_values_dashboard():
 
     st.markdown("## La Ponderosa - ECOWITT")
     st.caption("Lectura de temperatura, humedad, radiación PAR y LUX medidas por ECOWITT en el Bloque 35.")
-    _render_chart_explanation(
-        'Variables ECOWITT',
-        'Primero se muestran las cuatro variables juntas en una visual apilada con el mismo eje de tiempo. Después se muestran las gráficas individuales para revisar cada variable con su propia escala.',
-        accent=BRAND_COLORS['hero'],
-        kicker='Orientación'
-    )
     ecowitt_resolution = st.radio(
         "Resolución de las gráficas ECOWITT:",
         options=COMPARISON_RESOLUTION_OPTIONS,
@@ -5859,11 +5894,11 @@ def _render_ponderosa_ecowitt_values_dashboard():
         help="Usa el promedio para una lectura limpia por media hora, o punto por punto para ver las lecturas reales sin agrupar."
     )
 
-    combined_chart = _make_source_all_variables_chart(
+    ecowitt_variables = list(PONDEROSA_ECOWITT_VARIABLES.keys())
+    correlation_df = _build_single_source_correlacion_frame(
         filtered_df,
         selected_range,
-        list(PONDEROSA_ECOWITT_VARIABLES.keys()),
-        PONDEROSA_ECOWITT_VARIABLES,
+        ecowitt_variables,
         "ECOWITT",
         lambda df, variable, source_name, current_range, resolution: _build_ponderosa_ecowitt_individual_series(
             df,
@@ -5871,27 +5906,36 @@ def _render_ponderosa_ecowitt_values_dashboard():
             current_range,
             resolution
         ),
-        "Variables ECOWITT - La Ponderosa",
         ecowitt_resolution,
     )
-    if combined_chart is None:
+    if correlation_df.empty:
         st.warning("No hay datos suficientes para graficar las variables de ECOWITT Ponderosa.")
         st.stop()
 
-    tab_general, tab_detail, tab_records = st.tabs(["Vista general", "Detalle individual", "Registros"])
-    with tab_general:
-        _plotly_chart(combined_chart)
+    _render_correlacion(
+        correlation_df,
+        pd.DataFrame(),
+        selected_range,
+        variables_seleccionadas=ecowitt_variables,
+        block_label=f"ECOWITT Bloque {PONDEROSA_ECOWITT_BLOCK_CODE}",
+        chart_title='Variables ECOWITT - La Ponderosa',
+        explanation_title='Variables ECOWITT',
+        explanation_text='Esta gráfica reúne temperatura, humedad, radiación PAR y LUX de ECOWITT sobre la misma línea de tiempo. Cada color conserva su propia escala a la derecha para comparar el comportamiento de las lecturas.'
+    )
 
-    with tab_detail:
+    if st.checkbox(
+        "Cargar detalle individual ECOWITT",
+        key="mostrar_ponderosa_ecowitt_only_detalle",
+        help=FILTER_HELP_TEXTS['graficas_detalladas']
+    ):
         _render_ponderosa_ecowitt_individual_charts(filtered_df, selected_range, ecowitt_resolution)
 
-    with tab_records:
-        if st.checkbox(
-            "Cargar registros ECOWITT Ponderosa",
-            key="mostrar_ponderosa_ecowitt_only_registros",
-            help=FILTER_HELP_TEXTS['registros']
-        ):
-            _dataframe(filtered_df.drop(columns=['Fecha_Filtro'], errors='ignore'), hide_index=True)
+    if st.checkbox(
+        "Cargar registros ECOWITT Ponderosa",
+        key="mostrar_ponderosa_ecowitt_only_registros",
+        help=FILTER_HELP_TEXTS['registros']
+    ):
+        _dataframe(filtered_df.drop(columns=['Fecha_Filtro'], errors='ignore'), hide_index=True)
 
     st.stop()
 
@@ -6572,7 +6616,10 @@ def _render_correlacion(
     block_label=None,
     show_ideal_aperturas=False,
     df_variables_almacen=None,
-    compare_with_almacen=False
+    compare_with_almacen=False,
+    chart_title='Correlación entre Variables y Cortinas',
+    explanation_title='Correlación entre variables y cortinas',
+    explanation_text=None
 ):
     fecha_inicio, fecha_fin = fecha_variables
     multi_day_view = fecha_inicio != fecha_fin
@@ -6639,7 +6686,8 @@ def _render_correlacion(
         'Gramos de agua': 1,
         'Temperatura': 2,
         'Humedad Relativa': 3,
-        'Radiación PAR': 4
+        'Radiación PAR': 4,
+        'LUX': 5
     }
     sensor_traces = []
     compare_sensor_traces = []
@@ -6860,7 +6908,7 @@ def _render_correlacion(
             continue
         min_val = float(serie_combinada.min())
         max_val = float(serie_combinada.max())
-        padding = 2 if axis_var_name == 'Temperatura' else 5 if axis_var_name == 'Humedad Relativa' else max(100, (max_val - min_val) * 0.08) if axis_var_name == 'Radiación PAR' else 2
+        padding = 2 if axis_var_name == 'Temperatura' else 5 if axis_var_name == 'Humedad Relativa' else max(100, (max_val - min_val) * 0.08) if axis_var_name == 'Radiación PAR' else max(5000, (max_val - min_val) * 0.08) if axis_var_name == 'LUX' else 2
         range_min = min_val - padding
         if min_val >= 0:
             range_min = max(0, range_min)
@@ -6977,7 +7025,7 @@ def _render_correlacion(
 
     fig_corr.update_layout(
         title=dict(
-            text='Correlación entre Variables y Cortinas',
+            text=chart_title,
             x=0,
             xanchor='left',
             y=0.98,
@@ -7033,9 +7081,11 @@ def _render_correlacion(
         if selected_cortinas else
         ''
     )
+    if explanation_text is None:
+        explanation_text = 'Esta gráfica pone todas las variables seleccionadas sobre la misma línea de tiempo. Cada color tiene su propia escala a la derecha; pasa el cursor por la gráfica para ver la hora exacta y el valor de cada serie.' + cortina_help
     _render_chart_explanation(
-        'Correlación entre variables y cortinas',
-        'Esta gráfica pone todas las variables seleccionadas sobre la misma línea de tiempo. Cada color tiene su propia escala a la derecha; pasa el cursor por la gráfica para ver la hora exacta y el valor de cada serie.' + cortina_help,
+        explanation_title,
+        explanation_text,
         accent=BRAND_COLORS['hero']
     )
     if plot_compaction_messages:
@@ -8181,7 +8231,7 @@ if dashboard_mode == "WIGA relacion ECOWITT":
         _render_ponderosa_ecowitt_dashboard(_df_variables_all, _df_cortinas_all, selected_finca)
     st.stop()
 
-if dashboard_mode == "Solo ECOWITT":
+if dashboard_mode == "ECOWITT":
     with _loading_context(
         st.session_state.get("ponderosa_ecowitt_only_modo_fechas") == "Varios días",
         "Cargando variables ECOWITT de Ponderosa..."
