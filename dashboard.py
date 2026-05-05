@@ -8559,23 +8559,6 @@ with tab_correlacion:
         culatas_by_day = _get_culatas_observation_by_day(datos_cortinas_sel, block_label)
         daily_annotations = _get_daily_annotations(datos_cortinas_sel)
         annotations_by_day = _get_annotations_by_day(datos_cortinas_sel)
-        if (
-            block_label or
-            block_modification or
-            culatas_observation or
-            daily_annotations or
-            culatas_by_day or
-            annotations_by_day
-        ):
-            _render_info_panels(
-                block_label,
-                block_modification,
-                culatas_observation,
-                daily_annotations,
-                rango_multiple,
-                annotations_by_day=annotations_by_day,
-                culatas_by_day=culatas_by_day
-            )
 
         selected_vars = selected_vars_sidebar or st.session_state.get('variables_correlacion', available_correlacion_vars.copy())
 
@@ -8605,6 +8588,24 @@ with tab_correlacion:
                         df_variables_almacen=df_variables_almacen_corr,
                         compare_with_almacen=st.session_state.get('comparar_con_almacen', False)
                     )
+
+        if (
+            block_label or
+            block_modification or
+            culatas_observation or
+            daily_annotations or
+            culatas_by_day or
+            annotations_by_day
+        ):
+            _render_info_panels(
+                block_label,
+                block_modification,
+                culatas_observation,
+                daily_annotations,
+                rango_multiple,
+                annotations_by_day=annotations_by_day,
+                culatas_by_day=culatas_by_day
+            )
 
         _render_summary_cards_selector(
             df_variables_corr,
