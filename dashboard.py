@@ -7519,11 +7519,6 @@ def _render_hourly_metric_chart(grouped_df, variable_name, metric_column):
         if metric_column == 'Promedio' else
         'Cada punto muestra qué tanto variaron las mediciones dentro de esa franja horaria durante el periodo. Valores cercanos a cero indican estabilidad; valores altos indican cambios más fuertes.'
     )
-    _render_chart_explanation(
-        f'{metric_title} - {metric_label}',
-        metric_description,
-        accent=VARIABLE_COLORS.get(variable_name, BRAND_COLORS['hero'])
-    )
     _plotly_chart(
         fig,
         config={
@@ -7531,6 +7526,11 @@ def _render_hourly_metric_chart(grouped_df, variable_name, metric_column):
             'responsive': True,
             'modeBarButtonsToRemove': ['lasso2d', 'select2d']
         }
+    )
+    _render_chart_explanation(
+        f'{metric_title} - {metric_label}',
+        metric_description,
+        accent=VARIABLE_COLORS.get(variable_name, BRAND_COLORS['hero'])
     )
 
 
@@ -7759,6 +7759,41 @@ def _render_hourly_analysis_view(
         )
 
     variable_options = variable_options or SENSOR_VARIABLES
+    if st.session_state.get(variable_state_key) not in variable_options:
+        st.session_state[variable_state_key] = variable_options[0]
+    variable_name = st.segmented_control(
+        "Variable del análisis",
+        options=variable_options,
+        format_func=lambda value: VARIABLE_SELECTOR_LABELS.get(value, VARIABLE_LABELS.get(value, value)),
+        key=variable_state_key,
+        help="Calcula solo la variable seleccionada para evitar cargar todas las gráficas a la vez.",
+        width="stretch"
+    )
+
+    grouped_df, pivot_promedio, pivot_varianza = _build_hourly_block_analysis(df_variables, variable_name)
+    if grouped_df.empty:
+        st.info(f'No se encontraron datos para {variable_name} en el rango seleccionado.')
+        return
+
+    if tab_label == "Promedio":
+        _render_hourly_metric_chart(grouped_df, variable_name, 'Promedio')
+        with st.expander('Ver tabla dinámica de promedio', expanded=False):
+            _dataframe(_prepare_hourly_pivot_display(pivot_promedio))
+    elif single_day_analysis:
+        _render_chart_explanation(
+            f'Varianza por franja horaria - {VARIABLE_SELECTOR_LABELS.get(variable_name, variable_name)}',
+            'La varianza necesita al menos dos días para comparar la misma franja horaria entre días. Con un solo día se muestra la aclaración, pero no se grafica una variación representativa.',
+            accent=VARIABLE_COLORS.get(variable_name, BRAND_COLORS['hero'])
+        )
+        st.info(
+            f'Varianza de un solo día para {VARIABLE_SELECTOR_LABELS.get(variable_name, variable_name)}: '
+            'se muestra en 0 porque con un único día no hay suficiente repetición por franja horaria para calcular una dispersión representativa.'
+        )
+    else:
+        _render_hourly_metric_chart(grouped_df, variable_name, 'Varianza')
+        with st.expander('Ver tabla dinámica de varianza', expanded=False):
+            _dataframe(_prepare_hourly_pivot_display(pivot_varianza))
+
     metrics_data = _collect_analysis_metrics(df_variables, tab_label, variable_options)
     _render_analysis_metric_cards_row(metrics_data, tab_label, single_day_analysis, variable_options=variable_options)
 
@@ -7799,41 +7834,6 @@ def _render_hourly_analysis_view(
             accent=BRAND_COLORS['hero'],
             kicker='Cómo leer este análisis'
         )
-
-    if st.session_state.get(variable_state_key) not in variable_options:
-        st.session_state[variable_state_key] = variable_options[0]
-    variable_name = st.segmented_control(
-        "Variable del análisis",
-        options=variable_options,
-        format_func=lambda value: VARIABLE_SELECTOR_LABELS.get(value, VARIABLE_LABELS.get(value, value)),
-        key=variable_state_key,
-        help="Calcula solo la variable seleccionada para evitar cargar todas las gráficas a la vez.",
-        width="stretch"
-    )
-
-    grouped_df, pivot_promedio, pivot_varianza = _build_hourly_block_analysis(df_variables, variable_name)
-    if grouped_df.empty:
-        st.info(f'No se encontraron datos para {variable_name} en el rango seleccionado.')
-        return
-
-    if tab_label == "Promedio":
-        _render_hourly_metric_chart(grouped_df, variable_name, 'Promedio')
-        with st.expander('Ver tabla dinámica de promedio', expanded=False):
-            _dataframe(_prepare_hourly_pivot_display(pivot_promedio))
-    elif single_day_analysis:
-        _render_chart_explanation(
-            f'Varianza por franja horaria - {VARIABLE_SELECTOR_LABELS.get(variable_name, variable_name)}',
-            'La varianza necesita al menos dos días para comparar la misma franja horaria entre días. Con un solo día se muestra la aclaración, pero no se grafica una variación representativa.',
-            accent=VARIABLE_COLORS.get(variable_name, BRAND_COLORS['hero'])
-        )
-        st.info(
-            f'Varianza de un solo día para {VARIABLE_SELECTOR_LABELS.get(variable_name, variable_name)}: '
-            'se muestra en 0 porque con un único día no hay suficiente repetición por franja horaria para calcular una dispersión representativa.'
-        )
-    else:
-        _render_hourly_metric_chart(grouped_df, variable_name, 'Varianza')
-        with st.expander('Ver tabla dinámica de varianza', expanded=False):
-            _dataframe(_prepare_hourly_pivot_display(pivot_varianza))
 
 
 def _build_ponderosa_ecowitt_metric_frame(ecowitt_df):
