@@ -5423,7 +5423,7 @@ def _build_cortinas_only_chart(datos_cortinas_sel, fecha_periodo, selected_motor
     profile_times = []
 
     fig = go.Figure()
-    for motor_name in selected_motors:
+    for motor_index, motor_name in enumerate(selected_motors):
         df_state = pd.DataFrame()
         for config in SIDE_CONFIGS.values():
             if config['element_col'] not in datos_cortinas_sel.columns:
@@ -5436,23 +5436,28 @@ def _build_cortinas_only_chart(datos_cortinas_sel, fecha_periodo, selected_motor
             continue
 
         profile_times.extend(pd.to_datetime(df_state['Hora'], errors='coerce').dropna().tolist())
-    color = CORTINA_COLORS.get(motor_name, BRAND_COLORS['hero'])
-    fig.add_trace(go.Scatter(
-        x=df_state['Hora'],
-        y=df_state['Apertura'],
-        name=VARIABLE_SELECTOR_LABELS.get(motor_name, motor_name),
-        mode='lines+markers',
-        line=dict(color=color, width=3, shape='hv'),
-        marker=dict(size=5, color=color),
-        customdata=df_state[['Evento', 'Detalle']],
-        hovertemplate=(
-            f'<b>%{{x|{hover_time_format}}}</b><br>'
-            f'{VARIABLE_SELECTOR_LABELS.get(motor_name, motor_name)}: %{{y:.0f}}% abierto'
-            '<br>%{customdata[0]}'
-            '<br>%{customdata[1]}'
-            '<extra></extra>'
-        )
-    ))
+        df_state = df_state.copy()
+        df_state['Apertura_plot'] = df_state['Apertura']
+        closed_mask = pd.to_numeric(df_state['Apertura'], errors='coerce').fillna(-1).eq(0)
+        df_state.loc[closed_mask, 'Apertura_plot'] = -1.2 * (motor_index + 1)
+
+        color = CORTINA_COLORS.get(motor_name, BRAND_COLORS['hero'])
+        fig.add_trace(go.Scatter(
+            x=df_state['Hora'],
+            y=df_state['Apertura_plot'],
+            name=VARIABLE_SELECTOR_LABELS.get(motor_name, motor_name),
+            mode='lines+markers',
+            line=dict(color=color, width=3, shape='hv'),
+            marker=dict(size=5, color=color),
+            customdata=df_state[['Evento', 'Detalle', 'Apertura']],
+            hovertemplate=(
+                f'<b>%{{x|{hover_time_format}}}</b><br>'
+                f'{VARIABLE_SELECTOR_LABELS.get(motor_name, motor_name)}: %{{customdata[2]:.0f}}% abierto'
+                '<br>%{customdata[0]}'
+                '<br>%{customdata[1]}'
+                '<extra></extra>'
+            )
+        ))
 
     if not fig.data:
         return None
@@ -5846,7 +5851,7 @@ def _render_ponderosa_cortinas_dashboard(df_cortinas_all, selected_finca):
             _plotly_chart(chart)
             _render_chart_explanation(
                 "Comportamiento de cortinas",
-                "El eje inicia por debajo de cero para que los periodos cerrados se lean con claridad. Pasa el cursor por cada punto para ver inicio de apertura, duración y cierre cuando esa información exista en el registro.",
+                "El eje inicia por debajo de cero para separar visualmente las cortinas cerradas; el valor real sigue siendo 0% y se muestra correctamente en el cursor. Pasa el cursor por cada punto para ver inicio de apertura, duración y cierre cuando esa información exista en el registro.",
                 accent=BRAND_COLORS['hero']
             )
 
