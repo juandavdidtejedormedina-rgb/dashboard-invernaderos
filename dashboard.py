@@ -211,8 +211,8 @@ MARLEY_REMOTE_EXCEL_URLS = [
     (
         "https://raw.githubusercontent.com/"
         "juandavdidtejedormedina-rgb/dashboard-invernaderos/"
-        "89ab929cbeba025053c07941988fc5366e9727bd/"
-        "Datos%20Final%20marley.xlsx"
+        "23fbfd8c6f37df4b801a04d60b96f1ef45da3ce9/"
+        "Datos%20Final%20Marley.xlsx"
     )
 ]
 MARLEY_SENSOR_NAMES = ("WIGA", "ECOWITT")
