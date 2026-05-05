@@ -102,15 +102,14 @@ def _render_dashboard_media(selected_finca, lazy_load=False):
     video_url = media_config.get('video_urls') or media_config.get('video_url', '')
     location_query = str(media_config.get('location_query', '')).strip()
 
-    # VIDEO INTRODUCTORIO: carga automático y reproduce varios videos en bucle
     if video_url:
         with st.expander("Video introductorio", expanded=True):
 
-            # Si es una lista de videos, los reproduce uno tras otro en bucle
+            # Si hay varios videos, los reproduce en secuencia
             if isinstance(video_url, (list, tuple)):
                 _render_autoplay_video(video_url, height=430)
 
-            # Si es un solo video, lo reproduce normalmente
+            # Si hay un solo video, lo reproduce normal
             else:
                 youtube_embed_url = _youtube_embed_url(video_url)
 
@@ -119,7 +118,6 @@ def _render_dashboard_media(selected_finca, lazy_load=False):
                 else:
                     _render_autoplay_video(video_url, height=430)
 
-    # UBICACIÓN
     if location_query:
         with st.expander("Ubicación", expanded=False):
             st.iframe(_google_maps_embed_url(location_query), height=430)
@@ -376,12 +374,12 @@ DASHBOARD_MEDIA = {
     },
     'Marly': {
     'video_urls': [
-        "https://raw.githubusercontent.com/juandavdidtejedormedina-rgb/dashboard-invernaderos/277ebb73478df2c61271154170df491f8375f103/video%201.mp4",
-        "https://raw.githubusercontent.com/juandavdidtejedormedina-rgb/dashboard-invernaderos/277ebb73478df2c61271154170df491f8375f103/video%202.mp4",
-        "https://raw.githubusercontent.com/juandavdidtejedormedina-rgb/dashboard-invernaderos/277ebb73478df2c61271154170df491f8375f103/video%203.mp4",
-        "https://raw.githubusercontent.com/juandavdidtejedormedina-rgb/dashboard-invernaderos/277ebb73478df2c61271154170df491f8375f103/video%204.mp4",
-        "https://raw.githubusercontent.com/juandavdidtejedormedina-rgb/dashboard-invernaderos/277ebb73478df2c61271154170df491f8375f103/video%205.mp4",
-        "https://raw.githubusercontent.com/juandavdidtejedormedina-rgb/dashboard-invernaderos/277ebb73478df2c61271154170df491f8375f103/video%206.mp4",
+        "https://raw.githubusercontent.com/juandavdidtejedormedina-rgb/dashboard-invernaderos/222d523cb7c0e71fbc5385ab4be100e2d2eb7d2a/video%201.mp4",
+        "https://raw.githubusercontent.com/juandavdidtejedormedina-rgb/dashboard-invernaderos/222d523cb7c0e71fbc5385ab4be100e2d2eb7d2a/video%202.mp4",
+        "https://raw.githubusercontent.com/juandavdidtejedormedina-rgb/dashboard-invernaderos/222d523cb7c0e71fbc5385ab4be100e2d2eb7d2a/video%203.mp4",
+        "https://raw.githubusercontent.com/juandavdidtejedormedina-rgb/dashboard-invernaderos/222d523cb7c0e71fbc5385ab4be100e2d2eb7d2a/video%204.mp4",
+        "https://raw.githubusercontent.com/juandavdidtejedormedina-rgb/dashboard-invernaderos/222d523cb7c0e71fbc5385ab4be100e2d2eb7d2a/video%205.mp4",
+        "https://raw.githubusercontent.com/juandavdidtejedormedina-rgb/dashboard-invernaderos/222d523cb7c0e71fbc5385ab4be100e2d2eb7d2a/video%206.mp4",
     ],
     'location_query': "Finca Marly - The Elite Flower SAS CI Madrid Road Facatativa Cundinamarca Colombia",
 }
