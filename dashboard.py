@@ -84,7 +84,7 @@ def _render_autoplay_video(video_url, height=430):
             function playVideo(index) {{
                 video.src = playlist[index];
                 video.load();
-                video.playbackRate = 0.5;
+                video.playbackRate = 0.7;
                 video.play().catch(() => {{}});
             }}
 
