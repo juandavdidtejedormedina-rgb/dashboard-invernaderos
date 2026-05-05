@@ -7843,7 +7843,7 @@ def _get_ponderosa_metric_variable_options(source_option):
         return list(PONDEROSA_WIGA_VARIABLES.keys())
     if source_option == "ECOWITT":
         return list(PONDEROSA_ECOWITT_VARIABLES.keys())
-    return list(dict.fromkeys([*PONDEROSA_WIGA_VARIABLES.keys(), *PONDEROSA_ECOWITT_VARIABLES.keys()]))
+    return list(PONDEROSA_COMPARISON_VARIABLES.keys())
 
 
 def _render_ponderosa_metric_dashboard(df_variables_all, df_cortinas_all, selected_finca, metric_name):
@@ -7862,6 +7862,7 @@ def _render_ponderosa_metric_dashboard(df_variables_all, df_cortinas_all, select
 
     include_wiga = source_option in ("WIGA", "WIGA + ECOWITT")
     include_ecowitt = source_option in ("ECOWITT", "WIGA + ECOWITT")
+    comparison_source = source_option == "WIGA + ECOWITT"
     wiga_block_context = (metric_key, source_option)
     if st.session_state.get(f"ponderosa_{metric_key}_wiga_block_context") != wiga_block_context:
         for state_key in list(st.session_state.keys()):
@@ -7876,24 +7877,39 @@ def _render_ponderosa_metric_dashboard(df_variables_all, df_cortinas_all, select
     )
     selected_wiga_block_names = []
     if include_wiga:
+        wiga_block_codes = block_codes
+        if comparison_source:
+            wiga_block_codes = [
+                block_code
+                for block_code in block_codes
+                if str(block_code) == PONDEROSA_ECOWITT_BLOCK_CODE
+            ]
         with st.sidebar.expander("Bloques WIGA", expanded=True):
             if not block_codes:
                 st.warning("No hay bloques WIGA disponibles para La Ponderosa.")
+            elif comparison_source and not wiga_block_codes:
+                st.warning(f"No se encontró el Bloque {PONDEROSA_ECOWITT_BLOCK_CODE} en los datos WIGA.")
             else:
                 _sidebar_field_label("location", "Bloques incluidos")
-                for block_code in block_codes:
+                if comparison_source:
+                    st.caption(
+                        f"ECOWITT Ponderosa corresponde solo al Bloque {PONDEROSA_ECOWITT_BLOCK_CODE}; "
+                        "por eso esta comparación se limita a ese bloque."
+                    )
+                for block_code in wiga_block_codes:
                     block_state_key = f"ponderosa_{metric_key}_wiga_block_{block_code}"
                     if block_state_key not in st.session_state:
                         st.session_state[block_state_key] = True
                     st.checkbox(
                         _format_block_display_name(block_code),
                         key=block_state_key,
+                        disabled=comparison_source,
                         help=FILTER_HELP_TEXTS['bloques_comparados']
                     )
 
                 selected_wiga_block_names = [
                     variable_block_map[block_code]
-                    for block_code in block_codes
+                    for block_code in wiga_block_codes
                     if st.session_state.get(f"ponderosa_{metric_key}_wiga_block_{block_code}", False)
                     and block_code in variable_block_map
                 ]
@@ -7926,6 +7942,7 @@ def _render_ponderosa_metric_dashboard(df_variables_all, df_cortinas_all, select
         f"ponderosa_{metric_key}_fecha_inicio",
         f"ponderosa_{metric_key}_fecha_fin",
     )
+    metric_date_mode_key = f"ponderosa_{metric_key}_modo_fechas"
     for state_key in date_state_keys:
         if state_key in st.session_state and st.session_state[state_key] not in available_dates:
             del st.session_state[state_key]
@@ -7944,13 +7961,18 @@ def _render_ponderosa_metric_dashboard(df_variables_all, df_cortinas_all, select
             selected_range = (fecha_unica, fecha_unica)
             navigation_state_key = f"ponderosa_{metric_key}_fecha_unica"
         else:
-            modo_fechas = st.radio(
-                "Modo de fechas:",
-                options=["Un día", "Varios días"],
-                horizontal=True,
-                key=f"ponderosa_{metric_key}_modo_fechas",
-                help=FILTER_HELP_TEXTS['modo_fechas']
-            )
+            if metric_name == "Varianza":
+                modo_fechas = "Varios días"
+                st.session_state[metric_date_mode_key] = modo_fechas
+                st.caption("La varianza se calcula automáticamente con varios días.")
+            else:
+                modo_fechas = st.radio(
+                    "Modo de fechas:",
+                    options=["Un día", "Varios días"],
+                    horizontal=True,
+                    key=metric_date_mode_key,
+                    help=FILTER_HELP_TEXTS['modo_fechas']
+                )
             if modo_fechas == "Un día":
                 fecha_unica_default = _get_nearest_available_date(
                     st.session_state.get(f"ponderosa_{metric_key}_fecha_un_dia", max_date),
