@@ -7580,6 +7580,7 @@ def _render_analysis_metric_cards_row(metrics_data, tab_label, single_day_analys
             value = stats_payload['principal']
             color = VARIABLE_COLORS.get(variable_name, BRAND_COLORS['graphite'])
             unit = VARIABLE_UNITS.get(variable_name, '')
+            card_unit = unit.replace('µmol m⁻² s⁻¹', 'µmol/m²/s').replace('µmol m-2 s-1', 'µmol/m²/s')
             min_value = stats_payload['minimo']
             max_value = stats_payload['maximo']
 
@@ -7600,6 +7601,9 @@ def _render_analysis_metric_cards_row(metrics_data, tab_label, single_day_analys
                     descriptor = "En un solo día la varianza se reporta en 0 por consistencia analítica."
                     footer_label = "Varianza en un día"
 
+            if abs(float(value)) >= 100000:
+                display_value = f"{value:.2e}"
+
             metric_card_html = f'''
             <div style="
                 background: linear-gradient(135deg, rgba(255,255,255,0.95) 0%, rgba(255,255,255,0.85) 100%);
@@ -7618,24 +7622,26 @@ def _render_analysis_metric_cards_row(metrics_data, tab_label, single_day_analys
                     text-transform: uppercase;
                     letter-spacing: 0.5px;
                 ">{html.escape(variable_name)}</p>
-                <div style="display: flex; align-items: baseline; gap: 4px; flex-wrap: wrap;">
+                <div style="display: flex; align-items: baseline; gap: 0.45rem; flex-wrap: wrap;">
                     <p style="
                         font-family: 'Manrope', sans-serif;
-                        font-size: 32px;
+                        font-size: 1.72rem;
                         font-weight: 700;
                         color: {BRAND_COLORS['ink']};
                         margin: 0;
-                        line-height: 1;
+                        line-height: 1.08;
+                        overflow-wrap: anywhere;
                     ">{display_value}</p>
                     <p style="
                         font-family: 'Manrope', sans-serif;
-                        font-size: 12px;
+                        font-size: 0.78rem;
                         color: {BRAND_COLORS['graphite']};
                         margin: 0;
-                        font-weight: 500;
+                        font-weight: 700;
                         word-break: break-word;
                         line-height: 1.3;
-                    ">{unit}</p>
+                        max-width: 5.8rem;
+                    ">{card_unit}</p>
                 </div>
                 <p style="
                     font-family: 'Manrope', sans-serif;
@@ -7856,6 +7862,12 @@ def _render_ponderosa_metric_dashboard(df_variables_all, df_cortinas_all, select
 
     include_wiga = source_option in ("WIGA", "WIGA + ECOWITT")
     include_ecowitt = source_option in ("ECOWITT", "WIGA + ECOWITT")
+    wiga_block_context = (metric_key, source_option)
+    if st.session_state.get(f"ponderosa_{metric_key}_wiga_block_context") != wiga_block_context:
+        for state_key in list(st.session_state.keys()):
+            if str(state_key).startswith(f"ponderosa_{metric_key}_wiga_block_"):
+                del st.session_state[state_key]
+        st.session_state[f"ponderosa_{metric_key}_wiga_block_context"] = wiga_block_context
 
     block_codes, variable_block_map, _ = _get_block_options(
         df_variables_all,
@@ -7872,7 +7884,7 @@ def _render_ponderosa_metric_dashboard(df_variables_all, df_cortinas_all, select
                 for block_code in block_codes:
                     block_state_key = f"ponderosa_{metric_key}_wiga_block_{block_code}"
                     if block_state_key not in st.session_state:
-                        st.session_state[block_state_key] = block_code == PONDEROSA_ECOWITT_BLOCK_CODE or len(block_codes) == 1
+                        st.session_state[block_state_key] = True
                     st.checkbox(
                         _format_block_display_name(block_code),
                         key=block_state_key,
