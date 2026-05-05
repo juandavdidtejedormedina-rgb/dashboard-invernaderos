@@ -5902,6 +5902,7 @@ def _render_ponderosa_comparison_metric_cards(overlap, selected_variable):
     avg_signed_diff = overlap['SignedDiff'].mean() if not overlap.empty else None
     std_diff = overlap['SignedDiff'].std() if not overlap.empty else None
     unit = config['unit']
+    card_unit = unit.replace("µmol m-2 s-1", "µmol/m²/s")
 
     if pd.isna(avg_signed_diff):
         signed_interpretation = "No hay suficientes lecturas simultáneas para identificar cuál sensor quedó por encima."
@@ -5924,7 +5925,8 @@ def _render_ponderosa_comparison_metric_cards(overlap, selected_variable):
     metric_cards = [
         {
             'title': 'Diferencia absoluta media',
-            'value': f"{avg_abs_diff:.2f} {unit}" if pd.notna(avg_abs_diff) else "Sin datos",
+            'value': f"{avg_abs_diff:.2f}" if pd.notna(avg_abs_diff) else "Sin datos",
+            'unit': card_unit if pd.notna(avg_abs_diff) else "",
             'accent': config['colors']['WIGA'],
             'description': "Mide qué tan separados estuvieron WIGA y ECOWITT en promedio, sin importar cuál quedó por encima.",
             'insight': (
@@ -5935,14 +5937,16 @@ def _render_ponderosa_comparison_metric_cards(overlap, selected_variable):
         },
         {
             'title': 'Diferencia media WIGA - ECOWITT',
-            'value': f"{avg_signed_diff:+.2f} {unit}" if pd.notna(avg_signed_diff) else "Sin datos",
+            'value': f"{avg_signed_diff:+.2f}" if pd.notna(avg_signed_diff) else "Sin datos",
+            'unit': card_unit if pd.notna(avg_signed_diff) else "",
             'accent': config['colors']['ECOWITT'],
             'description': "Conserva el signo de la diferencia. Nos dice si uno de los sensores tiende a leer más alto que el otro.",
             'insight': signed_interpretation,
         },
         {
             'title': 'Desviación estándar',
-            'value': f"{std_diff:.2f} {unit}" if pd.notna(std_diff) else "Sin datos",
+            'value': f"{std_diff:.2f}" if pd.notna(std_diff) else "Sin datos",
+            'unit': card_unit if pd.notna(std_diff) else "",
             'accent': config['accent'],
             'description': "Muestra qué tan estable fue la diferencia entre ambos sensores a lo largo del tiempo.",
             'insight': std_interpretation,
@@ -5961,7 +5965,7 @@ def _render_ponderosa_comparison_metric_cards(overlap, selected_variable):
                     border-radius: 24px;
                     padding: 1.15rem 1.1rem 1rem 1.1rem;
                     box-shadow: 0 18px 36px rgba(44, 46, 42, 0.08);
-                    min-height: 255px;
+                    min-height: 235px;
                 ">
                     <div style="
                         font-family: 'Manrope', sans-serif;
@@ -5975,14 +5979,31 @@ def _render_ponderosa_comparison_metric_cards(overlap, selected_variable):
                         {html.escape(metric['title'])}
                     </div>
                     <div style="
-                        font-family: 'Manrope', sans-serif;
-                        font-size: 2.35rem;
-                        line-height: 1;
-                        font-weight: 800;
-                        color: {BRAND_COLORS['graphite']};
+                        display: flex;
+                        align-items: baseline;
+                        gap: 0.45rem;
+                        flex-wrap: wrap;
                         margin-bottom: 0.95rem;
                     ">
-                        {html.escape(metric['value'])}
+                        <span style="
+                            font-family: 'Manrope', sans-serif;
+                            font-size: 2rem;
+                            line-height: 1.08;
+                            font-weight: 800;
+                            color: {BRAND_COLORS['graphite']};
+                        ">
+                            {html.escape(metric['value'])}
+                        </span>
+                        <span style="
+                            font-family: 'Manrope', sans-serif;
+                            font-size: 1.02rem;
+                            line-height: 1.15;
+                            font-weight: 800;
+                            color: rgba(56, 58, 53, 0.86);
+                            max-width: 8.8rem;
+                        ">
+                            {html.escape(metric['unit'])}
+                        </span>
                     </div>
                     <div style="
                         font-family: 'Manrope', sans-serif;
