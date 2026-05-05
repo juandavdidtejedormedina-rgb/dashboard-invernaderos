@@ -2666,7 +2666,7 @@ def _render_summary_cards_selector(df_variables, fecha_variables, df_reference=N
         "Métrica del resumen",
         options=summary_modes,
         key="resumen_metric_option",
-        help="Calcula solo el resumen visible para mantener la carga más liviana.",
+        help="Calcula el resumen visible.",
         width="stretch"
     )
     _render_summary_cards(
