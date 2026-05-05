@@ -8553,13 +8553,6 @@ with tab_correlacion:
             if not df_variables_almacen_corr.empty and selected_block_code != 'ALMACEN'
             else None
         )
-        _render_summary_cards_selector(
-            df_variables_corr,
-            fecha_variables,
-            df_reference=summary_reference_df,
-            reference_label='Estación externa',
-            base_label=block_label
-        )
 
         block_modification = _get_block_modification(block_label)
         culatas_observation = _get_culatas_daily_observation(datos_cortinas_sel, block_label)
@@ -8584,75 +8577,71 @@ with tab_correlacion:
                 culatas_by_day=culatas_by_day
             )
 
-        corr_content_options = ["Correlación", "Registros"]
-        if st.session_state.get("vista_correlacion_contenido") not in corr_content_options:
-            st.session_state["vista_correlacion_contenido"] = corr_content_options[0]
-        selected_corr_content = st.segmented_control(
-            "Contenido de la vista",
-            options=corr_content_options,
-            key="vista_correlacion_contenido",
-            help="Muestra solo la sección seleccionada para mantener la página ligera.",
+        selected_vars = selected_vars_sidebar or st.session_state.get('variables_correlacion', available_correlacion_vars.copy())
+
+        if df_variables_corr.empty:
+            fecha_label = fecha_inicio.strftime('%Y-%m-%d') if not rango_multiple else f"{fecha_inicio.strftime('%Y-%m-%d')} a {fecha_fin.strftime('%Y-%m-%d')}"
+            st.warning(f"No se encontraron datos de variables para el rango seleccionado: {fecha_label}.")
+        elif not available_correlacion_vars:
+            st.warning("No se encontraron variables con datos para graficar en el rango seleccionado.")
+        elif datos_cortinas_sel.empty:
+            st.info("No hay información de motores para este periodo. Se mostrarán las variables ambientales disponibles.")
+
+        if not df_variables_corr.empty and available_correlacion_vars:
+            if not selected_vars:
+                st.warning('Selecciona al menos una variable para mostrar la correlación.')
+            else:
+                with _loading_context(
+                    st.session_state.get("modo_fechas_compartidas") == "Varios días",
+                    "Cargando gráficas de correlación..."
+                ):
+                    _render_correlacion(
+                        df_variables_corr,
+                        datos_cortinas_sel,
+                        fecha_variables,
+                        selected_vars,
+                        block_label=block_label,
+                        show_ideal_aperturas=st.session_state.get('mostrar_aperturas_ideales', False),
+                        df_variables_almacen=df_variables_almacen_corr,
+                        compare_with_almacen=st.session_state.get('comparar_con_almacen', False)
+                    )
+
+        _render_summary_cards_selector(
+            df_variables_corr,
+            fecha_variables,
+            df_reference=summary_reference_df,
+            reference_label='Estación externa',
+            base_label=block_label
+        )
+
+        if st.session_state.get("mostrar_graficas_detalladas", DETAIL_CHARTS_DEFAULT):
+            _render_temperature_focus_chart(
+                df_variables_corr,
+                fecha_variables,
+                block_label=block_label,
+                df_external=df_variables_almacen_corr,
+                datos_cortinas_sel=datos_cortinas_sel
+            )
+
+        record_content_options = ["Ocultar registros", "Sensores", "Cortinas"]
+        if st.session_state.get("vista_registros_correlacion") not in record_content_options:
+            st.session_state["vista_registros_correlacion"] = record_content_options[0]
+        selected_record_content = st.segmented_control(
+            "Registros",
+            options=record_content_options,
+            key="vista_registros_correlacion",
+            help=FILTER_HELP_TEXTS['registros'],
             width="stretch"
         )
 
-        if selected_corr_content == "Correlación":
-            selected_vars = selected_vars_sidebar or st.session_state.get('variables_correlacion', available_correlacion_vars.copy())
-
-            if df_variables_corr.empty:
-                fecha_label = fecha_inicio.strftime('%Y-%m-%d') if not rango_multiple else f"{fecha_inicio.strftime('%Y-%m-%d')} a {fecha_fin.strftime('%Y-%m-%d')}"
-                st.warning(f"No se encontraron datos de variables para el rango seleccionado: {fecha_label}.")
-            elif not available_correlacion_vars:
-                st.warning("No se encontraron variables con datos para graficar en el rango seleccionado.")
-            elif datos_cortinas_sel.empty:
-                st.info("No hay información de motores para este periodo. Se mostrarán las variables ambientales disponibles.")
-
-            if not df_variables_corr.empty and available_correlacion_vars:
-                if not selected_vars:
-                    st.warning('Selecciona al menos una variable para mostrar la correlación.')
-                else:
-                    with _loading_context(
-                        st.session_state.get("modo_fechas_compartidas") == "Varios días",
-                        "Cargando gráficas de correlación..."
-                    ):
-                        _render_correlacion(
-                            df_variables_corr,
-                            datos_cortinas_sel,
-                            fecha_variables,
-                            selected_vars,
-                            block_label=block_label,
-                            show_ideal_aperturas=st.session_state.get('mostrar_aperturas_ideales', False),
-                            df_variables_almacen=df_variables_almacen_corr,
-                            compare_with_almacen=st.session_state.get('comparar_con_almacen', False)
-                        )
-                        if st.session_state.get("mostrar_graficas_detalladas", DETAIL_CHARTS_DEFAULT):
-                            _render_temperature_focus_chart(
-                                df_variables_corr,
-                                fecha_variables,
-                                block_label=block_label,
-                                df_external=df_variables_almacen_corr,
-                                datos_cortinas_sel=datos_cortinas_sel
-                            )
-
-        elif selected_corr_content == "Registros":
-            record_content_options = ["Sensores", "Cortinas"]
-            if st.session_state.get("vista_registros_correlacion") not in record_content_options:
-                st.session_state["vista_registros_correlacion"] = record_content_options[0]
-            selected_record_content = st.segmented_control(
-                "Tipo de registros",
-                options=record_content_options,
-                key="vista_registros_correlacion",
-                help=FILTER_HELP_TEXTS['registros'],
-                width="stretch"
-            )
-
-            if selected_record_content == "Sensores":
-                if datos_sensores_corr.empty:
-                    st.info("No hay registros de sensores para los filtros seleccionados.")
-                else:
-                    _dataframe(datos_sensores_corr)
+        if selected_record_content == "Sensores":
+            if datos_sensores_corr.empty:
+                st.info("No hay registros de sensores para los filtros seleccionados.")
             else:
-                if datos_cortinas_sel.empty:
-                    st.info("No hay registros de cortinas para los filtros seleccionados.")
-                else:
-                    _dataframe(datos_cortinas_sel)
+                _dataframe(datos_sensores_corr)
+        elif selected_record_content == "Cortinas":
+            if datos_cortinas_sel.empty:
+                st.info("No hay registros de cortinas para los filtros seleccionados.")
+            else:
+                _dataframe(datos_cortinas_sel)
 
