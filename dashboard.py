@@ -2655,7 +2655,7 @@ def _render_reference_summary_cards(df_reference, fecha_variables, summary_mode,
 def _render_summary_cards_selector(df_variables, fecha_variables, df_reference=None, reference_label='Estación externa', base_label='Bloque seleccionado'):
     _render_chart_explanation(
         'Resumen rápido del periodo',
-        'Estas tarjetas condensan las variables ambientales del periodo filtrado. Cambia entre promedio, máximo y mínimo para entender el comportamiento general antes de revisar las gráficas.',
+        'Estas tarjetas condensan las variables ambientales del periodo filtrado. Cambia entre promedio, máximo y mínimo para entender el comportamiento general.',
         accent=BRAND_COLORS['hero'],
         kicker='Resumen del análisis'
     )
