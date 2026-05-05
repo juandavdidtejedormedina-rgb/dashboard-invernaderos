@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import streamlit.components.v1 as components
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import io
@@ -44,19 +45,22 @@ def _google_maps_embed_url(location_query):
 
 def _render_autoplay_video(video_url, height=430):
     video_urls = video_url if isinstance(video_url, (list, tuple)) else [video_url]
+
     safe_urls = [
         html.escape(str(url or "").strip(), quote=True)
         for url in video_urls
         if str(url or "").strip()
     ]
+
     if not safe_urls:
         return
-    first_url = safe_urls[0]
+
     playlist_js = "[" + ",".join(f'"{url}"' for url in safe_urls) + "]"
 
-    st.html(
+    components.html(
         f"""
         <video
+            id="dashboardVideo"
             autoplay
             muted
             playsinline
@@ -70,26 +74,33 @@ def _render_autoplay_video(video_url, height=430):
                 border-radius: 18px;
                 background: #111;
             "
-        >
-            <source src="{first_url}" type="video/mp4">
-        </video>
+        ></video>
+
         <script>
-            const video = document.currentScript.previousElementSibling;
+            const video = document.getElementById("dashboardVideo");
             const playlist = {playlist_js};
             let currentIndex = 0;
-            if (video) {{
-                video.muted = true;
-                video.addEventListener("ended", () => {{
-                    currentIndex = (currentIndex + 1) % playlist.length;
-                    video.src = playlist[currentIndex];
-                    video.load();
-                    video.play().catch(() => {{}});
-                }});
+
+            function playVideo(index) {{
+                video.src = playlist[index];
+                video.load();
                 video.play().catch(() => {{}});
             }}
+
+            video.addEventListener("ended", () => {{
+                currentIndex = (currentIndex + 1) % playlist.length;
+                playVideo(currentIndex);
+            }});
+
+            video.addEventListener("error", () => {{
+                currentIndex = (currentIndex + 1) % playlist.length;
+                playVideo(currentIndex);
+            }});
+
+            playVideo(currentIndex);
         </script>
         """,
-        unsafe_allow_javascript=True
+        height=height + 20,
     )
 
 
