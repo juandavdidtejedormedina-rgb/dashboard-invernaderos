@@ -4514,6 +4514,17 @@ def _render_marley_dashboard(dashboard_mode):
     )
     overlap = comparison.dropna(subset=list(MARLEY_SENSOR_NAMES)).copy()
 
+    _render_chart_explanation(
+        'Comparación directa WIGA vs ECOWITT',
+        (
+            'Aquí se superponen las lecturas punto por punto. Cada punto WIGA se compara con la lectura ECOWITT más cercana en el tiempo para ver mejor la relación real entre sensores.'
+            if point_mode else
+            'Aquí se superponen ambos sensores para la variable elegida. Si las líneas viajan cerca, las lecturas son similares; si se separan, hay diferencia entre equipos en esa franja de 30 minutos.'
+        ),
+        accent=MARLEY_VARIABLES[selected_variable]['accent']
+    )
+    _plotly_chart(_make_marley_comparison_chart(comparison, selected_variable, selected_range, comparison_resolution))
+
     avg_abs_diff = overlap['DiffValue'].mean() if not overlap.empty else None
     avg_signed_diff = overlap['SignedDiff'].mean() if not overlap.empty else None
     std_diff = overlap['SignedDiff'].std() if not overlap.empty else None
@@ -4659,17 +4670,6 @@ def _render_marley_dashboard(dashboard_mode):
         """,
         unsafe_allow_html=True
     )
-
-    _render_chart_explanation(
-        'Comparación directa WIGA vs ECOWITT',
-        (
-            'Aquí se superponen las lecturas punto por punto. Cada punto WIGA se compara con la lectura ECOWITT más cercana en el tiempo para ver mejor la relación real entre sensores.'
-            if point_mode else
-            'Aquí se superponen ambos sensores para la variable elegida. Si las líneas viajan cerca, las lecturas son similares; si se separan, hay diferencia entre equipos en esa franja de 30 minutos.'
-        ),
-        accent=MARLEY_VARIABLES[selected_variable]['accent']
-    )
-    _plotly_chart(_make_marley_comparison_chart(comparison, selected_variable, selected_range, comparison_resolution))
 
     difference_chart = _make_marley_difference_chart(comparison, selected_variable, selected_range, comparison_resolution)
     if difference_chart is not None:
@@ -6212,7 +6212,6 @@ def _render_ponderosa_ecowitt_dashboard(df_variables_all, df_cortinas_all, selec
         _build_ponderosa_hourly_comparison(filtered_df, selected_variable, selected_range)
     )
     overlap = comparison.dropna(subset=list(PONDEROSA_SENSOR_NAMES)).copy()
-    _render_ponderosa_comparison_metric_cards(overlap, selected_variable)
 
     _render_chart_explanation(
         'Comparación directa WIGA vs ECOWITT',
@@ -6224,6 +6223,7 @@ def _render_ponderosa_ecowitt_dashboard(df_variables_all, df_cortinas_all, selec
         accent=PONDEROSA_COMPARISON_VARIABLES[selected_variable]['accent']
     )
     _plotly_chart(_make_ponderosa_comparison_chart(comparison, selected_variable, selected_range, comparison_resolution))
+    _render_ponderosa_comparison_metric_cards(overlap, selected_variable)
 
     difference_chart = _make_ponderosa_difference_chart(comparison, selected_variable, selected_range, comparison_resolution)
     if difference_chart is not None:
