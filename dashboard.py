@@ -266,6 +266,12 @@ MARLEY_VARIABLES = {
         "accent": "#6BEA5B",
     },
 }
+MARLEY_CORRELACION_VARIABLE_MAP = {
+    "Temperatura (°C)": "Temperatura",
+    "Humedad Relativa (%)": "Humedad Relativa",
+    "Radiación PAR (µmol m-2 s-1)": "Radiación PAR",
+    "Gramos de agua (g)": "Gramos de agua",
+}
 PONDEROSA_COMPARISON_VARIABLES = {
     "Temperatura": {
         "title": "Comparativa de temperatura",
