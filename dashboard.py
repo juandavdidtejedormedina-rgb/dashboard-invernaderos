@@ -103,23 +103,18 @@ def _render_dashboard_media(selected_finca, lazy_load=False):
     location_query = str(media_config.get('location_query', '')).strip()
 
     if video_url:
-        with st.expander("Video introductorio", expanded=not lazy_load):
-            if not lazy_load or st.checkbox("Cargar video", key="cargar_video_dashboard"):
-                youtube_source_url = video_url[0] if isinstance(video_url, (list, tuple)) else video_url
-                youtube_embed_url = _youtube_embed_url(youtube_source_url)
-                if youtube_embed_url:
-                    st.iframe(youtube_embed_url, height=430)
-                else:
-                    _render_autoplay_video(video_url)
+        with st.expander("Video introductorio", expanded=True):
+            youtube_source_url = video_url[0] if isinstance(video_url, (list, tuple)) else video_url
+            youtube_embed_url = _youtube_embed_url(youtube_source_url)
+
+            if youtube_embed_url:
+                st.iframe(youtube_embed_url, height=430)
             else:
-                st.caption("Carga el video solo cuando lo necesites.")
+                _render_autoplay_video(video_url)
 
     if location_query:
-        with st.expander("Ubicación", expanded=not lazy_load):
-            if not lazy_load or st.checkbox("Cargar mapa", key="cargar_mapa_dashboard"):
-                st.iframe(_google_maps_embed_url(location_query), height=430)
-            else:
-                st.caption("Carga el mapa solo cuando lo necesites.")
+        with st.expander("Ubicación", expanded=False):
+            st.iframe(_google_maps_embed_url(location_query), height=430)
 
 SENSOR_VARIABLES = ['Temperatura', 'Humedad Relativa', 'Radiación PAR', 'Gramos de agua']
 VARIABLE_LABELS = {
@@ -383,7 +378,7 @@ DASHBOARD_MEDIA = {
         'location_query': "Finca Marly - The Elite Flower SAS CI Madrid Road Facatativa Cundinamarca Colombia",
     }
 }
-LAZY_LOAD_MEDIA = True
+LAZY_LOAD_MEDIA = False
 DETAIL_CHARTS_DEFAULT = False
 MARLEY_DETAIL_CHARTS_DEFAULT = False
 MARLEY_RECORDS_DEFAULT = False
