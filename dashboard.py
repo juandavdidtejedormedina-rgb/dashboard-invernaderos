@@ -3905,6 +3905,62 @@ def _get_marley_y_axis_config(df, variable):
     return {'title': 'Radiación PAR (µmol m-2 s-1)', 'range': [-25, axis_max], 'dtick': dtick}
 
 
+def _tighten_comparison_y_axis(comparison, sensor_names, y_axis, variable_name):
+    values = []
+    for source_name in sensor_names:
+        if source_name not in comparison.columns:
+            continue
+        clean = pd.to_numeric(comparison[source_name], errors='coerce').dropna()
+        if not clean.empty:
+            values.append(clean)
+
+    if not values:
+        return y_axis
+
+    combined = pd.concat(values, ignore_index=True)
+    vmin = float(combined.min())
+    vmax = float(combined.max())
+    spread = max(vmax - vmin, 0.01)
+    normalized_variable = _build_normalized_text_key(variable_name)
+
+    if 'humedad' in normalized_variable:
+        padding = max(1.2, spread * 0.08)
+        axis_min = max(0, vmin - padding)
+        axis_max = min(100, vmax + padding)
+        dtick = 1 if (axis_max - axis_min) <= 12 else 2 if (axis_max - axis_min) <= 25 else 5
+        y_axis.update({'range': [round(axis_min, 1), round(axis_max, 1)], 'dtick': dtick, 'ticksuffix': '%'})
+        return y_axis
+
+    if 'temperatura' in normalized_variable:
+        padding = max(0.35, spread * 0.08)
+        axis_min = vmin - padding
+        axis_max = vmax + padding
+        dtick = 0.5 if (axis_max - axis_min) <= 5 else 1 if (axis_max - axis_min) <= 12 else 2
+        y_axis.update({'range': [round(axis_min, 2), round(axis_max, 2)], 'dtick': dtick})
+        return y_axis
+
+    if 'gramos' in normalized_variable:
+        padding = max(0.18, spread * 0.08)
+        axis_min = max(0, vmin - padding)
+        axis_max = vmax + padding
+        dtick = 0.2 if (axis_max - axis_min) <= 2 else 0.5 if (axis_max - axis_min) <= 5 else 1
+        y_axis.update({'range': [round(axis_min, 2), round(axis_max, 2)], 'dtick': dtick})
+        return y_axis
+
+    if 'radiacion par' in normalized_variable:
+        padding = max(12, spread * 0.06)
+        axis_min = max(0, vmin - padding)
+        axis_max = vmax + padding
+        axis_span = max(axis_max - axis_min, 1)
+        dtick = 10 if axis_span <= 120 else 25 if axis_span <= 350 else 50 if axis_span <= 900 else 100
+        y_axis.update({'range': [round(axis_min, 1), round(axis_max, 1)], 'dtick': dtick})
+        return y_axis
+
+    padding = max(spread * 0.08, 1)
+    y_axis.update({'range': [round(vmin - padding, 2), round(vmax + padding, 2)]})
+    return y_axis
+
+
 def _make_marley_comparison_chart(comparison, variable, selected_range, resolution_label=COMPARISON_RESOLUTION_OPTIONS[0]):
     config = MARLEY_VARIABLES[variable]
     fig = go.Figure()
@@ -3913,6 +3969,7 @@ def _make_marley_comparison_chart(comparison, variable, selected_range, resoluti
         comparison.rename(columns={name: f"{variable} - {name}" for name in MARLEY_SENSOR_NAMES}),
         variable
     )
+    y_axis = _tighten_comparison_y_axis(comparison, MARLEY_SENSOR_NAMES, y_axis, variable)
     start_date, end_date = selected_range
     multi_day_view = start_date != end_date
     point_mode = resolution_label == COMPARISON_RESOLUTION_OPTIONS[1]
@@ -5164,6 +5221,7 @@ def _make_ponderosa_comparison_chart(comparison, variable, selected_range, resol
         comparison.rename(columns={name: f"{variable} - {name}" for name in PONDEROSA_SENSOR_NAMES}),
         variable
     )
+    y_axis = _tighten_comparison_y_axis(comparison, PONDEROSA_SENSOR_NAMES, y_axis, variable)
     start_date, end_date = selected_range
     multi_day_view = start_date != end_date
     point_mode = resolution_label == COMPARISON_RESOLUTION_OPTIONS[1]
