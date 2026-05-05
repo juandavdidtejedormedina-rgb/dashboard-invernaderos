@@ -168,7 +168,7 @@ VARIABLE_SELECTOR_LABELS = {
     'PUERTA 2': 'Puerta 2'
 }
 FILTER_HELP_TEXTS = {
-    'modo_dashboard': 'Elige la vista principal: WIGA con cortinas, relación WIGA / ECOWITT, varianza, promedio o fuentes individuales.',
+    'modo_dashboard': 'Elige la vista principal: WIGA con cortinas, relación WIGA / ECOWITT, APOGI / MCI / WIGA, varianza, promedio o fuentes individuales.',
     'finca': 'Selecciona la finca que quieres explorar en el dashboard. Los bloques y fechas disponibles se ajustan según esa finca.',
     'modo_fechas': 'Define si quieres analizar un solo día o un rango de varios días.',
     'fecha': 'Selecciona la fecha o el rango que se usará para filtrar los registros visibles en la vista actual.',
@@ -241,6 +241,9 @@ PONDEROSA_SENSOR_NAMES = ("WIGA", "ECOWITT")
 PONDEROSA_ECOWITT_BLOCK_CODE = "35"
 PONDEROSA_ECOWITT_RECORDS_DEFAULT = False
 PONDEROSA_ECOWITT_DETAILS_DEFAULT = False
+PAR_TO_LUX_FACTOR = 54.0
+PONDEROSA_LIGHT_SENSOR_NAMES = ("WIGA", "MCI", "APOGI")
+PONDEROSA_LIGHT_VIEW_NAME = "APOGI MCI WIGGA"
 MARLEY_SHEETS = {
     "WIGA": ["WIGGA MONTAÑA", "WIGA MARLEY"],
     "ECOWITT": ["ECOWITT MONTAÑA", "ECOWIT MARLEY"],
@@ -330,6 +333,20 @@ PONDEROSA_ECOWITT_VARIABLES = {
         "unit": "lux",
         "colors": {"ECOWITT": "#B9832F"},
         "accent": "#B9832F",
+    },
+}
+PONDEROSA_LIGHT_VARIABLES = {
+    "LUX": {
+        "title": "Comparativa de LUX",
+        "unit": "lux",
+        "colors": {"WIGA": "#B9832F", "MCI": "#5AA6A6", "APOGI": "#D39A58"},
+        "accent": "#B9832F",
+    },
+    "Radiación PAR": {
+        "title": "Comparativa de radiación PAR",
+        "unit": "µmol m-2 s-1",
+        "colors": {"WIGA": "#6BEA5B", "MCI": "#524B82", "APOGI": "#4E8D7C"},
+        "accent": "#6BEA5B",
     },
 }
 MARLEY_CANONICAL_COLUMNS = {
@@ -5262,6 +5279,218 @@ def _build_ponderosa_comparison_dataset(df_variables_all, ecowitt_df, bloque_var
     return merged, {'WIGA': wiga_source, 'ECOWITT': ecowitt_source}
 
 
+def _build_ponderosa_light_sensor_dataset(df_variables_all, ecowitt_df, bloque_variables):
+    wiga_source_raw = _build_ponderosa_wiga_source(df_variables_all, bloque_variables)
+    light_columns = [
+        'FechaHora',
+        'Fecha_Filtro',
+        *[
+            f"{variable} - {sensor_name}"
+            for variable in PONDEROSA_LIGHT_VARIABLES
+            for sensor_name in PONDEROSA_LIGHT_SENSOR_NAMES
+        ],
+    ]
+
+    wiga_source = pd.DataFrame()
+    if not wiga_source_raw.empty and 'Radiación PAR - WIGA' in wiga_source_raw.columns:
+        wiga_source = wiga_source_raw[['FechaHora', 'Fecha_Filtro', 'Radiación PAR - WIGA']].copy()
+        wiga_source['Radiación PAR - WIGA'] = pd.to_numeric(wiga_source['Radiación PAR - WIGA'], errors='coerce')
+        wiga_source['LUX - WIGA'] = wiga_source['Radiación PAR - WIGA'] * PAR_TO_LUX_FACTOR
+
+    mci_source = pd.DataFrame()
+    apogi_source = pd.DataFrame()
+    if not ecowitt_df.empty:
+        base_ecowitt = ecowitt_df[['FechaHora', 'Fecha_Filtro', 'Radiación PAR', 'LUX']].copy()
+        base_ecowitt['Radiación PAR'] = pd.to_numeric(base_ecowitt['Radiación PAR'], errors='coerce')
+        base_ecowitt['LUX'] = pd.to_numeric(base_ecowitt['LUX'], errors='coerce')
+
+        mci_source = base_ecowitt[['FechaHora', 'Fecha_Filtro', 'Radiación PAR']].copy()
+        mci_source.rename(columns={'Radiación PAR': 'Radiación PAR - MCI'}, inplace=True)
+        mci_source['LUX - MCI'] = mci_source['Radiación PAR - MCI'] * PAR_TO_LUX_FACTOR
+
+        apogi_source = base_ecowitt[['FechaHora', 'Fecha_Filtro', 'LUX']].copy()
+        apogi_source.rename(columns={'LUX': 'LUX - APOGI'}, inplace=True)
+        apogi_source['Radiación PAR - APOGI'] = apogi_source['LUX - APOGI'] / PAR_TO_LUX_FACTOR
+
+    merge_frames = [
+        frame.drop(columns=['Fecha_Filtro'], errors='ignore')
+        for frame in (wiga_source, mci_source, apogi_source)
+        if not frame.empty
+    ]
+    if not merge_frames:
+        return pd.DataFrame(columns=light_columns), {
+            'WIGA': wiga_source,
+            'MCI': mci_source,
+            'APOGI': apogi_source,
+        }
+
+    merged = merge_frames[0]
+    for frame in merge_frames[1:]:
+        merged = merged.merge(frame, on='FechaHora', how='outer')
+
+    merged = merged.sort_values('FechaHora').reset_index(drop=True)
+    merged['Fecha_Filtro'] = pd.to_datetime(merged['FechaHora'], errors='coerce').dt.date
+    for column in light_columns:
+        if column not in merged.columns:
+            merged[column] = pd.NA
+    return merged[light_columns].copy(), {
+        'WIGA': wiga_source,
+        'MCI': mci_source,
+        'APOGI': apogi_source,
+    }
+
+
+def _build_multi_sensor_average_comparison(df, variable, sensor_names, selected_range, hourly_builder):
+    comparison = None
+    for sensor_name in sensor_names:
+        column_name = f"{variable} - {sensor_name}"
+        if df.empty or column_name not in df.columns:
+            continue
+        series_df = hourly_builder(df, column_name, selected_range)
+        if series_df.empty or column_name not in series_df.columns:
+            continue
+        series_df = series_df.rename(columns={column_name: sensor_name})
+        comparison = series_df if comparison is None else comparison.merge(series_df, on='FechaHora', how='outer')
+
+    if comparison is None:
+        return pd.DataFrame(columns=['FechaHora', *sensor_names])
+
+    for sensor_name in sensor_names:
+        if sensor_name not in comparison.columns:
+            comparison[sensor_name] = pd.NA
+        comparison[sensor_name] = pd.to_numeric(comparison[sensor_name], errors='coerce')
+    return comparison.sort_values('FechaHora').reset_index(drop=True)
+
+
+def _build_multi_sensor_raw_frames(df, variable, sensor_names):
+    source_frames = {}
+    for sensor_name in sensor_names:
+        column_name = f"{variable} - {sensor_name}"
+        if df.empty or column_name not in df.columns:
+            source_frames[sensor_name] = pd.DataFrame(columns=['FechaHora', sensor_name])
+            continue
+
+        source_df = df[['FechaHora', column_name]].dropna(subset=[column_name]).copy()
+        source_df['FechaHora'] = pd.to_datetime(source_df['FechaHora'], errors='coerce')
+        source_df[column_name] = pd.to_numeric(source_df[column_name], errors='coerce')
+        source_df = (
+            source_df
+            .dropna(subset=['FechaHora', column_name])
+            .groupby('FechaHora', as_index=False)[column_name]
+            .mean()
+            .sort_values('FechaHora')
+            .rename(columns={column_name: sensor_name})
+        )
+        source_frames[sensor_name] = source_df
+    return source_frames
+
+
+def _finalize_multi_sensor_comparison(comparison, sensor_names):
+    if comparison is None or comparison.empty:
+        return pd.DataFrame(columns=['FechaHora', *sensor_names])
+
+    comparison = comparison.copy()
+    for sensor_name in sensor_names:
+        if sensor_name not in comparison.columns:
+            comparison[sensor_name] = pd.NA
+        comparison[sensor_name] = pd.to_numeric(comparison[sensor_name], errors='coerce')
+    return comparison.sort_values('FechaHora').reset_index(drop=True)
+
+
+def _build_multi_sensor_point_comparison(df, variable, sensor_names, tolerance=POINT_COMPARISON_TOLERANCE):
+    if not sensor_names:
+        return pd.DataFrame(columns=['FechaHora'])
+
+    source_frames = _build_multi_sensor_raw_frames(df, variable, sensor_names)
+    anchor_sensor = sensor_names[0]
+    comparison = source_frames.get(anchor_sensor, pd.DataFrame()).copy()
+    if comparison.empty:
+        return pd.DataFrame(columns=['FechaHora', *sensor_names])
+
+    for sensor_name in sensor_names[1:]:
+        sensor_df = source_frames.get(sensor_name, pd.DataFrame())
+        if sensor_df.empty:
+            comparison[sensor_name] = pd.NA
+            continue
+        comparison = pd.merge_asof(
+            comparison.sort_values('FechaHora'),
+            sensor_df.sort_values('FechaHora'),
+            on='FechaHora',
+            direction='nearest',
+            tolerance=tolerance
+        )
+    return _finalize_multi_sensor_comparison(comparison, sensor_names)
+
+
+def _build_multi_sensor_anchor_nearest_comparison(
+    df,
+    variable,
+    sensor_names,
+    selected_range,
+    hourly_builder,
+    tolerance=POINT_COMPARISON_TOLERANCE
+):
+    if not sensor_names:
+        return pd.DataFrame(columns=['FechaHora'])
+
+    anchor_sensor = sensor_names[0]
+    anchor_column = f"{variable} - {anchor_sensor}"
+    if df.empty or anchor_column not in df.columns:
+        return pd.DataFrame(columns=['FechaHora', *sensor_names])
+
+    anchor_df = hourly_builder(df, anchor_column, selected_range)
+    if anchor_df.empty or anchor_column not in anchor_df.columns:
+        return pd.DataFrame(columns=['FechaHora', *sensor_names])
+
+    comparison = (
+        anchor_df[['FechaHora', anchor_column]]
+        .dropna(subset=[anchor_column])
+        .sort_values('FechaHora')
+        .rename(columns={anchor_column: anchor_sensor})
+    )
+    if comparison.empty:
+        return pd.DataFrame(columns=['FechaHora', *sensor_names])
+
+    source_frames = _build_multi_sensor_raw_frames(df, variable, sensor_names[1:])
+    for sensor_name in sensor_names[1:]:
+        sensor_df = source_frames.get(sensor_name, pd.DataFrame())
+        if sensor_df.empty:
+            comparison[sensor_name] = pd.NA
+            continue
+        comparison = pd.merge_asof(
+            comparison.sort_values('FechaHora'),
+            sensor_df.sort_values('FechaHora'),
+            on='FechaHora',
+            direction='nearest',
+            tolerance=tolerance
+        )
+    return _finalize_multi_sensor_comparison(comparison, sensor_names)
+
+
+def _build_ponderosa_light_comparison(df, variable, selected_range, resolution_label):
+    if resolution_label == COMPARISON_RESOLUTION_OPTIONS[1]:
+        return _build_multi_sensor_point_comparison(
+            df,
+            variable,
+            PONDEROSA_LIGHT_SENSOR_NAMES
+        )
+    if resolution_label == COMPARISON_RESOLUTION_OPTIONS[2]:
+        return _build_multi_sensor_anchor_nearest_comparison(
+            df,
+            variable,
+            PONDEROSA_LIGHT_SENSOR_NAMES,
+            selected_range,
+            _build_ponderosa_hourly_series
+        )
+    return _build_multi_sensor_average_comparison(
+        df,
+        variable,
+        PONDEROSA_LIGHT_SENSOR_NAMES,
+        selected_range,
+        _build_ponderosa_hourly_series
+    )
+
+
 def _build_ponderosa_full_time_index(selected_range):
     start_date, end_date = selected_range
     return pd.date_range(
@@ -5719,6 +5948,260 @@ def _render_ponderosa_ecowitt_individual_charts(filtered_df, selected_range, res
         "Estas gráficas muestran las cuatro variables medidas por ECOWITT, incluyendo LUX, sin mezclarlas con WIGA.",
         resolution_label
     )
+
+
+def _get_ponderosa_light_y_axis_config(comparison, variable):
+    config = PONDEROSA_LIGHT_VARIABLES[variable]
+    values = []
+    for sensor_name in PONDEROSA_LIGHT_SENSOR_NAMES:
+        if sensor_name in comparison.columns:
+            clean = pd.to_numeric(comparison[sensor_name], errors='coerce').dropna()
+            if not clean.empty:
+                values.append(clean)
+
+    if not values:
+        return {'title': config['unit']}
+
+    all_values = pd.concat(values, ignore_index=True)
+    vmin = float(all_values.min())
+    vmax = float(all_values.max())
+    span = max(vmax - vmin, 1)
+
+    if variable == "LUX":
+        axis_min = 0 if vmin >= 0 else vmin - span * 0.08
+        axis_max = vmax + max(span * 0.08, 500)
+        dtick = 1000 if axis_max <= 12000 else 2500 if axis_max <= 30000 else 5000 if axis_max <= 70000 else 10000
+        return {
+            'title': 'LUX',
+            'range': [axis_min, axis_max],
+            'dtick': dtick,
+            'tickformat': ',.0f',
+        }
+
+    axis_min = 0 if vmin >= 0 else vmin - span * 0.08
+    axis_max = vmax + max(span * 0.08, 15)
+    dtick = 10 if axis_max <= 120 else 25 if axis_max <= 350 else 50 if axis_max <= 900 else 100
+    return {
+        'title': 'Radiación PAR (µmol m-2 s-1)',
+        'range': [axis_min, axis_max],
+        'dtick': dtick,
+        'tickformat': ',.0f',
+    }
+
+
+def _make_ponderosa_light_comparison_chart(comparison, variable, selected_range, resolution_label):
+    if comparison.empty:
+        return None
+
+    config = PONDEROSA_LIGHT_VARIABLES[variable]
+    time_axis = _get_marley_time_axis_config(comparison)
+    y_axis = _get_ponderosa_light_y_axis_config(comparison, variable)
+    start_date, end_date = selected_range
+    multi_day_view = start_date != end_date
+    point_mode = resolution_label == COMPARISON_RESOLUTION_OPTIONS[1]
+    nearest_mode = resolution_label == COMPARISON_RESOLUTION_OPTIONS[2]
+    chart_suffix = (
+        " - punto por punto"
+        if point_mode else
+        " - WIGA 30 min / sensores cercanos"
+        if nearest_mode else
+        ""
+    )
+
+    fig = go.Figure()
+    for sensor_name in PONDEROSA_LIGHT_SENSOR_NAMES:
+        if sensor_name not in comparison.columns or comparison[sensor_name].dropna().empty:
+            continue
+        source_df = comparison[['FechaHora', sensor_name]].dropna(subset=[sensor_name]).copy()
+        trace_type = go.Scattergl if point_mode and len(source_df) > 250 else go.Scatter
+        fig.add_trace(
+            trace_type(
+                x=source_df['FechaHora'],
+                y=source_df[sensor_name],
+                name=sensor_name,
+                mode='lines+markers' if point_mode or not multi_day_view else 'lines',
+                line=dict(color=config['colors'][sensor_name], width=2.2 if point_mode else 3),
+                marker=dict(size=4 if point_mode else 6),
+                opacity=0.86 if point_mode else 1,
+                connectgaps=False,
+                hovertemplate=(
+                    "<b>%{x|%Y-%m-%d %H:%M}</b><br>"
+                    + f"{sensor_name}: "
+                    + "%{y:.2f} "
+                    + config['unit']
+                    + "<extra></extra>"
+                ),
+            )
+        )
+
+    if not fig.data:
+        return None
+
+    fig.update_layout(
+        title=dict(text=f"{config['title']}{chart_suffix}", x=0, xanchor='left'),
+        height=460,
+        margin=dict(l=30, r=30, t=76, b=32),
+        paper_bgcolor="rgba(255,255,255,0)",
+        plot_bgcolor="rgba(250,248,243,0.72)",
+        hovermode='x unified',
+        template='plotly_white',
+        legend=dict(orientation='h', yanchor='bottom', y=1.02, xanchor='left', x=0),
+        xaxis=dict(
+            title=time_axis['title'],
+            showgrid=True,
+            gridcolor="rgba(76, 70, 120, 0.07)",
+            zeroline=False,
+            tickformat=time_axis['tickformat'],
+            tickmode=time_axis.get('tickmode', 'linear'),
+            dtick=time_axis['dtick'],
+            range=[pd.Timestamp(start_date), pd.Timestamp(end_date) + MARLEY_AXIS_END_OFFSET],
+        ),
+        yaxis=dict(
+            title=y_axis['title'],
+            showgrid=True,
+            gridcolor="rgba(76, 70, 120, 0.07)",
+            zeroline=False,
+            range=y_axis.get('range'),
+            dtick=y_axis.get('dtick'),
+            tickformat=y_axis.get('tickformat'),
+        ),
+    )
+    return fig
+
+
+def _make_ponderosa_light_individual_chart(comparison, variable, sensor_name, selected_range, resolution_label):
+    if comparison.empty or sensor_name not in comparison.columns or comparison[sensor_name].dropna().empty:
+        return None
+
+    config = PONDEROSA_LIGHT_VARIABLES[variable]
+    series_df = comparison[['FechaHora', sensor_name]].dropna(subset=[sensor_name]).copy()
+    time_axis = _get_marley_time_axis_config(series_df)
+    y_axis = _get_ponderosa_light_y_axis_config(series_df.rename(columns={sensor_name: sensor_name}), variable)
+    start_date, end_date = selected_range
+    point_mode = resolution_label == COMPARISON_RESOLUTION_OPTIONS[1]
+    trace_type = go.Scattergl if point_mode and len(series_df) > 250 else go.Scatter
+
+    fig = go.Figure()
+    fig.add_trace(
+        trace_type(
+            x=series_df['FechaHora'],
+            y=series_df[sensor_name],
+            name=sensor_name,
+            mode='lines+markers',
+            line=dict(color=config['colors'][sensor_name], width=2.1 if point_mode else 2.7),
+            marker=dict(size=3.5 if point_mode else 5),
+            opacity=0.86 if point_mode else 1,
+            connectgaps=False,
+            hovertemplate=(
+                "<b>%{x|%Y-%m-%d %H:%M}</b><br>"
+                + f"{sensor_name}: "
+                + "%{y:.2f} "
+                + config['unit']
+                + "<extra></extra>"
+            ),
+        )
+    )
+    fig.update_layout(
+        title=dict(text=f"{config['title'].replace('Comparativa de ', '').capitalize()} - {sensor_name}", x=0, xanchor='left'),
+        height=300,
+        margin=dict(l=24, r=18, t=54, b=42),
+        paper_bgcolor="rgba(255,255,255,0)",
+        plot_bgcolor="rgba(250,248,243,0.72)",
+        hovermode='x unified',
+        template='plotly_white',
+        showlegend=False,
+        xaxis=dict(
+            title=time_axis['title'],
+            showgrid=True,
+            gridcolor="rgba(76, 70, 120, 0.07)",
+            zeroline=False,
+            tickformat=time_axis['tickformat'],
+            tickmode=time_axis.get('tickmode', 'linear'),
+            dtick=time_axis['dtick'],
+            range=[pd.Timestamp(start_date), pd.Timestamp(end_date) + MARLEY_AXIS_END_OFFSET],
+        ),
+        yaxis=dict(
+            title=y_axis['title'],
+            showgrid=True,
+            gridcolor="rgba(76, 70, 120, 0.07)",
+            zeroline=False,
+            range=y_axis.get('range'),
+            dtick=y_axis.get('dtick'),
+            tickformat=y_axis.get('tickformat'),
+        ),
+    )
+    return fig
+
+
+def _build_ponderosa_light_comparison_table(filtered_df, selected_range, resolution_label):
+    rows = []
+    for variable, config in PONDEROSA_LIGHT_VARIABLES.items():
+        comparison = _build_ponderosa_light_comparison(filtered_df, variable, selected_range, resolution_label)
+        if comparison.empty:
+            continue
+
+        comparison = comparison.dropna(how='all', subset=list(PONDEROSA_LIGHT_SENSOR_NAMES))
+        for _, row in comparison.iterrows():
+            timestamp = pd.to_datetime(row.get('FechaHora'), errors='coerce')
+            if pd.isna(timestamp):
+                continue
+
+            values = {
+                sensor_name: pd.to_numeric(pd.Series([row.get(sensor_name)]), errors='coerce').iloc[0]
+                for sensor_name in PONDEROSA_LIGHT_SENSOR_NAMES
+            }
+            if all(pd.isna(value) for value in values.values()):
+                continue
+
+            wiga_value = values.get('WIGA')
+            mci_value = values.get('MCI')
+            apogi_value = values.get('APOGI')
+            rows.append({
+                'Fecha': timestamp.strftime('%Y-%m-%d'),
+                'Hora': timestamp.strftime('%H:%M'),
+                'Variable': config['title'].replace('Comparativa de ', '').capitalize(),
+                'Unidad': config['unit'],
+                'WIGA': round(float(wiga_value), 2) if pd.notna(wiga_value) else pd.NA,
+                'MCI': round(float(mci_value), 2) if pd.notna(mci_value) else pd.NA,
+                'APOGI': round(float(apogi_value), 2) if pd.notna(apogi_value) else pd.NA,
+                'MCI - WIGA': round(float(mci_value - wiga_value), 2) if pd.notna(mci_value) and pd.notna(wiga_value) else pd.NA,
+                'APOGI - WIGA': round(float(apogi_value - wiga_value), 2) if pd.notna(apogi_value) and pd.notna(wiga_value) else pd.NA,
+                'APOGI - MCI': round(float(apogi_value - mci_value), 2) if pd.notna(apogi_value) and pd.notna(mci_value) else pd.NA,
+            })
+
+    if not rows:
+        return pd.DataFrame()
+    return pd.DataFrame(rows).sort_values(['Fecha', 'Hora', 'Variable']).reset_index(drop=True)
+
+
+def _render_ponderosa_light_individual_charts(comparisons, selected_range, resolution_label):
+    rendered_charts = []
+    for variable, comparison in comparisons.items():
+        for sensor_name in PONDEROSA_LIGHT_SENSOR_NAMES:
+            chart = _make_ponderosa_light_individual_chart(
+                comparison,
+                variable,
+                sensor_name,
+                selected_range,
+                resolution_label
+            )
+            if chart is not None:
+                rendered_charts.append(chart)
+
+    if not rendered_charts:
+        return
+
+    st.markdown("### Lecturas individuales APOGI / MCI / WIGA")
+    _render_chart_explanation(
+        'Detalle individual',
+        'Cada tarjeta separa una variable por sensor usando la misma resolución seleccionada arriba.',
+        accent=BRAND_COLORS['hero']
+    )
+    for start in range(0, len(rendered_charts), 2):
+        cols = st.columns(2)
+        for offset, chart in enumerate(rendered_charts[start:start + 2]):
+            with cols[offset]:
+                _plotly_chart(chart)
 
 
 def _get_available_cortina_dates(df_cortinas_all, bloque_cortinas=None):
@@ -6356,6 +6839,225 @@ def _render_ponderosa_ecowitt_values_dashboard():
     if st.checkbox(
         "Cargar registros ECOWITT Ponderosa",
         key="mostrar_ponderosa_ecowitt_only_registros",
+        help=FILTER_HELP_TEXTS['registros']
+    ):
+        _dataframe(filtered_df.drop(columns=['Fecha_Filtro'], errors='ignore'), hide_index=True)
+
+    st.stop()
+
+
+def _render_ponderosa_apogi_mci_wiga_dashboard(df_variables_all, df_cortinas_all, selected_finca):
+    try:
+        ecowitt_df = _load_ponderosa_ecowitt_data()
+    except Exception as error:
+        st.error(f"No fue posible cargar ECOWITT Ponderosa. Detalle: {error}")
+        st.stop()
+
+    block_codes, variable_block_map, _ = _get_block_options(
+        df_variables_all,
+        df_cortinas_all,
+        selected_finca=selected_finca
+    )
+    if PONDEROSA_ECOWITT_BLOCK_CODE not in block_codes:
+        st.warning("No hay datos WIGA del Bloque 35 disponibles para comparar APOGI / MCI / WIGA.")
+        st.stop()
+
+    selected_source_code = PONDEROSA_ECOWITT_BLOCK_CODE
+    bloque_variables = variable_block_map.get(selected_source_code)
+    comparison_df, source_frames = _build_ponderosa_light_sensor_dataset(
+        df_variables_all,
+        ecowitt_df,
+        bloque_variables
+    )
+    if comparison_df.empty:
+        st.warning("No fue posible construir la comparación APOGI / MCI / WIGA.")
+        st.stop()
+
+    date_sets = []
+    for source_name in PONDEROSA_LIGHT_SENSOR_NAMES:
+        source_df = source_frames.get(source_name, pd.DataFrame())
+        if source_df.empty or 'Fecha_Filtro' not in source_df.columns:
+            date_sets.append(set())
+        else:
+            date_sets.append(set(source_df['Fecha_Filtro'].dropna().unique()))
+    available_dates = sorted(set.intersection(*date_sets)) if date_sets and all(date_sets) else []
+    if not available_dates:
+        st.warning("No hay fechas comunes entre APOGI, MCI y WIGA para esta comparación.")
+        st.stop()
+
+    min_date = available_dates[0]
+    max_date = available_dates[-1]
+    navigation_state_key = None
+    date_state_keys = (
+        "ponderosa_light_fecha_unica",
+        "ponderosa_light_fecha_un_dia",
+        "ponderosa_light_fecha_inicio",
+        "ponderosa_light_fecha_fin",
+    )
+    for state_key in date_state_keys:
+        if state_key in st.session_state and st.session_state[state_key] not in available_dates:
+            del st.session_state[state_key]
+
+    with st.sidebar.expander("Fuente WIGA", expanded=True):
+        _sidebar_field_label("location", "Fuente comparada")
+        st.markdown(
+            f"""
+            <div class="sidebar-helper-text">
+                La comparación usa WIGA del {_format_block_display_name(selected_source_code)}.
+                MCI y APOGI salen de ECOWITT Ponderosa para cruzar los tres sensores sobre el mismo periodo.
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+    with st.sidebar.expander("Periodo", expanded=True):
+        if min_date == max_date:
+            fecha_unica = _date_input_with_state(
+                "Seleccionar fecha:",
+                default_value=max_date,
+                key="ponderosa_light_fecha_unica",
+                min_value=min_date,
+                max_value=max_date,
+                help_text=FILTER_HELP_TEXTS['fecha']
+            )
+            fecha_unica = _get_nearest_available_date(fecha_unica, available_dates)
+            selected_range = (fecha_unica, fecha_unica)
+            navigation_state_key = "ponderosa_light_fecha_unica"
+        else:
+            modo_fechas = st.radio(
+                "Modo de fechas:",
+                options=["Un día", "Varios días"],
+                horizontal=True,
+                key="ponderosa_light_modo_fechas",
+                help=FILTER_HELP_TEXTS['modo_fechas']
+            )
+            if modo_fechas == "Un día":
+                fecha_unica_default = _get_nearest_available_date(
+                    st.session_state.get("ponderosa_light_fecha_un_dia", max_date),
+                    available_dates
+                )
+                _sidebar_field_label("calendar", "Seleccionar fecha")
+                fecha_unica = _date_input_with_state(
+                    "Seleccionar fecha:",
+                    default_value=fecha_unica_default,
+                    key="ponderosa_light_fecha_un_dia",
+                    min_value=min_date,
+                    max_value=max_date,
+                    help_text=FILTER_HELP_TEXTS['fecha']
+                )
+                fecha_unica = _get_nearest_available_date(fecha_unica, available_dates)
+                selected_range = (fecha_unica, fecha_unica)
+                navigation_state_key = "ponderosa_light_fecha_un_dia"
+            else:
+                default_range_end = _get_sidebar_default_range_end(min_date, max_date, default_days=5)
+                fecha_inicio_default = _get_nearest_available_date(
+                    st.session_state.get("ponderosa_light_fecha_inicio", min_date),
+                    available_dates
+                )
+                fecha_fin_default = _get_nearest_available_date(
+                    st.session_state.get("ponderosa_light_fecha_fin", default_range_end),
+                    available_dates
+                )
+                _sidebar_field_label("calendar", "Fecha inicio")
+                fecha_inicio = _date_input_with_state(
+                    "Fecha inicio:",
+                    default_value=fecha_inicio_default,
+                    key="ponderosa_light_fecha_inicio",
+                    min_value=min_date,
+                    max_value=max_date,
+                    help_text=FILTER_HELP_TEXTS['fecha']
+                )
+                _sidebar_field_label("calendar", "Fecha fin")
+                fecha_fin = _date_input_with_state(
+                    "Fecha fin:",
+                    default_value=fecha_fin_default,
+                    key="ponderosa_light_fecha_fin",
+                    min_value=min_date,
+                    max_value=max_date,
+                    help_text=FILTER_HELP_TEXTS['fecha']
+                )
+                fecha_inicio = _get_nearest_available_date(fecha_inicio, available_dates)
+                fecha_fin = _get_nearest_available_date(fecha_fin, available_dates)
+                selected_range = _normalize_sidebar_date_range(fecha_inicio, fecha_fin, min_date, max_date)
+
+    filtered_df = comparison_df[comparison_df['Fecha_Filtro'].between(*selected_range)].copy()
+    if filtered_df.empty:
+        st.warning("No hay datos APOGI / MCI / WIGA en el periodo seleccionado.")
+        st.stop()
+
+    _render_selected_period_banner(
+        selected_range,
+        min_fecha=min_date,
+        max_fecha=max_date,
+        navigation_state_key=navigation_state_key,
+        title_text='Periodo APOGI / MCI / WIGA',
+        available_dates=available_dates
+    )
+
+    block_label = _format_block_display_name(selected_source_code)
+    st.markdown("## La Ponderosa - APOGI / MCI / WIGA")
+    st.caption(f"Comparación de luz y radiación para {block_label}. WIGA usa Datos_Variables; MCI y APOGI usan ECOWITT Ponderosa.")
+    _render_chart_explanation(
+        'Origen de los valores',
+        (
+            f"WIGA toma la radiación PAR real del Bloque 35 y calcula LUX estimado con PAR x {PAR_TO_LUX_FACTOR:.0f}. "
+            f"MCI toma la radiación PAR del archivo ECOWITT Ponderosa y calcula LUX con el mismo factor. "
+            f"APOGI toma la columna luz_lux y calcula radiación PAR estimada dividiendo entre {PAR_TO_LUX_FACTOR:.0f}."
+        ),
+        accent=BRAND_COLORS['hero'],
+        kicker='Cálculo'
+    )
+
+    comparison_resolution = st.radio(
+        "Resolución de APOGI / MCI / WIGA:",
+        options=COMPARISON_RESOLUTION_OPTIONS,
+        horizontal=True,
+        key="ponderosa_light_resolution",
+        help="Promedio agrupa todos los sensores cada 30 minutos; punto por punto usa WIGA como ancla cruda y toma el registro más cercano de MCI/APOGI; WIGA 30 min toma WIGA por media hora y busca los registros cercanos de MCI/APOGI."
+    )
+    show_details = st.checkbox(
+        "Cargar detalle individual APOGI / MCI / WIGA",
+        key="mostrar_ponderosa_light_detalles",
+        help=FILTER_HELP_TEXTS['graficas_detalladas']
+    )
+
+    comparisons = {}
+    for variable in PONDEROSA_LIGHT_VARIABLES:
+        comparison = _build_ponderosa_light_comparison(filtered_df, variable, selected_range, comparison_resolution)
+        comparison = comparison.dropna(how='all', subset=list(PONDEROSA_LIGHT_SENSOR_NAMES)) if not comparison.empty else comparison
+        comparisons[variable] = comparison
+        chart = _make_ponderosa_light_comparison_chart(comparison, variable, selected_range, comparison_resolution)
+        if chart is None:
+            st.info(f"No hay suficientes datos para graficar {PONDEROSA_LIGHT_VARIABLES[variable]['title'].lower()}.")
+            continue
+        _plotly_chart(chart)
+
+    table_mode = (
+        "Promedio de cada sensor en bloques de 30 minutos"
+        if comparison_resolution == COMPARISON_RESOLUTION_OPTIONS[0] else
+        "WIGA crudo con MCI/APOGI más cercanos"
+        if comparison_resolution == COMPARISON_RESOLUTION_OPTIONS[1] else
+        "WIGA 30 min con MCI/APOGI más cercanos"
+    )
+    if st.checkbox(
+        "Mostrar tabla comparativa de registros",
+        value=True,
+        key="mostrar_ponderosa_light_tabla",
+        help="Muestra fecha, hora, valores de los tres sensores y diferencias por variable."
+    ):
+        table = _build_ponderosa_light_comparison_table(filtered_df, selected_range, comparison_resolution)
+        if table.empty:
+            st.info("No hay datos suficientes para construir la tabla comparativa.")
+        else:
+            st.caption(f"Tabla calculada con: {table_mode}. Las diferencias se leen como sensor comparado menos WIGA o APOGI menos MCI.")
+            _dataframe(table, hide_index=True)
+
+    if show_details:
+        _render_ponderosa_light_individual_charts(comparisons, selected_range, comparison_resolution)
+
+    if st.checkbox(
+        "Cargar registros base APOGI / MCI / WIGA",
+        key="mostrar_ponderosa_light_registros",
         help=FILTER_HELP_TEXTS['registros']
     ):
         _dataframe(filtered_df.drop(columns=['Fecha_Filtro'], errors='ignore'), hide_index=True)
@@ -8617,7 +9319,7 @@ with st.sidebar.expander("Finca", expanded=True):
 dashboard_view_options = (
     ["Comparativa", "Solo WIGA", "Solo ECOWITT", "Varianza"]
     if selected_finca == 'Marly' else
-    ["WIGA con cortinas", "WIGA relacion ECOWITT", "Varianza", "Promedio", "WIGA", "ECOWITT", "Cortinas"]
+    ["WIGA con cortinas", "WIGA relacion ECOWITT", PONDEROSA_LIGHT_VIEW_NAME, "Varianza", "Promedio", "WIGA", "ECOWITT", "Cortinas"]
 )
 if st.session_state.get("modo_dashboard") not in dashboard_view_options:
     st.session_state["modo_dashboard"] = dashboard_view_options[0]
@@ -8634,7 +9336,7 @@ with st.sidebar.expander("Vista", expanded=True):
         help=(
             "Elige cómo quieres analizar Marly: comparativa, varianza o lecturas individuales por sensor."
             if selected_finca == 'Marly' else
-            "Elige la vista de Ponderosa: WIGA con cortinas, relación WIGA / ECOWITT, varianza, promedio, WIGA, ECOWITT o cortinas."
+            "Elige la vista de Ponderosa: WIGA con cortinas, relación WIGA / ECOWITT, APOGI / MCI / WIGA, varianza, promedio, WIGA, ECOWITT o cortinas."
         )
     )
 
@@ -8674,6 +9376,14 @@ if dashboard_mode == "WIGA relacion ECOWITT":
         "Cargando comparativa WIGA / ECOWITT de Ponderosa..."
     ):
         _render_ponderosa_ecowitt_dashboard(_df_variables_all, _df_cortinas_all, selected_finca)
+    st.stop()
+
+if dashboard_mode == PONDEROSA_LIGHT_VIEW_NAME:
+    with _loading_context(
+        st.session_state.get("ponderosa_light_modo_fechas") == "Varios días",
+        "Cargando comparativa APOGI / MCI / WIGA de Ponderosa..."
+    ):
+        _render_ponderosa_apogi_mci_wiga_dashboard(_df_variables_all, _df_cortinas_all, selected_finca)
     st.stop()
 
 if dashboard_mode == "ECOWITT":
