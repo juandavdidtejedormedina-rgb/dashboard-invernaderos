@@ -8078,6 +8078,10 @@ with st.sidebar.expander("Vista", expanded=True):
         )
     )
 
+previous_dashboard_mode = st.session_state.get("_last_dashboard_mode")
+force_all_correlacion_series = dashboard_mode == "WIGA con bloques" and previous_dashboard_mode != dashboard_mode
+st.session_state["_last_dashboard_mode"] = dashboard_mode
+
 if selected_finca == 'Marly':
     with _loading_context(
         st.session_state.get("marley_modo_fechas") == "Varios días",
@@ -8488,7 +8492,7 @@ with st.sidebar.expander("Series visibles", expanded=True):
             tuple(available_correlacion_vars)
         )
         previous_context = st.session_state.get('variables_correlacion_context')
-        if previous_context != current_context:
+        if previous_context != current_context or force_all_correlacion_series:
             _reset_correlacion_selector(available_correlacion_vars)
             st.session_state['variables_correlacion_context'] = current_context
 
