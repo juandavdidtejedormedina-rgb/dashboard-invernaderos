@@ -3216,13 +3216,13 @@ def _build_cortina_apertura_profile(df_cortinas, elemento, config):
                     'Hora': inicio_apertura,
                     'Apertura': current_level,
                     'Evento': 'Inicio Apertura',
-                    'Detalle': f"Objetivo: {target_open_level:.0f}% abierto | Duración: {duracion_ap:.0f} min"
+                    'Detalle': f"Objetivo: {target_open_level:.0f}% abierto | Duración apertura: {duracion_ap:.0f} min"
                 })
                 profile.append({
                     'Hora': fin_apertura,
                     'Apertura': target_open_level,
                     'Evento': 'Fin Apertura',
-                    'Detalle': f"Nivel alcanzado: {target_open_level:.0f}% abierto"
+                    'Detalle': f"Nivel alcanzado: {target_open_level:.0f}% abierto | Inicio: {inicio_apertura.strftime('%H:%M')} | Fin: {fin_apertura.strftime('%H:%M')}"
                 })
                 current_level = target_open_level
 
@@ -3234,14 +3234,14 @@ def _build_cortina_apertura_profile(df_cortinas, elemento, config):
                     'Hora': inicio_cierre,
                     'Apertura': current_level,
                     'Evento': 'Inicio Cierre',
-                    'Detalle': f"Cierre: {cierre_pct:.0f}% | Duración: {duracion_ci:.0f} min"
-                    if cierre_pct is not None else f"Duración: {duracion_ci:.0f} min"
+                    'Detalle': f"Cierre: {cierre_pct:.0f}% | Duración cierre: {duracion_ci:.0f} min"
+                    if cierre_pct is not None else f"Duración cierre: {duracion_ci:.0f} min"
                 })
                 profile.append({
                     'Hora': fin_cierre,
                     'Apertura': target_close_level,
                     'Evento': 'Fin Cierre',
-                    'Detalle': f"Nivel final: {target_close_level:.0f}% abierto"
+                    'Detalle': f"Nivel final: {target_close_level:.0f}% abierto | Inicio: {inicio_cierre.strftime('%H:%M')} | Fin: {fin_cierre.strftime('%H:%M')}"
                 })
                 current_level = target_close_level
 
@@ -3297,6 +3297,81 @@ def _get_culatas_observation_by_day(datos_cortinas, block_label=None):
         })
 
     return observations
+
+
+def _format_cortina_time(value):
+    if pd.isna(value):
+        return 'Sin dato'
+    if hasattr(value, 'strftime'):
+        return value.strftime('%H:%M')
+    timestamp = pd.to_datetime(value, errors='coerce')
+    if pd.isna(timestamp):
+        return str(value)
+    return timestamp.strftime('%H:%M')
+
+
+def _format_cortina_duration(value):
+    numeric_value = pd.to_numeric(pd.Series([value]), errors='coerce').iloc[0]
+    if pd.isna(numeric_value):
+        return 'Sin dato'
+    return f"{float(numeric_value):.0f} min"
+
+
+def _format_cortina_pct(value):
+    pct_value = _normalize_percent_value(value)
+    if pct_value is None:
+        return 'Sin dato'
+    return f"{pct_value:.0f}%"
+
+
+def _build_cortina_operation_rows(datos_cortinas, selected_motors=None):
+    if datos_cortinas.empty:
+        return pd.DataFrame()
+
+    selected_set = set(selected_motors or [])
+    rows = []
+    for _, record in datos_cortinas.sort_values('Fecha').iterrows():
+        fecha = record.get('Fecha')
+        fecha_label = _format_info_day_label(fecha)
+        for side_label, config in SIDE_CONFIGS.items():
+            motor_name = _normalize_cortina_name(record.get(config['element_col']))
+            if not motor_name or (selected_set and motor_name not in selected_set):
+                continue
+
+            note_value = record.get(config['note_col'])
+            note_text = '' if pd.isna(note_value) else str(note_value).strip()
+            if note_text.lower() in {'nan', 'none'}:
+                note_text = ''
+
+            rows.append({
+                'Fecha': fecha_label,
+                'Cortina': VARIABLE_SELECTOR_LABELS.get(motor_name, motor_name),
+                'Lado': side_label,
+                'Inicio apertura': _format_cortina_time(record.get(config['open_time_col'])),
+                'Duración apertura': _format_cortina_duration(record.get(config['open_duration_col'])),
+                'Apertura objetivo': _format_cortina_pct(record.get(config['open_pct_col'])),
+                'Inicio cierre': _format_cortina_time(record.get(config['close_time_col'])),
+                'Duración cierre': _format_cortina_duration(record.get(config['close_duration_col'])),
+                'Cierre registrado': _format_cortina_pct(record.get(config['close_pct_col'])),
+                'Comentario': note_text or 'Sin comentario'
+            })
+
+    return pd.DataFrame(rows)
+
+
+def _render_cortina_operation_summary(datos_cortinas, selected_motors):
+    operation_rows = _build_cortina_operation_rows(datos_cortinas, selected_motors)
+    if operation_rows.empty:
+        st.info("No hay eventos operativos de apertura o cierre para las cortinas seleccionadas.")
+        return
+
+    st.markdown("### Detalle operativo de cortinas")
+    _render_chart_explanation(
+        "Aperturas y cierres registrados",
+        "Esta tabla resume cuándo empezó a abrir o cerrar cada frente o puerta, cuánto duró el movimiento, el porcentaje objetivo y los comentarios registrados en el Excel.",
+        accent=BRAND_COLORS['hero']
+    )
+    _dataframe(operation_rows, hide_index=True)
 
 
 def _get_available_cortina_vars(datos_cortinas):
@@ -5361,20 +5436,23 @@ def _build_cortinas_only_chart(datos_cortinas_sel, fecha_periodo, selected_motor
             continue
 
         profile_times.extend(pd.to_datetime(df_state['Hora'], errors='coerce').dropna().tolist())
-        color = CORTINA_COLORS.get(motor_name, BRAND_COLORS['hero'])
-        fig.add_trace(go.Scatter(
-            x=df_state['Hora'],
-            y=df_state['Apertura'],
-            name=VARIABLE_SELECTOR_LABELS.get(motor_name, motor_name),
-            mode='lines+markers',
-            line=dict(color=color, width=3, shape='hv'),
-            marker=dict(size=5, color=color),
-            hovertemplate=(
-                f'<b>%{{x|{hover_time_format}}}</b><br>'
-                f'{VARIABLE_SELECTOR_LABELS.get(motor_name, motor_name)}: %{{y:.0f}}% abierto'
-                '<extra></extra>'
-            )
-        ))
+    color = CORTINA_COLORS.get(motor_name, BRAND_COLORS['hero'])
+    fig.add_trace(go.Scatter(
+        x=df_state['Hora'],
+        y=df_state['Apertura'],
+        name=VARIABLE_SELECTOR_LABELS.get(motor_name, motor_name),
+        mode='lines+markers',
+        line=dict(color=color, width=3, shape='hv'),
+        marker=dict(size=5, color=color),
+        customdata=df_state[['Evento', 'Detalle']],
+        hovertemplate=(
+            f'<b>%{{x|{hover_time_format}}}</b><br>'
+            f'{VARIABLE_SELECTOR_LABELS.get(motor_name, motor_name)}: %{{y:.0f}}% abierto'
+            '<br>%{customdata[0]}'
+            '<br>%{customdata[1]}'
+            '<extra></extra>'
+        )
+    ))
 
     if not fig.data:
         return None
@@ -5405,13 +5483,17 @@ def _build_cortinas_only_chart(datos_cortinas_sel, fecha_periodo, selected_motor
             gridcolor="rgba(76, 70, 120, 0.07)",
             zeroline=False,
         ),
-        yaxis=dict(
-            title='Apertura (%)',
-            range=[0, 100],
-            showgrid=True,
-            gridcolor="rgba(76, 70, 120, 0.07)",
-            zeroline=False,
-        ),
+    yaxis=dict(
+        title='Apertura (%)',
+        range=[-8, 105],
+        showgrid=True,
+        gridcolor="rgba(76, 70, 120, 0.07)",
+        zeroline=True,
+        zerolinecolor='rgba(84, 83, 134, 0.35)',
+        tickmode='array',
+        tickvals=[0, 25, 50, 75, 100],
+        ticksuffix='%',
+    ),
     )
     return fig
 
@@ -5737,6 +5819,12 @@ def _render_ponderosa_cortinas_dashboard(df_cortinas_all, selected_finca):
         if st.session_state.get(f"ponderosa_cortina_visible_{_build_normalized_text_key(motor_name).replace(' ', '_')}", True)
     ]
     block_label = _format_block_display_name(selected_block_code)
+    rango_multiple = fecha_inicio != fecha_fin
+    block_modification = _get_block_modification(block_label)
+    culatas_observation = _get_culatas_daily_observation(filtered_df, block_label)
+    culatas_by_day = _get_culatas_observation_by_day(filtered_df, block_label)
+    daily_annotations = _get_daily_annotations(filtered_df)
+    annotations_by_day = _get_annotations_by_day(filtered_df)
     _render_selected_period_banner(
         selected_range,
         min_fecha=min_date,
@@ -5748,23 +5836,36 @@ def _render_ponderosa_cortinas_dashboard(df_cortinas_all, selected_finca):
 
     st.markdown(f"## La Ponderosa - Solo bloques | {block_label}")
     st.caption("Vista dedicada al comportamiento de frentes y puertas registrado en Registro_Cortinas.")
-    tab_chart, tab_records = st.tabs(["Comportamiento", "Registros"])
-    with tab_chart:
-        if not selected_motors:
-            st.warning("Selecciona al menos una cortina para graficar.")
+    if not selected_motors:
+        st.warning("Selecciona al menos una cortina para graficar.")
+    else:
+        chart = _build_cortinas_only_chart(filtered_df, selected_range, selected_motors, block_label=block_label)
+        if chart is None:
+            st.warning("No hay información de apertura para las cortinas seleccionadas.")
         else:
-            chart = _build_cortinas_only_chart(filtered_df, selected_range, selected_motors, block_label=block_label)
-            if chart is None:
-                st.warning("No hay información de apertura para las cortinas seleccionadas.")
-            else:
-                _render_chart_explanation(
-                    "Comportamiento de cortinas",
-                    "Esta vista muestra únicamente la apertura de frentes y puertas del bloque seleccionado, sin mezclarla con variables WIGA o ECOWITT.",
-                    accent=BRAND_COLORS['hero']
-                )
-                _plotly_chart(chart)
+            _plotly_chart(chart)
+            _render_chart_explanation(
+                "Comportamiento de cortinas",
+                "El eje inicia por debajo de cero para que los periodos cerrados se lean con claridad. Pasa el cursor por cada punto para ver inicio de apertura, duración y cierre cuando esa información exista en el registro.",
+                accent=BRAND_COLORS['hero']
+            )
 
-    with tab_records:
+    _render_info_panels(
+        block_label,
+        block_modification,
+        culatas_observation,
+        daily_annotations,
+        rango_multiple,
+        annotations_by_day=annotations_by_day,
+        culatas_by_day=culatas_by_day
+    )
+    _render_cortina_operation_summary(filtered_df, selected_motors)
+
+    if st.checkbox(
+        "Cargar registros completos de cortinas",
+        key="mostrar_ponderosa_cortinas_registros",
+        help=FILTER_HELP_TEXTS['registros']
+    ):
         _dataframe(filtered_df, hide_index=True)
 
     st.stop()
