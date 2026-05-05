@@ -191,7 +191,7 @@ FILTER_HELP_TEXTS = {
     'comparar_almacen': 'Muestra la serie equivalente de la Estación externa para cada variable ambiental seleccionada.',
     'aperturas_ideales': 'Superpone la apertura ideal calculada sobre las series de frentes y puertas cuando exista la referencia del bloque.',
     'graficas_detalladas': 'Carga las gráficas secundarias solo cuando necesites revisar cada variable por separado.',
-    'registros': 'Carga las tablas de registros solo cuando necesites inspeccionar los datos crudos.'
+    'registros': 'Carga las tablas de registros cuando necesites inspeccionar los datos crudos.'
 }
 VARIABLE_FILTER_HELP = {
     'Temperatura': 'Muestra la temperatura del bloque seleccionado.',
