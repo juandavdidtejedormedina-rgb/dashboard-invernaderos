@@ -383,7 +383,7 @@ DASHBOARD_MEDIA = {
         'location_query': "Finca Marly - The Elite Flower SAS CI Madrid Road Facatativa Cundinamarca Colombia",
     }
 }
-LAZY_LOAD_MEDIA = false
+LAZY_LOAD_MEDIA = True
 DETAIL_CHARTS_DEFAULT = False
 MARLEY_DETAIL_CHARTS_DEFAULT = False
 MARLEY_RECORDS_DEFAULT = False
