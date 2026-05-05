@@ -168,7 +168,7 @@ VARIABLE_SELECTOR_LABELS = {
     'PUERTA 2': 'Puerta 2'
 }
 FILTER_HELP_TEXTS = {
-    'modo_dashboard': 'Elige la vista principal: WIGA, bloques, WIGA con bloques, ECOWITT, comparación, varianza o promedio.',
+    'modo_dashboard': 'Elige la vista principal: WIGA con cortinas, relación WIGA / ECOWITT, varianza, promedio o fuentes individuales.',
     'finca': 'Selecciona la finca que quieres explorar en el dashboard. Los bloques y fechas disponibles se ajustan según esa finca.',
     'modo_fechas': 'Define si quieres analizar un solo día o un rango de varios días.',
     'fecha': 'Selecciona la fecha o el rango que se usará para filtrar los registros visibles en la vista actual.',
@@ -8057,7 +8057,7 @@ with st.sidebar.expander("Finca", expanded=True):
 dashboard_view_options = (
     ["Comparativa", "Solo WIGA", "Solo ECOWITT", "Varianza"]
     if selected_finca == 'Marly' else
-    ["Solo WIGA", "Solo bloques", "WIGA con bloques", "Solo ECOWITT", "WIGA vs ECOWITT", "Varianza", "Promedio"]
+    ["WIGA con cortinas", "WIGA relacion ECOWITT", "Varianza", "Promedio", "WIGA", "ECOWITT", "Cortinas"]
 )
 if st.session_state.get("modo_dashboard") not in dashboard_view_options:
     st.session_state["modo_dashboard"] = dashboard_view_options[0]
@@ -8074,12 +8074,12 @@ with st.sidebar.expander("Vista", expanded=True):
         help=(
             "Elige cómo quieres analizar Marly: comparativa, varianza o lecturas individuales por sensor."
             if selected_finca == 'Marly' else
-            "Elige la vista de Ponderosa: WIGA, bloques, WIGA con bloques, ECOWITT, comparación, varianza o promedio."
+            "Elige la vista de Ponderosa: WIGA con cortinas, relación WIGA / ECOWITT, varianza, promedio, WIGA, ECOWITT o cortinas."
         )
     )
 
 previous_dashboard_mode = st.session_state.get("_last_dashboard_mode")
-force_all_correlacion_series = dashboard_mode == "WIGA con bloques" and previous_dashboard_mode != dashboard_mode
+force_all_correlacion_series = dashboard_mode == "WIGA con cortinas" and previous_dashboard_mode != dashboard_mode
 st.session_state["_last_dashboard_mode"] = dashboard_mode
 
 if selected_finca == 'Marly':
@@ -8092,7 +8092,7 @@ if selected_finca == 'Marly':
 
 _df_variables_all, _df_cortinas_all = cargar_dashboard_completo()
 
-if dashboard_mode == "Solo WIGA":
+if dashboard_mode == "WIGA":
     with _loading_context(
         st.session_state.get("ponderosa_wiga_only_modo_fechas") == "Varios días",
         "Cargando variables WIGA de Ponderosa..."
@@ -8100,7 +8100,7 @@ if dashboard_mode == "Solo WIGA":
         _render_ponderosa_wiga_values_dashboard(_df_variables_all, _df_cortinas_all, selected_finca)
     st.stop()
 
-if dashboard_mode == "Solo bloques":
+if dashboard_mode == "Cortinas":
     with _loading_context(
         st.session_state.get("ponderosa_cortinas_modo_fechas") == "Varios días",
         "Cargando comportamiento de bloques..."
@@ -8108,7 +8108,7 @@ if dashboard_mode == "Solo bloques":
         _render_ponderosa_cortinas_dashboard(_df_cortinas_all, selected_finca)
     st.stop()
 
-if dashboard_mode == "WIGA vs ECOWITT":
+if dashboard_mode == "WIGA relacion ECOWITT":
     with _loading_context(
         st.session_state.get("ponderosa_ecowitt_modo_fechas") == "Varios días",
         "Cargando comparativa WIGA / ECOWITT de Ponderosa..."
