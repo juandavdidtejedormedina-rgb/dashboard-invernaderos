@@ -3924,40 +3924,43 @@ def _tighten_comparison_y_axis(comparison, sensor_names, y_axis, variable_name):
     normalized_variable = _build_normalized_text_key(variable_name)
 
     if 'humedad' in normalized_variable:
-        padding = max(1.2, spread * 0.08)
+        padding = max(0.6, spread * 0.035)
         axis_min = max(0, vmin - padding)
         axis_max = min(100, vmax + padding)
-        dtick = 1 if (axis_max - axis_min) <= 12 else 2 if (axis_max - axis_min) <= 25 else 5
-        y_axis.update({'range': [round(axis_min, 1), round(axis_max, 1)], 'dtick': dtick, 'ticksuffix': '%'})
+        axis_span = axis_max - axis_min
+        dtick = 0.5 if axis_span <= 8 else 1 if axis_span <= 18 else 2 if axis_span <= 35 else 5
+        y_axis.update({'range': [round(axis_min, 1), round(axis_max, 1)], 'dtick': dtick, 'ticksuffix': '%', 'tickformat': '.1f'})
         return y_axis
 
     if 'temperatura' in normalized_variable:
-        padding = max(0.35, spread * 0.08)
+        padding = max(0.15, spread * 0.035)
         axis_min = vmin - padding
         axis_max = vmax + padding
-        dtick = 0.5 if (axis_max - axis_min) <= 5 else 1 if (axis_max - axis_min) <= 12 else 2
-        y_axis.update({'range': [round(axis_min, 2), round(axis_max, 2)], 'dtick': dtick})
+        axis_span = axis_max - axis_min
+        dtick = 0.2 if axis_span <= 3 else 0.5 if axis_span <= 7 else 1 if axis_span <= 15 else 2
+        y_axis.update({'range': [round(axis_min, 2), round(axis_max, 2)], 'dtick': dtick, 'tickformat': '.2f'})
         return y_axis
 
     if 'gramos' in normalized_variable:
-        padding = max(0.18, spread * 0.08)
+        padding = max(0.08, spread * 0.035)
         axis_min = max(0, vmin - padding)
         axis_max = vmax + padding
-        dtick = 0.2 if (axis_max - axis_min) <= 2 else 0.5 if (axis_max - axis_min) <= 5 else 1
-        y_axis.update({'range': [round(axis_min, 2), round(axis_max, 2)], 'dtick': dtick})
+        axis_span = axis_max - axis_min
+        dtick = 0.1 if axis_span <= 1.2 else 0.2 if axis_span <= 2.5 else 0.5 if axis_span <= 6 else 1
+        y_axis.update({'range': [round(axis_min, 2), round(axis_max, 2)], 'dtick': dtick, 'tickformat': '.2f'})
         return y_axis
 
     if 'radiacion par' in normalized_variable:
-        padding = max(12, spread * 0.06)
+        padding = max(5, spread * 0.035)
         axis_min = max(0, vmin - padding)
         axis_max = vmax + padding
         axis_span = max(axis_max - axis_min, 1)
-        dtick = 10 if axis_span <= 120 else 25 if axis_span <= 350 else 50 if axis_span <= 900 else 100
-        y_axis.update({'range': [round(axis_min, 1), round(axis_max, 1)], 'dtick': dtick})
+        dtick = 5 if axis_span <= 80 else 10 if axis_span <= 180 else 25 if axis_span <= 450 else 50 if axis_span <= 900 else 100
+        y_axis.update({'range': [round(axis_min, 1), round(axis_max, 1)], 'dtick': dtick, 'tickformat': '.1f'})
         return y_axis
 
-    padding = max(spread * 0.08, 1)
-    y_axis.update({'range': [round(vmin - padding, 2), round(vmax + padding, 2)]})
+    padding = max(spread * 0.035, 0.25)
+    y_axis.update({'range': [round(vmin - padding, 2), round(vmax + padding, 2)], 'tickformat': '.2f'})
     return y_axis
 
 
@@ -4043,6 +4046,7 @@ def _make_marley_comparison_chart(comparison, variable, selected_range, resoluti
             range=y_axis.get('range'),
             dtick=y_axis.get('dtick'),
             ticksuffix=y_axis.get('ticksuffix', ''),
+            tickformat=y_axis.get('tickformat'),
         ),
     )
     return fig
@@ -5292,6 +5296,7 @@ def _make_ponderosa_comparison_chart(comparison, variable, selected_range, resol
             range=y_axis.get('range'),
             dtick=y_axis.get('dtick'),
             ticksuffix=y_axis.get('ticksuffix', ''),
+            tickformat=y_axis.get('tickformat'),
         ),
     )
     return fig
