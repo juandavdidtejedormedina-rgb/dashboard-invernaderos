@@ -102,16 +102,24 @@ def _render_dashboard_media(selected_finca, lazy_load=False):
     video_url = media_config.get('video_urls') or media_config.get('video_url', '')
     location_query = str(media_config.get('location_query', '')).strip()
 
+    # VIDEO INTRODUCTORIO: carga automático y reproduce varios videos en bucle
     if video_url:
         with st.expander("Video introductorio", expanded=True):
-            youtube_source_url = video_url[0] if isinstance(video_url, (list, tuple)) else video_url
-            youtube_embed_url = _youtube_embed_url(youtube_source_url)
 
-            if youtube_embed_url:
-                st.iframe(youtube_embed_url, height=430)
+            # Si es una lista de videos, los reproduce uno tras otro en bucle
+            if isinstance(video_url, (list, tuple)):
+                _render_autoplay_video(video_url, height=430)
+
+            # Si es un solo video, lo reproduce normalmente
             else:
-                _render_autoplay_video(video_url)
+                youtube_embed_url = _youtube_embed_url(video_url)
 
+                if youtube_embed_url:
+                    st.iframe(youtube_embed_url, height=430)
+                else:
+                    _render_autoplay_video(video_url, height=430)
+
+    # UBICACIÓN
     if location_query:
         with st.expander("Ubicación", expanded=False):
             st.iframe(_google_maps_embed_url(location_query), height=430)
@@ -367,16 +375,16 @@ DASHBOARD_MEDIA = {
         'location_query': "La Ponderosa - The Elite Flower SAS CI Madrid Cundinamarca Colombia",
     },
     'Marly': {
-        'video_urls': [
-            "https://raw.githubusercontent.com/juandavdidtejedormedina-rgb/dashboard-invernaderos/277ebb73478df2c61271154170df491f8375f103/video%201.mp4",
-            "https://raw.githubusercontent.com/juandavdidtejedormedina-rgb/dashboard-invernaderos/277ebb73478df2c61271154170df491f8375f103/video%202.mp4",
-            "https://raw.githubusercontent.com/juandavdidtejedormedina-rgb/dashboard-invernaderos/277ebb73478df2c61271154170df491f8375f103/video%203.mp4",
-            "https://raw.githubusercontent.com/juandavdidtejedormedina-rgb/dashboard-invernaderos/277ebb73478df2c61271154170df491f8375f103/video%204.mp4",
-            "https://raw.githubusercontent.com/juandavdidtejedormedina-rgb/dashboard-invernaderos/277ebb73478df2c61271154170df491f8375f103/video%205.mp4",
-            "https://raw.githubusercontent.com/juandavdidtejedormedina-rgb/dashboard-invernaderos/277ebb73478df2c61271154170df491f8375f103/video%206.mp4",
-        ],
-        'location_query': "Finca Marly - The Elite Flower SAS CI Madrid Road Facatativa Cundinamarca Colombia",
-    }
+    'video_urls': [
+        "https://raw.githubusercontent.com/juandavdidtejedormedina-rgb/dashboard-invernaderos/277ebb73478df2c61271154170df491f8375f103/video%201.mp4",
+        "https://raw.githubusercontent.com/juandavdidtejedormedina-rgb/dashboard-invernaderos/277ebb73478df2c61271154170df491f8375f103/video%202.mp4",
+        "https://raw.githubusercontent.com/juandavdidtejedormedina-rgb/dashboard-invernaderos/277ebb73478df2c61271154170df491f8375f103/video%203.mp4",
+        "https://raw.githubusercontent.com/juandavdidtejedormedina-rgb/dashboard-invernaderos/277ebb73478df2c61271154170df491f8375f103/video%204.mp4",
+        "https://raw.githubusercontent.com/juandavdidtejedormedina-rgb/dashboard-invernaderos/277ebb73478df2c61271154170df491f8375f103/video%205.mp4",
+        "https://raw.githubusercontent.com/juandavdidtejedormedina-rgb/dashboard-invernaderos/277ebb73478df2c61271154170df491f8375f103/video%206.mp4",
+    ],
+    'location_query': "Finca Marly - The Elite Flower SAS CI Madrid Road Facatativa Cundinamarca Colombia",
+}
 }
 LAZY_LOAD_MEDIA = False
 DETAIL_CHARTS_DEFAULT = False
