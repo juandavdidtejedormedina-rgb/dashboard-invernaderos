@@ -251,6 +251,28 @@ PONDEROSA_ECOWITT_DETAILS_DEFAULT = False
 PAR_TO_LUX_FACTOR = 54.0
 PONDEROSA_LIGHT_SENSOR_NAMES = ("WIGA", "MCI", "APOGEE")
 PONDEROSA_LIGHT_VIEW_NAME = "APOGEE MCI WIGGA"
+PONDEROSA_VIEW_GROUPS = {
+    "Comparativas": ["WIGA con cortinas", "WIGA relacion ECOWITT", PONDEROSA_LIGHT_VIEW_NAME],
+    "Análisis": ["Varianza", "Promedio"],
+    "Fuentes individuales": ["WIGA", "ECOWITT", "APOGEE", "Cortinas"],
+}
+MARLY_VIEW_GROUPS = {
+    "Comparativas": ["Comparativa"],
+    "Análisis": ["Varianza", "Promedio"],
+    "Fuentes individuales": ["Solo WIGA", "Solo ECOWITT"],
+}
+VIEW_DISPLAY_LABELS = {
+    "WIGA relacion ECOWITT": "WIGA relación ECOWITT",
+    PONDEROSA_LIGHT_VIEW_NAME: "APOGEE / MCI / WIGA",
+    "Comparativa": "WIGA relación ECOWITT",
+    "Solo WIGA": "WIGA",
+    "Solo ECOWITT": "ECOWITT",
+}
+PPFD_HELP_TEXT = (
+    "PPFD significa Photosynthetic Photon Flux Density: mide el flujo de fotones de luz PAR "
+    "útiles para fotosíntesis que llegan a un metro cuadrado cada segundo. En el dashboard se "
+    "muestra como PPFD (PAR, µmol m-2 s-1)."
+)
 MARLEY_SHEETS = {
     "WIGA": ["WIGGA MONTAÑA", "WIGA MARLEY"],
     "ECOWITT": ["ECOWITT MONTAÑA", "ECOWIT MARLEY"],
@@ -352,14 +374,14 @@ PONDEROSA_LIGHT_VARIABLES = {
     "LUX": {
         "title": "Comparativa de LUX",
         "unit": "lux",
-        "colors": {"WIGA": "#B9832F", "MCI": "#5AA6A6", "APOGEE": "#D39A58"},
-        "accent": "#B9832F",
+        "colors": {"WIGA": "#5E5AAE", "MCI": "#00A6A6", "APOGEE": "#E07A2F"},
+        "accent": "#5E5AAE",
     },
     "Radiación PAR": {
         "title": "Comparativa de PPFD (PAR)",
         "unit": "PPFD µmol m-2 s-1",
-        "colors": {"WIGA": "#6BEA5B", "MCI": "#524B82", "APOGEE": "#4E8D7C"},
-        "accent": "#6BEA5B",
+        "colors": {"WIGA": "#5E5AAE", "MCI": "#00A6A6", "APOGEE": "#E07A2F"},
+        "accent": "#5E5AAE",
     },
 }
 MARLEY_CANONICAL_COLUMNS = {
@@ -2303,6 +2325,17 @@ def _dataframe(data, **kwargs):
     st.dataframe(data, width='stretch', **kwargs)
 
 
+def _format_dashboard_view_option(view_name):
+    return VIEW_DISPLAY_LABELS.get(view_name, view_name)
+
+
+def _get_view_group_for_mode(view_groups, mode):
+    for group_name, group_options in view_groups.items():
+        if mode in group_options:
+            return group_name
+    return next(iter(view_groups))
+
+
 def _format_variable_display_title(title):
     clean_title = str(title or "").replace("Comparativa de ", "").strip()
     if 'ppfd' in _build_normalized_text_key(clean_title):
@@ -4030,6 +4063,7 @@ def _render_difference_table_30min(
 ):
     show_table = st.checkbox(
         "Mostrar tabla de diferencias cada 30 min",
+        value=True,
         key=state_key,
         help="Genera una tabla con WIGA, ECOWITT y la diferencia para temperatura, humedad y PPFD (PAR) en cada franja de 30 minutos."
     )
@@ -4728,6 +4762,73 @@ def _build_single_source_correlacion_frame(
     return merged
 
 
+def _get_table_variable_label(variable, variable_configs=None):
+    normalized_variable = _build_normalized_text_key(variable)
+    if 'radiacion par' in normalized_variable or 'ppfd' in normalized_variable:
+        return PPFD_DISPLAY_LABEL_ASCII
+
+    if variable in VARIABLE_LABELS:
+        return VARIABLE_LABELS[variable]
+
+    config = (variable_configs or {}).get(variable, {})
+    if config:
+        title = _format_variable_display_title(config.get('title', variable))
+        unit = str(config.get('unit', '')).strip()
+        if unit and unit not in title:
+            return f"{title} ({unit})"
+        return title
+
+    return str(variable)
+
+
+def _prepare_graphed_series_table(correlation_df, variables, variable_configs=None):
+    if correlation_df.empty or 'DateTime' not in correlation_df.columns:
+        return pd.DataFrame()
+
+    value_columns = [variable for variable in variables if variable in correlation_df.columns]
+    if not value_columns:
+        return pd.DataFrame()
+
+    table = correlation_df[['DateTime', *value_columns]].copy()
+    table['DateTime'] = pd.to_datetime(table['DateTime'], errors='coerce')
+    table = table.dropna(subset=['DateTime']).sort_values('DateTime').reset_index(drop=True)
+    table.insert(0, 'Fecha', table['DateTime'].dt.strftime('%Y-%m-%d'))
+    table.insert(1, 'Hora', table['DateTime'].dt.strftime('%H:%M'))
+    table = table.drop(columns=['DateTime'])
+    table = table.rename(
+        columns={
+            variable: _get_table_variable_label(variable, variable_configs)
+            for variable in value_columns
+        }
+    )
+    numeric_columns = table.select_dtypes(include='number').columns
+    if len(numeric_columns):
+        table[numeric_columns] = table[numeric_columns].round(2)
+    return table.dropna(how='all', subset=[column for column in table.columns if column not in ('Fecha', 'Hora')])
+
+
+def _render_graphed_series_table(
+    correlation_df,
+    variables,
+    variable_configs,
+    title,
+    resolution_label,
+    source_label=None,
+    expanded=False,
+):
+    table = _prepare_graphed_series_table(correlation_df, variables, variable_configs)
+    if table.empty:
+        return
+
+    with st.expander(title, expanded=expanded):
+        caption_source = f" para {source_label}" if source_label else ""
+        st.caption(
+            f"Datos usados por la gráfica{caption_source}. Resolución: {resolution_label}. "
+            "La tabla queda ordenada por fecha y hora para facilitar revisión o reporte."
+        )
+        _dataframe(table, hide_index=True)
+
+
 def _render_marley_individual_variable_charts(
     filtered_df,
     selected_range,
@@ -4801,13 +4902,18 @@ def _render_marley_dashboard(dashboard_mode):
             selected_range = (fecha_unica, fecha_unica)
             marley_navigation_state_key = "marley_fecha_unica"
         else:
-            modo_fechas = st.radio(
-                "Modo de fechas:",
-                options=["Un día", "Varios días"],
-                horizontal=True,
-                key="marley_modo_fechas",
-                help=FILTER_HELP_TEXTS['modo_fechas']
-            )
+            if dashboard_mode == "Varianza":
+                modo_fechas = "Varios días"
+                st.session_state["marley_modo_fechas"] = modo_fechas
+                st.caption("La varianza se calcula automáticamente con varios días.")
+            else:
+                modo_fechas = st.radio(
+                    "Modo de fechas:",
+                    options=["Un día", "Varios días"],
+                    horizontal=True,
+                    key="marley_modo_fechas",
+                    help=FILTER_HELP_TEXTS['modo_fechas']
+                )
             if modo_fechas == "Un día":
                 fecha_unica_default = _clamp_sidebar_date(
                     _coerce_sidebar_date(st.session_state.get("marley_fecha_un_dia", max_date), max_date),
@@ -4897,6 +5003,14 @@ def _render_marley_dashboard(dashboard_mode):
         if combined_chart is None:
             st.warning(f"No hay datos suficientes para graficar las variables de {source_name} en el periodo seleccionado.")
             st.stop()
+        graphed_frame = _build_single_source_correlacion_frame(
+            filtered_df,
+            selected_range,
+            list(MARLEY_VARIABLES.keys()),
+            source_name,
+            _build_marley_individual_series,
+            source_resolution,
+        )
 
         tab_general, tab_detail, tab_records = st.tabs(["Vista general", "Detalle individual", "Registros"])
         with tab_general:
@@ -4912,8 +5026,17 @@ def _render_marley_dashboard(dashboard_mode):
             )
 
         with tab_records:
+            _render_graphed_series_table(
+                graphed_frame,
+                list(MARLEY_VARIABLES.keys()),
+                MARLEY_VARIABLES,
+                f"Tabla de datos graficados - {source_name}",
+                source_resolution,
+                source_label=f"{source_name} Marly",
+                expanded=True,
+            )
             if st.checkbox(
-                f"Cargar registros consolidados de Marly - {source_name}",
+                f"Cargar registros crudos de Marly - {source_name}",
                 key=f"mostrar_marley_{source_name.lower()}_registros",
                 help=FILTER_HELP_TEXTS['registros']
             ):
@@ -4929,7 +5052,7 @@ def _render_marley_dashboard(dashboard_mode):
     st.caption("Lectura comparativa entre los sensores WIGA y ECOWITT, con opción de promedio por franja o lectura punto por punto.")
     _render_chart_explanation(
         'Cómo usar el análisis Marly',
-        'Elige una variable para comparar ambos sensores. Las tarjetas explican la diferencia general y las gráficas muestran cuándo se parecen, cuándo se separan y qué sensor mide más alto.',
+        f'Elige una variable para comparar ambos sensores. Las tarjetas explican la diferencia general y las gráficas muestran cuándo se parecen, cuándo se separan y qué sensor mide más alto. {PPFD_HELP_TEXT}',
         accent=BRAND_COLORS['hero'],
         kicker='Orientación'
     )
@@ -4947,8 +5070,8 @@ def _render_marley_dashboard(dashboard_mode):
         help=FILTER_HELP_TEXTS['graficas_detalladas']
     )
 
-    if dashboard_mode == "Varianza":
-        if selected_range[0] == selected_range[1]:
+    if dashboard_mode in ("Varianza", "Promedio"):
+        if dashboard_mode == "Varianza" and selected_range[0] == selected_range[1]:
             st.warning("Para ver la varianza en Marly selecciona un rango de al menos 2 días.")
             st.stop()
 
@@ -4958,20 +5081,25 @@ def _render_marley_dashboard(dashboard_mode):
             st.stop()
 
         _render_chart_explanation(
-            'Varianza por franja horaria',
-            'Esta gráfica muestra qué tanto cambió cada sensor dentro de una misma hora del día durante el rango seleccionado. Valores bajos indican lecturas más estables; valores altos indican mayor fluctuación.',
+            f'{dashboard_mode} por franja horaria',
+            (
+                'Esta gráfica muestra qué tanto cambió cada sensor dentro de una misma hora del día durante el rango seleccionado. Valores bajos indican lecturas más estables; valores altos indican mayor fluctuación.'
+                if dashboard_mode == "Varianza" else
+                'Esta gráfica resume el valor promedio de cada sensor por franja de 30 minutos para comparar el comportamiento típico dentro del periodo seleccionado.'
+            ),
             accent=MARLEY_VARIABLES[selected_variable]['accent']
         )
         _plotly_chart(_make_marley_hourly_metric_chart(grouped_metric, selected_variable, dashboard_mode))
-        with st.expander(f"Ver tabla dinámica de {dashboard_mode.lower()}", expanded=False):
+        with st.expander(f"Ver tabla ordenada de {dashboard_mode.lower()}", expanded=True):
+            st.caption("Tabla calculada con los mismos valores de la gráfica, ordenada por franja horaria.")
             _dataframe(_prepare_marley_hourly_metric_table(grouped_metric), hide_index=True)
         if show_marley_details:
             detail_resolution = st.radio(
                 "Resolución de las gráficas individuales:",
                 options=SOURCE_RESOLUTION_OPTIONS,
                 horizontal=True,
-                key="marley_varianza_detail_resolution",
-                help="La varianza se mantiene por franja horaria; este control aplica solo a las gráficas individuales con promedio, punto por punto o valor más cercano cada 30 minutos."
+                key=f"marley_{dashboard_mode.lower()}_detail_resolution",
+                help=f"El análisis de {dashboard_mode.lower()} se mantiene por franja horaria; este control aplica solo a las gráficas individuales con promedio, punto por punto o valor más cercano cada 30 minutos."
             )
             _render_marley_individual_variable_charts(
                 filtered_df,
@@ -6083,10 +6211,10 @@ def _get_ponderosa_light_y_axis_config(comparison, variable):
     span = max(vmax - vmin, 1)
 
     if variable == "LUX":
-        axis_max = vmax + max(span * 0.08, 500)
-        zero_padding = max(axis_max * 0.025, 500)
+        axis_max = vmax + max(span * 0.035, 300)
+        zero_padding = max(axis_max * 0.018, 250)
         axis_min = -zero_padding if vmin >= 0 else vmin - span * 0.08
-        dtick = 1000 if axis_max <= 12000 else 2500 if axis_max <= 30000 else 5000 if axis_max <= 70000 else 10000
+        dtick = 500 if axis_max <= 8000 else 1000 if axis_max <= 15000 else 2500 if axis_max <= 45000 else 5000
         return {
             'title': 'LUX',
             'range': [axis_min, axis_max],
@@ -6094,10 +6222,10 @@ def _get_ponderosa_light_y_axis_config(comparison, variable):
             'tickformat': ',.0f',
         }
 
-    axis_max = vmax + max(span * 0.08, 15)
-    zero_padding = max(axis_max * 0.025, 5)
+    axis_max = vmax + max(span * 0.035, 8)
+    zero_padding = max(axis_max * 0.018, 3)
     axis_min = -zero_padding if vmin >= 0 else vmin - span * 0.08
-    dtick = 10 if axis_max <= 120 else 25 if axis_max <= 350 else 50 if axis_max <= 900 else 100
+    dtick = 5 if axis_max <= 80 else 10 if axis_max <= 180 else 25 if axis_max <= 450 else 50 if axis_max <= 1200 else 100
     return {
         'title': PPFD_DISPLAY_LABEL_ASCII,
         'range': [axis_min, axis_max],
@@ -6126,6 +6254,7 @@ def _make_ponderosa_light_comparison_chart(comparison, variable, selected_range,
     )
 
     fig = go.Figure()
+    line_dashes = {"WIGA": "solid", "MCI": "dash", "APOGEE": "dot"}
     for sensor_name in PONDEROSA_LIGHT_SENSOR_NAMES:
         if sensor_name not in comparison.columns or comparison[sensor_name].dropna().empty:
             continue
@@ -6137,9 +6266,13 @@ def _make_ponderosa_light_comparison_chart(comparison, variable, selected_range,
                 y=source_df[sensor_name],
                 name=sensor_name,
                 mode='lines+markers' if point_mode or not multi_day_view else 'lines',
-                line=dict(color=config['colors'][sensor_name], width=2.2 if point_mode else 3),
-                marker=dict(size=4 if point_mode else 6),
-                opacity=0.86 if point_mode else 1,
+                line=dict(
+                    color=config['colors'][sensor_name],
+                    width=2.4 if point_mode else 3.3,
+                    dash=line_dashes.get(sensor_name, 'solid')
+                ),
+                marker=dict(size=4.5 if point_mode else 6.5, symbol='circle'),
+                opacity=0.9 if point_mode else 1,
                 connectgaps=False,
                 hovertemplate=(
                     "<b>%{x|%Y-%m-%d %H:%M}</b><br>"
@@ -6177,10 +6310,101 @@ def _make_ponderosa_light_comparison_chart(comparison, variable, selected_range,
             title=y_axis['title'],
             showgrid=True,
             gridcolor="rgba(76, 70, 120, 0.07)",
-            zeroline=False,
+            zeroline=True,
+            zerolinecolor="rgba(45, 48, 64, 0.45)",
+            zerolinewidth=1.2,
             range=y_axis.get('range'),
             dtick=y_axis.get('dtick'),
             tickformat=y_axis.get('tickformat'),
+        ),
+    )
+    return fig
+
+
+def _make_ponderosa_light_difference_chart(comparison, variable, selected_range, resolution_label):
+    if comparison.empty or 'WIGA' not in comparison.columns:
+        return None
+
+    config = PONDEROSA_LIGHT_VARIABLES[variable]
+    diff_df = comparison[['FechaHora', 'WIGA', 'MCI', 'APOGEE']].copy()
+    diff_df['MCI - WIGA'] = pd.to_numeric(diff_df['MCI'], errors='coerce') - pd.to_numeric(diff_df['WIGA'], errors='coerce')
+    diff_df['APOGEE - WIGA'] = pd.to_numeric(diff_df['APOGEE'], errors='coerce') - pd.to_numeric(diff_df['WIGA'], errors='coerce')
+    diff_df = diff_df.dropna(how='all', subset=['MCI - WIGA', 'APOGEE - WIGA'])
+    if diff_df.empty:
+        return None
+
+    time_axis = _get_marley_time_axis_config(diff_df)
+    start_date, end_date = selected_range
+    point_mode = resolution_label == COMPARISON_RESOLUTION_OPTIONS[1]
+    nearest_mode = resolution_label == COMPARISON_RESOLUTION_OPTIONS[2]
+    max_abs = float(pd.concat([
+        diff_df['MCI - WIGA'].abs().dropna(),
+        diff_df['APOGEE - WIGA'].abs().dropna(),
+    ], ignore_index=True).max())
+    axis_limit = max(max_abs * 1.12, 1)
+    if variable == 'LUX':
+        dtick = 250 if axis_limit <= 1500 else 500 if axis_limit <= 4000 else 1000 if axis_limit <= 12000 else 2500
+    else:
+        dtick = 5 if axis_limit <= 60 else 10 if axis_limit <= 150 else 25 if axis_limit <= 400 else 50
+
+    fig = go.Figure()
+    for diff_name, sensor_name in (('MCI - WIGA', 'MCI'), ('APOGEE - WIGA', 'APOGEE')):
+        fig.add_trace(
+            (go.Scattergl if point_mode and len(diff_df) > 250 else go.Scatter)(
+                x=diff_df['FechaHora'],
+                y=diff_df[diff_name],
+                name=diff_name,
+                mode='lines+markers',
+                line=dict(color=config['colors'][sensor_name], width=2.8, dash='dash' if sensor_name == 'MCI' else 'dot'),
+                marker=dict(size=5.5),
+                connectgaps=False,
+                hovertemplate=(
+                    "<b>%{x|%Y-%m-%d %H:%M}</b><br>"
+                    + f"{diff_name}: "
+                    + "%{y:+.2f} "
+                    + config['unit']
+                    + "<extra></extra>"
+                ),
+            )
+        )
+
+    fig.add_hline(y=0, line_width=1.4, line_dash='solid', line_color="rgba(45, 48, 64, 0.45)")
+    fig.update_layout(
+        title=dict(
+            text=(
+                f"Diferencia de {config['title'].replace('Comparativa de ', '')} contra WIGA"
+                + (" - punto por punto" if point_mode else " - sensores cercanos" if nearest_mode else " - 30 min")
+            ),
+            x=0,
+            xanchor='left'
+        ),
+        height=330,
+        margin=dict(l=30, r=30, t=70, b=32),
+        paper_bgcolor="rgba(255,255,255,0)",
+        plot_bgcolor="rgba(250,248,243,0.72)",
+        hovermode='x unified',
+        template='plotly_white',
+        legend=dict(orientation='h', yanchor='bottom', y=1.02, xanchor='left', x=0),
+        xaxis=dict(
+            title=time_axis['title'],
+            showgrid=True,
+            gridcolor="rgba(76, 70, 120, 0.07)",
+            zeroline=False,
+            tickformat=time_axis['tickformat'],
+            tickmode=time_axis.get('tickmode', 'linear'),
+            dtick=time_axis['dtick'],
+            range=[pd.Timestamp(start_date), pd.Timestamp(end_date) + MARLEY_AXIS_END_OFFSET],
+        ),
+        yaxis=dict(
+            title=f"Diferencia ({config['unit']})",
+            range=[-axis_limit, axis_limit],
+            dtick=dtick,
+            tickformat=',.0f' if variable == 'LUX' else ',.1f',
+            zeroline=True,
+            zerolinecolor="rgba(45, 48, 64, 0.45)",
+            zerolinewidth=1.2,
+            showgrid=True,
+            gridcolor="rgba(76, 70, 120, 0.07)",
         ),
     )
     return fig
@@ -6576,7 +6800,15 @@ def _render_ponderosa_wiga_values_dashboard(df_variables_all, df_cortinas_all, s
         block_label=block_label,
         chart_title='Variables WIGA - La Ponderosa',
         explanation_title='Variables WIGA',
-        explanation_text='Esta gráfica reúne las cuatro variables WIGA del bloque seleccionado sobre la misma línea de tiempo. Cada color conserva su propia escala a la derecha para comparar comportamiento sin separar la lectura.'
+        explanation_text=f'Esta gráfica reúne las cuatro variables WIGA del bloque seleccionado sobre la misma línea de tiempo. Cada color conserva su propia escala a la derecha para comparar comportamiento sin separar la lectura. {PPFD_HELP_TEXT}'
+    )
+    _render_graphed_series_table(
+        correlation_df,
+        wiga_variables,
+        PONDEROSA_WIGA_VARIABLES,
+        "Tabla de datos graficados - WIGA",
+        wiga_resolution,
+        source_label=f"WIGA {block_label}",
     )
 
     if st.checkbox(
@@ -6943,7 +7175,15 @@ def _render_ponderosa_ecowitt_values_dashboard():
         block_label=f"ECOWITT Bloque {PONDEROSA_ECOWITT_BLOCK_CODE}",
         chart_title='Variables ECOWITT - La Ponderosa',
         explanation_title='Variables ECOWITT',
-        explanation_text='Esta gráfica reúne temperatura, humedad y PPFD (PAR, µmol m-2 s-1) de ECOWITT/MCI sobre la misma línea de tiempo. La luminosidad LUX pertenece a APOGEE y se consulta en su propia vista.'
+        explanation_text=f'Esta gráfica reúne temperatura, humedad y PPFD (PAR, µmol m-2 s-1) de ECOWITT/MCI sobre la misma línea de tiempo. La luminosidad LUX pertenece a APOGEE y se consulta en su propia vista. {PPFD_HELP_TEXT}'
+    )
+    _render_graphed_series_table(
+        correlation_df,
+        ecowitt_variables,
+        PONDEROSA_ECOWITT_VARIABLES,
+        "Tabla de datos graficados - ECOWITT",
+        ecowitt_resolution,
+        source_label=f"ECOWITT Bloque {PONDEROSA_ECOWITT_BLOCK_CODE}",
     )
 
     if st.checkbox(
@@ -7114,6 +7354,14 @@ def _render_ponderosa_apogee_values_dashboard():
         chart_title='Luminosidad APOGEE - La Ponderosa',
         explanation_title='Luminosidad APOGEE',
         explanation_text='Esta gráfica muestra únicamente la luminosidad LUX medida por APOGEE. Esta serie no pertenece a ECOWITT/MCI; solo comparte el archivo de origen.'
+    )
+    _render_graphed_series_table(
+        correlation_df,
+        apogee_variables,
+        PONDEROSA_APOGEE_VARIABLES,
+        "Tabla de datos graficados - APOGEE",
+        apogee_resolution,
+        source_label="APOGEE",
     )
 
     if st.checkbox(
@@ -7289,7 +7537,8 @@ def _render_ponderosa_apogee_mci_wiga_dashboard(df_variables_all, df_cortinas_al
         (
             f"WIGA toma el PPFD (PAR, µmol m-2 s-1) real del Bloque 35 y calcula LUX estimado con PPFD x {PAR_TO_LUX_FACTOR:.0f}. "
             f"MCI toma el PPFD (PAR) del archivo ECOWITT Ponderosa y calcula LUX con el mismo factor. "
-            f"APOGEE toma la columna luz_lux y calcula PPFD (PAR) estimado dividiendo entre {PAR_TO_LUX_FACTOR:.0f}."
+            f"APOGEE toma la columna luz_lux y calcula PPFD (PAR) estimado dividiendo entre {PAR_TO_LUX_FACTOR:.0f}. "
+            f"{PPFD_HELP_TEXT}"
         ),
         accent=BRAND_COLORS['hero'],
         kicker='Cálculo'
@@ -7318,6 +7567,19 @@ def _render_ponderosa_apogee_mci_wiga_dashboard(df_variables_all, df_cortinas_al
             st.info(f"No hay suficientes datos para graficar {PONDEROSA_LIGHT_VARIABLES[variable]['title'].lower()}.")
             continue
         _plotly_chart(chart)
+        difference_chart = _make_ponderosa_light_difference_chart(
+            comparison,
+            variable,
+            selected_range,
+            comparison_resolution
+        )
+        if difference_chart is not None:
+            _render_chart_explanation(
+                f'Diferencia de {PONDEROSA_LIGHT_VARIABLES[variable]["title"].replace("Comparativa de ", "")}',
+                'Esta gráfica no muestra el valor absoluto, sino cuánto se separan MCI y APOGEE respecto a WIGA. La línea cero significa que el sensor está igual a WIGA; arriba mide más alto y abajo mide más bajo.',
+                accent=PONDEROSA_LIGHT_VARIABLES[variable]['accent']
+            )
+            _plotly_chart(difference_chart)
 
     table_mode = (
         "Promedio de cada sensor en bloques de 30 minutos"
@@ -8517,7 +8779,8 @@ def _render_correlacion(
         ''
     )
     if explanation_text is None:
-        explanation_text = 'Esta gráfica pone todas las variables seleccionadas sobre la misma línea de tiempo. Cada color tiene su propia escala a la derecha; pasa el cursor por la gráfica para ver la hora exacta y el valor de cada serie.' + cortina_help
+        ppfd_help = f" {PPFD_HELP_TEXT}" if 'Radiación PAR' in variables_seleccionadas else ''
+        explanation_text = 'Esta gráfica pone todas las variables seleccionadas sobre la misma línea de tiempo. Cada color tiene su propia escala a la derecha; pasa el cursor por la gráfica para ver la hora exacta y el valor de cada serie.' + ppfd_help + cortina_help
     _render_chart_explanation(
         explanation_title,
         explanation_text,
@@ -9604,27 +9867,43 @@ with st.sidebar.expander("Finca", expanded=True):
         help=FILTER_HELP_TEXTS['finca']
     )
 
-dashboard_view_options = (
-    ["Comparativa", "Solo WIGA", "Solo ECOWITT", "Varianza"]
-    if selected_finca == 'Marly' else
-    ["WIGA con cortinas", "WIGA relacion ECOWITT", PONDEROSA_LIGHT_VIEW_NAME, "Varianza", "Promedio", "WIGA", "ECOWITT", "APOGEE", "Cortinas"]
-)
+dashboard_view_groups = MARLY_VIEW_GROUPS if selected_finca == 'Marly' else PONDEROSA_VIEW_GROUPS
+dashboard_view_options = [
+    option
+    for group_options in dashboard_view_groups.values()
+    for option in group_options
+]
 if st.session_state.get("modo_dashboard") not in dashboard_view_options:
     st.session_state["modo_dashboard"] = dashboard_view_options[0]
+default_view_group = _get_view_group_for_mode(dashboard_view_groups, st.session_state.get("modo_dashboard"))
+if st.session_state.get("modo_dashboard_grupo") not in dashboard_view_groups:
+    st.session_state["modo_dashboard_grupo"] = default_view_group
 
 with st.sidebar.expander("Vista", expanded=True):
     _sidebar_field_label(
         "filter",
         "Seleccionar análisis" if selected_finca == 'Marly' else "Seleccionar vista"
     )
+    selected_view_group = st.radio(
+        "Grupo:",
+        options=list(dashboard_view_groups.keys()),
+        key="modo_dashboard_grupo",
+        help=(
+            "Comparativas cruza sensores o cortinas; Análisis contiene varianza y promedio; Fuentes individuales muestra cada origen por separado."
+        )
+    )
+    group_view_options = dashboard_view_groups[selected_view_group]
+    if st.session_state.get("modo_dashboard") not in group_view_options:
+        st.session_state["modo_dashboard"] = group_view_options[0]
     dashboard_mode = st.radio(
-        "Seleccionar análisis:" if selected_finca == 'Marly' else "Seleccionar vista:",
-        options=dashboard_view_options,
+        "Seleccionar vista:",
+        options=group_view_options,
+        format_func=_format_dashboard_view_option,
         key="modo_dashboard",
         help=(
-            "Elige cómo quieres analizar Marly: comparativa, varianza o lecturas individuales por sensor."
+            "Elige una vista de Marly: comparativa WIGA / ECOWITT, análisis estadístico o lecturas individuales por sensor."
             if selected_finca == 'Marly' else
-            "Elige la vista de Ponderosa: WIGA con cortinas, relación WIGA / ECOWITT, APOGEE / MCI / WIGA, varianza, promedio, WIGA, ECOWITT, APOGEE o cortinas."
+            "Elige una vista de Ponderosa: comparativas, análisis estadístico o fuentes individuales."
         )
     )
 
