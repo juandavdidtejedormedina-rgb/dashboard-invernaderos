@@ -171,7 +171,7 @@ VARIABLE_SELECTOR_LABELS = {
     'PUERTA 2': 'Puerta 2'
 }
 FILTER_HELP_TEXTS = {
-    'modo_dashboard': 'Elige la vista principal: WIGA con cortinas, relación WIGA / ECOWITT, APOGI / MCI / WIGA, varianza, promedio o fuentes individuales.',
+    'modo_dashboard': 'Elige la vista principal: WIGA con cortinas, relación WIGA / ECOWITT, APOGI / MCI / WIGA, APOGI, varianza, promedio o fuentes individuales.',
     'finca': 'Selecciona la finca que quieres explorar en el dashboard. Los bloques y fechas disponibles se ajustan según esa finca.',
     'modo_fechas': 'Define si quieres analizar un solo día o un rango de varios días.',
     'fecha': 'Selecciona la fecha o el rango que se usará para filtrar los registros visibles en la vista actual.',
@@ -331,12 +331,18 @@ PONDEROSA_WIGA_VARIABLES = {
 }
 PONDEROSA_ECOWITT_VARIABLES = {
     **PONDEROSA_COMPARISON_VARIABLES,
+}
+PONDEROSA_APOGI_VARIABLES = {
     "LUX": {
         "title": "Luminosidad LUX",
         "unit": "lux",
-        "colors": {"ECOWITT": "#B9832F"},
+        "colors": {"APOGI": "#B9832F"},
         "accent": "#B9832F",
     },
+}
+PONDEROSA_ECOWITT_DATA_VARIABLES = {
+    **PONDEROSA_ECOWITT_VARIABLES,
+    **PONDEROSA_APOGI_VARIABLES,
 }
 PONDEROSA_LIGHT_VARIABLES = {
     "LUX": {
@@ -5208,12 +5214,12 @@ def _load_ponderosa_ecowitt_data_from_source(excel_source, source_signature):
     df = df.dropna(subset=['FechaHora']).sort_values('FechaHora')
     df['Fecha_Filtro'] = df['FechaHora'].dt.date
 
-    for variable in PONDEROSA_ECOWITT_VARIABLES:
+    for variable in PONDEROSA_ECOWITT_DATA_VARIABLES:
         if variable not in df.columns:
             df[variable] = pd.NA
         df[variable] = pd.to_numeric(df[variable], errors='coerce')
 
-    return df[['FechaHora', 'Fecha_Filtro', *PONDEROSA_ECOWITT_VARIABLES.keys()]].copy()
+    return df[['FechaHora', 'Fecha_Filtro', *PONDEROSA_ECOWITT_DATA_VARIABLES.keys()]].copy()
 
 
 def _load_ponderosa_ecowitt_data():
@@ -5266,6 +5272,16 @@ def _build_ponderosa_ecowitt_source(ecowitt_df):
     df = ecowitt_df[['FechaHora', 'Fecha_Filtro', *PONDEROSA_ECOWITT_VARIABLES.keys()]].copy()
     for variable in PONDEROSA_ECOWITT_VARIABLES:
         df.rename(columns={variable: f"{variable} - ECOWITT"}, inplace=True)
+    return df
+
+
+def _build_ponderosa_apogi_source(ecowitt_df):
+    if ecowitt_df.empty:
+        return pd.DataFrame()
+
+    df = ecowitt_df[['FechaHora', 'Fecha_Filtro', *PONDEROSA_APOGI_VARIABLES.keys()]].copy()
+    for variable in PONDEROSA_APOGI_VARIABLES:
+        df.rename(columns={variable: f"{variable} - APOGI"}, inplace=True)
     return df
 
 
@@ -5558,10 +5574,11 @@ def _get_ponderosa_y_axis_config(df, variable):
     config = (
         PONDEROSA_WIGA_VARIABLES.get(variable) or
         PONDEROSA_COMPARISON_VARIABLES.get(variable) or
-        PONDEROSA_ECOWITT_VARIABLES.get(variable, {})
+        PONDEROSA_ECOWITT_VARIABLES.get(variable) or
+        PONDEROSA_APOGI_VARIABLES.get(variable, {})
     )
     series = []
-    for source_name in PONDEROSA_SENSOR_NAMES:
+    for source_name in (*PONDEROSA_SENSOR_NAMES, "APOGI"):
         column_name = f"{variable} - {source_name}"
         if column_name in df.columns:
             clean = pd.to_numeric(df[column_name], errors='coerce').dropna()
@@ -5804,7 +5821,9 @@ def _get_ponderosa_source_variable_configs(source_name):
         return PONDEROSA_WIGA_VARIABLES
     if source_name == "ECOWITT":
         return PONDEROSA_ECOWITT_VARIABLES
-    return {**PONDEROSA_WIGA_VARIABLES, **PONDEROSA_ECOWITT_VARIABLES}
+    if source_name == "APOGI":
+        return PONDEROSA_APOGI_VARIABLES
+    return {**PONDEROSA_WIGA_VARIABLES, **PONDEROSA_ECOWITT_VARIABLES, **PONDEROSA_APOGI_VARIABLES}
 
 
 def _build_ponderosa_source_individual_series(df, variable, source_name, selected_range, resolution_label=COMPARISON_RESOLUTION_OPTIONS[0]):
@@ -5834,6 +5853,10 @@ def _build_ponderosa_ecowitt_individual_series(df, variable, selected_range, res
     return _build_ponderosa_source_individual_series(df, variable, "ECOWITT", selected_range, resolution_label)
 
 
+def _build_ponderosa_apogi_individual_series(df, variable, selected_range, resolution_label=COMPARISON_RESOLUTION_OPTIONS[0]):
+    return _build_ponderosa_source_individual_series(df, variable, "APOGI", selected_range, resolution_label)
+
+
 def _make_ponderosa_source_individual_chart(df, variable, source_name, selected_range, resolution_label=COMPARISON_RESOLUTION_OPTIONS[0]):
     series_df = _build_ponderosa_source_individual_series(df, variable, source_name, selected_range, resolution_label)
     if series_df.empty:
@@ -5846,7 +5869,7 @@ def _make_ponderosa_source_individual_chart(df, variable, source_name, selected_
     point_mode = resolution_label == COMPARISON_RESOLUTION_OPTIONS[1]
     trace_type = go.Scattergl if point_mode and len(series_df) > 250 else go.Scatter
     y_axis = _get_ponderosa_y_axis_config(
-        series_df.rename(columns={'Valor': f"{variable} - ECOWITT"}),
+        series_df.rename(columns={'Valor': f"{variable} - {source_name}"}),
         variable
     )
 
@@ -5956,7 +5979,19 @@ def _render_ponderosa_ecowitt_individual_charts(filtered_df, selected_range, res
         list(PONDEROSA_ECOWITT_VARIABLES.keys()),
         ("ECOWITT",),
         "Variables individuales ECOWITT Ponderosa",
-        "Estas gráficas muestran las cuatro variables medidas por ECOWITT, incluyendo LUX, sin mezclarlas con WIGA.",
+        "Estas gráficas muestran temperatura, humedad y PPFD (PAR) de ECOWITT/MCI, sin mezclar la luminosidad de APOGI.",
+        resolution_label
+    )
+
+
+def _render_ponderosa_apogi_individual_charts(filtered_df, selected_range, resolution_label=COMPARISON_RESOLUTION_OPTIONS[0]):
+    _render_ponderosa_source_individual_charts(
+        filtered_df,
+        selected_range,
+        list(PONDEROSA_APOGI_VARIABLES.keys()),
+        ("APOGI",),
+        "Variables individuales APOGI Ponderosa",
+        "Estas gráficas muestran la luminosidad LUX medida por APOGI desde la columna luz_lux.",
         resolution_label
     )
 
@@ -6804,7 +6839,7 @@ def _render_ponderosa_ecowitt_values_dashboard():
     )
 
     st.markdown("## La Ponderosa - ECOWITT")
-    st.caption("Lectura de temperatura, humedad, PPFD (PAR, µmol m-2 s-1) y LUX medidas por ECOWITT en el Bloque 35.")
+    st.caption("Lectura de temperatura, humedad y PPFD (PAR, µmol m-2 s-1) de ECOWITT/MCI. La luminosidad LUX se muestra aparte en la vista APOGI.")
     ecowitt_resolution = st.radio(
         "Resolución de las gráficas ECOWITT:",
         options=SOURCE_RESOLUTION_OPTIONS,
@@ -6839,7 +6874,7 @@ def _render_ponderosa_ecowitt_values_dashboard():
         block_label=f"ECOWITT Bloque {PONDEROSA_ECOWITT_BLOCK_CODE}",
         chart_title='Variables ECOWITT - La Ponderosa',
         explanation_title='Variables ECOWITT',
-        explanation_text='Esta gráfica reúne temperatura, humedad, PPFD (PAR, µmol m-2 s-1) y LUX de ECOWITT sobre la misma línea de tiempo. Cada color conserva su propia escala a la derecha para comparar el comportamiento de las lecturas.'
+        explanation_text='Esta gráfica reúne temperatura, humedad y PPFD (PAR, µmol m-2 s-1) de ECOWITT/MCI sobre la misma línea de tiempo. La luminosidad LUX pertenece a APOGI y se consulta en su propia vista.'
     )
 
     if st.checkbox(
@@ -6852,6 +6887,176 @@ def _render_ponderosa_ecowitt_values_dashboard():
     if st.checkbox(
         "Cargar registros ECOWITT Ponderosa",
         key="mostrar_ponderosa_ecowitt_only_registros",
+        help=FILTER_HELP_TEXTS['registros']
+    ):
+        _dataframe(filtered_df.drop(columns=['Fecha_Filtro'], errors='ignore'), hide_index=True)
+
+    st.stop()
+
+
+def _render_ponderosa_apogi_values_dashboard():
+    try:
+        ecowitt_df = _load_ponderosa_ecowitt_data()
+    except Exception as error:
+        st.error(f"No fue posible cargar los datos de APOGI desde ECOWITT Ponderosa. Detalle: {error}")
+        st.stop()
+
+    if ecowitt_df.empty:
+        st.warning("No hay datos disponibles para APOGI.")
+        st.stop()
+
+    source_df = _build_ponderosa_apogi_source(ecowitt_df)
+    available_dates = sorted(source_df['Fecha_Filtro'].dropna().unique())
+    if not available_dates:
+        st.warning("No hay fechas disponibles para APOGI.")
+        st.stop()
+
+    min_date = available_dates[0]
+    max_date = available_dates[-1]
+    navigation_state_key = None
+    date_state_keys = (
+        "ponderosa_apogi_fecha_unica",
+        "ponderosa_apogi_fecha_un_dia",
+        "ponderosa_apogi_fecha_inicio",
+        "ponderosa_apogi_fecha_fin",
+    )
+    for state_key in date_state_keys:
+        if state_key in st.session_state and st.session_state[state_key] not in available_dates:
+            del st.session_state[state_key]
+
+    with st.sidebar.expander("Periodo", expanded=True):
+        if min_date == max_date:
+            fecha_unica = _date_input_with_state(
+                "Seleccionar fecha:",
+                default_value=max_date,
+                key="ponderosa_apogi_fecha_unica",
+                min_value=min_date,
+                max_value=max_date,
+                help_text=FILTER_HELP_TEXTS['fecha']
+            )
+            fecha_unica = _get_nearest_available_date(fecha_unica, available_dates)
+            selected_range = (fecha_unica, fecha_unica)
+            navigation_state_key = "ponderosa_apogi_fecha_unica"
+        else:
+            modo_fechas = st.radio(
+                "Modo de fechas:",
+                options=["Un día", "Varios días"],
+                horizontal=True,
+                key="ponderosa_apogi_modo_fechas",
+                help=FILTER_HELP_TEXTS['modo_fechas']
+            )
+            if modo_fechas == "Un día":
+                fecha_unica_default = _get_nearest_available_date(
+                    st.session_state.get("ponderosa_apogi_fecha_un_dia", max_date),
+                    available_dates
+                )
+                _sidebar_field_label("calendar", "Seleccionar fecha")
+                fecha_unica = _date_input_with_state(
+                    "Seleccionar fecha:",
+                    default_value=fecha_unica_default,
+                    key="ponderosa_apogi_fecha_un_dia",
+                    min_value=min_date,
+                    max_value=max_date,
+                    help_text=FILTER_HELP_TEXTS['fecha']
+                )
+                fecha_unica = _get_nearest_available_date(fecha_unica, available_dates)
+                selected_range = (fecha_unica, fecha_unica)
+                navigation_state_key = "ponderosa_apogi_fecha_un_dia"
+            else:
+                default_range_end = _get_sidebar_default_range_end(min_date, max_date, default_days=5)
+                fecha_inicio_default = _get_nearest_available_date(
+                    st.session_state.get("ponderosa_apogi_fecha_inicio", min_date),
+                    available_dates
+                )
+                fecha_fin_default = _get_nearest_available_date(
+                    st.session_state.get("ponderosa_apogi_fecha_fin", default_range_end),
+                    available_dates
+                )
+                _sidebar_field_label("calendar", "Fecha inicio")
+                fecha_inicio = _date_input_with_state(
+                    "Fecha inicio:",
+                    default_value=fecha_inicio_default,
+                    key="ponderosa_apogi_fecha_inicio",
+                    min_value=min_date,
+                    max_value=max_date,
+                    help_text=FILTER_HELP_TEXTS['fecha']
+                )
+                _sidebar_field_label("calendar", "Fecha fin")
+                fecha_fin = _date_input_with_state(
+                    "Fecha fin:",
+                    default_value=fecha_fin_default,
+                    key="ponderosa_apogi_fecha_fin",
+                    min_value=min_date,
+                    max_value=max_date,
+                    help_text=FILTER_HELP_TEXTS['fecha']
+                )
+                fecha_inicio = _get_nearest_available_date(fecha_inicio, available_dates)
+                fecha_fin = _get_nearest_available_date(fecha_fin, available_dates)
+                selected_range = _normalize_sidebar_date_range(fecha_inicio, fecha_fin, min_date, max_date)
+
+    filtered_df = source_df[source_df['Fecha_Filtro'].between(*selected_range)].copy()
+    if filtered_df.empty:
+        st.warning("No hay datos APOGI en el periodo seleccionado.")
+        st.stop()
+
+    _render_selected_period_banner(
+        selected_range,
+        min_fecha=min_date,
+        max_fecha=max_date,
+        navigation_state_key=navigation_state_key,
+        title_text='Periodo APOGI Ponderosa',
+        available_dates=available_dates
+    )
+
+    st.markdown("## La Ponderosa - APOGI")
+    st.caption("Lectura de luminosidad LUX medida por APOGI desde la columna luz_lux del archivo ECOWITT Ponderosa.")
+    apogi_resolution = st.radio(
+        "Resolución de las gráficas APOGI:",
+        options=SOURCE_RESOLUTION_OPTIONS,
+        horizontal=True,
+        key="ponderosa_apogi_resolution",
+        help="Usa el promedio para una lectura limpia por media hora, o punto por punto para ver las lecturas reales sin agrupar."
+    )
+
+    apogi_variables = list(PONDEROSA_APOGI_VARIABLES.keys())
+    correlation_df = _build_single_source_correlacion_frame(
+        filtered_df,
+        selected_range,
+        apogi_variables,
+        "APOGI",
+        lambda df, variable, source_name, current_range, resolution: _build_ponderosa_apogi_individual_series(
+            df,
+            variable,
+            current_range,
+            resolution
+        ),
+        apogi_resolution,
+    )
+    if correlation_df.empty:
+        st.warning("No hay datos suficientes para graficar la luminosidad de APOGI.")
+        st.stop()
+
+    _render_correlacion(
+        correlation_df,
+        pd.DataFrame(),
+        selected_range,
+        variables_seleccionadas=apogi_variables,
+        block_label="APOGI",
+        chart_title='Luminosidad APOGI - La Ponderosa',
+        explanation_title='Luminosidad APOGI',
+        explanation_text='Esta gráfica muestra únicamente la luminosidad LUX medida por APOGI. Esta serie no pertenece a ECOWITT/MCI; solo comparte el archivo de origen.'
+    )
+
+    if st.checkbox(
+        "Cargar detalle individual APOGI",
+        key="mostrar_ponderosa_apogi_detalle",
+        help=FILTER_HELP_TEXTS['graficas_detalladas']
+    ):
+        _render_ponderosa_apogi_individual_charts(filtered_df, selected_range, apogi_resolution)
+
+    if st.checkbox(
+        "Cargar registros APOGI Ponderosa",
+        key="mostrar_ponderosa_apogi_registros",
         help=FILTER_HELP_TEXTS['registros']
     ):
         _dataframe(filtered_df.drop(columns=['Fecha_Filtro'], errors='ignore'), hide_index=True)
@@ -9333,7 +9538,7 @@ with st.sidebar.expander("Finca", expanded=True):
 dashboard_view_options = (
     ["Comparativa", "Solo WIGA", "Solo ECOWITT", "Varianza"]
     if selected_finca == 'Marly' else
-    ["WIGA con cortinas", "WIGA relacion ECOWITT", PONDEROSA_LIGHT_VIEW_NAME, "Varianza", "Promedio", "WIGA", "ECOWITT", "Cortinas"]
+    ["WIGA con cortinas", "WIGA relacion ECOWITT", PONDEROSA_LIGHT_VIEW_NAME, "Varianza", "Promedio", "WIGA", "ECOWITT", "APOGI", "Cortinas"]
 )
 if st.session_state.get("modo_dashboard") not in dashboard_view_options:
     st.session_state["modo_dashboard"] = dashboard_view_options[0]
@@ -9350,7 +9555,7 @@ with st.sidebar.expander("Vista", expanded=True):
         help=(
             "Elige cómo quieres analizar Marly: comparativa, varianza o lecturas individuales por sensor."
             if selected_finca == 'Marly' else
-            "Elige la vista de Ponderosa: WIGA con cortinas, relación WIGA / ECOWITT, APOGI / MCI / WIGA, varianza, promedio, WIGA, ECOWITT o cortinas."
+            "Elige la vista de Ponderosa: WIGA con cortinas, relación WIGA / ECOWITT, APOGI / MCI / WIGA, varianza, promedio, WIGA, ECOWITT, APOGI o cortinas."
         )
     )
 
@@ -9406,6 +9611,14 @@ if dashboard_mode == "ECOWITT":
         "Cargando variables ECOWITT de Ponderosa..."
     ):
         _render_ponderosa_ecowitt_values_dashboard()
+    st.stop()
+
+if dashboard_mode == "APOGI":
+    with _loading_context(
+        st.session_state.get("ponderosa_apogi_modo_fechas") == "Varios días",
+        "Cargando luminosidad APOGI de Ponderosa..."
+    ):
+        _render_ponderosa_apogi_values_dashboard()
     st.stop()
 
 if dashboard_mode in ("Varianza", "Promedio"):
