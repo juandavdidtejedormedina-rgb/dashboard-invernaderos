@@ -122,17 +122,20 @@ def _render_dashboard_media(selected_finca, lazy_load=False):
                 st.caption("Carga el mapa solo cuando lo necesites.")
 
 SENSOR_VARIABLES = ['Temperatura', 'Humedad Relativa', 'Radiación PAR', 'Gramos de agua']
+PPFD_DISPLAY_NAME = 'PPFD (PAR)'
+PPFD_DISPLAY_LABEL = 'PPFD (PAR, µmol m⁻² s⁻¹)'
+PPFD_DISPLAY_LABEL_ASCII = 'PPFD (PAR, µmol m-2 s-1)'
 VARIABLE_LABELS = {
     'Temperatura': 'Temperatura (°C)',
     'Humedad Relativa': 'Humedad Relativa (%)',
-    'Radiación PAR': 'Radiación PAR (µmol m⁻² s⁻¹)',
+    'Radiación PAR': PPFD_DISPLAY_LABEL,
     'Gramos de agua': 'Gramos de agua (g)',
     'LUX': 'LUX'
 }
 VARIABLE_UNITS = {
     'Temperatura': '°C',
     'Humedad Relativa': '%',
-    'Radiación PAR': 'µmol m⁻² s⁻¹',
+    'Radiación PAR': 'PPFD µmol m⁻² s⁻¹',
     'Gramos de agua': 'g',
     'LUX': 'lux'
 }
@@ -159,7 +162,7 @@ MOTOR_AREA_REFERENCE = {
 VARIABLE_SELECTOR_LABELS = {
     'Temperatura': 'Temperatura (°C)',
     'Humedad Relativa': 'Humedad Relativa (%)',
-    'Radiación PAR': 'Radiación PAR',
+    'Radiación PAR': PPFD_DISPLAY_NAME,
     'Gramos de agua': 'Gramos de agua (g)',
     'LUX': 'LUX',
     'FRENTE 1': 'Frente 1',
@@ -183,7 +186,7 @@ FILTER_HELP_TEXTS = {
 VARIABLE_FILTER_HELP = {
     'Temperatura': 'Muestra la temperatura del bloque seleccionado.',
     'Humedad Relativa': 'Muestra la humedad relativa del bloque seleccionado.',
-    'Radiación PAR': 'Muestra la radiación PAR del bloque seleccionado.',
+    'Radiación PAR': 'Muestra el PPFD del bloque seleccionado: fotones de luz PAR útiles para fotosíntesis por metro cuadrado por segundo.',
     'Gramos de agua': 'Muestra los gramos de agua del bloque seleccionado.',
     'FRENTE 1': 'Muestra la apertura del Frente 1.',
     'FRENTE 2': 'Muestra la apertura del Frente 2.',
@@ -268,8 +271,8 @@ MARLEY_VARIABLES = {
         "accent": "#D39A58",
     },
     "Radiación PAR (µmol m-2 s-1)": {
-        "title": "Comparativa de radiación PAR",
-        "unit": "µmol m-2 s-1",
+        "title": "Comparativa de PPFD (PAR)",
+        "unit": "PPFD µmol m-2 s-1",
         "colors": {"WIGA": "#6BEA5B", "ECOWITT": "#524B82"},
         "accent": "#6BEA5B",
     },
@@ -294,8 +297,8 @@ PONDEROSA_COMPARISON_VARIABLES = {
         "accent": "#8077AE",
     },
     "Radiación PAR": {
-        "title": "Comparativa de radiación PAR",
-        "unit": "µmol m-2 s-1",
+        "title": "Comparativa de PPFD (PAR)",
+        "unit": "PPFD µmol m-2 s-1",
         "colors": {"WIGA": "#6BEA5B", "ECOWITT": "#524B82"},
         "accent": "#6BEA5B",
     },
@@ -314,8 +317,8 @@ PONDEROSA_WIGA_VARIABLES = {
         "accent": VARIABLE_COLORS["Humedad Relativa"],
     },
     "Radiación PAR": {
-        "title": "Radiación PAR",
-        "unit": "µmol m-2 s-1",
+        "title": "PPFD (PAR)",
+        "unit": "PPFD µmol m-2 s-1",
         "colors": {"WIGA": VARIABLE_COLORS["Radiación PAR"]},
         "accent": VARIABLE_COLORS["Radiación PAR"],
     },
@@ -343,8 +346,8 @@ PONDEROSA_LIGHT_VARIABLES = {
         "accent": "#B9832F",
     },
     "Radiación PAR": {
-        "title": "Comparativa de radiación PAR",
-        "unit": "µmol m-2 s-1",
+        "title": "Comparativa de PPFD (PAR)",
+        "unit": "PPFD µmol m-2 s-1",
         "colors": {"WIGA": "#6BEA5B", "MCI": "#524B82", "APOGI": "#4E8D7C"},
         "accent": "#6BEA5B",
     },
@@ -428,7 +431,7 @@ TEMP_FOCUS_CHART_TITLE = 'Temperatura del bloque'
 HUMIDITY_FOCUS_CHART_ENABLED = True
 HUMIDITY_FOCUS_CHART_TITLE = 'Humedad del bloque'
 PAR_FOCUS_CHART_ENABLED = True
-PAR_FOCUS_CHART_TITLE = 'Radiación PAR del bloque'
+PAR_FOCUS_CHART_TITLE = 'PPFD (PAR) del bloque'
 WATER_FOCUS_CHART_ENABLED = True
 WATER_FOCUS_CHART_TITLE = 'Gramos de agua del bloque'
 FOCUS_CHART_CONFIGS = (
@@ -444,7 +447,7 @@ MOTOR_FOCUS_CHART_TITLE = 'Motores del bloque'
 CORR_AXIS_TITLES = {
     'Temperatura': 'Temp.',
     'Humedad Relativa': 'Humedad',
-    'Radiación PAR': 'Rad. PAR',
+    'Radiación PAR': 'PPFD',
     'Gramos de agua': 'Gramos',
     'LUX': 'LUX',
     '% Apertura Cortinas': 'Cortinas %'
@@ -2290,6 +2293,13 @@ def _dataframe(data, **kwargs):
     st.dataframe(data, width='stretch', **kwargs)
 
 
+def _format_variable_display_title(title):
+    clean_title = str(title or "").replace("Comparativa de ", "").strip()
+    if 'ppfd' in _build_normalized_text_key(clean_title):
+        return PPFD_DISPLAY_NAME
+    return clean_title[:1].upper() + clean_title[1:] if clean_title else clean_title
+
+
 def _hex_to_rgba(hex_color, alpha):
     color = str(hex_color).strip().lstrip('#')
     if len(color) != 6:
@@ -2362,9 +2372,9 @@ def _get_summary_metric_config(var_name):
         }
     if normalized_key.startswith('radiacion par'):
         return {
-            'label': 'Radiación PAR',
-            'unit_html': 'umol m<sup>-2</sup> s<sup>-1</sup>',
-            'delta_unit_html': 'umol/m2/s',
+            'label': 'PPFD (PAR)',
+            'unit_html': 'PPFD &micro;mol m<sup>-2</sup> s<sup>-1</sup>',
+            'delta_unit_html': 'PPFD umol/m2/s',
             'decimals': 0,
             'icon_svg': (
                 '<svg viewBox="0 0 24 24" aria-hidden="true">'
@@ -3912,8 +3922,9 @@ def _build_difference_table_30min(
 
         config = variable_configs.get(variable, {})
         unit = config.get('unit', VARIABLE_UNITS.get(variable, ''))
-        variable_label = config.get('title', VARIABLE_SELECTOR_LABELS.get(variable, variable))
-        variable_label = variable_label.replace('Comparativa de ', '').capitalize()
+        variable_label = _format_variable_display_title(
+            config.get('title', VARIABLE_SELECTOR_LABELS.get(variable, variable))
+        )
 
         for _, row in comparison.iterrows():
             timestamp = pd.to_datetime(row.get('FechaHora'), errors='coerce')
@@ -3974,7 +3985,7 @@ def _render_difference_table_30min(
     show_table = st.checkbox(
         "Mostrar tabla de diferencias cada 30 min",
         key=state_key,
-        help="Genera una tabla con WIGA, ECOWITT y la diferencia para temperatura, humedad y radiación en cada franja de 30 minutos."
+        help="Genera una tabla con WIGA, ECOWITT y la diferencia para temperatura, humedad y PPFD (PAR) en cada franja de 30 minutos."
     )
     if not show_table:
         return
@@ -4048,7 +4059,7 @@ def _get_marley_y_axis_config(df, variable):
     axis_max = int(vmax * 1.05) if vmax > 0 else 10
     spread = max(axis_max, 1)
     dtick = 10 if spread <= 100 else 25 if spread <= 300 else 50 if spread <= 800 else 100
-    return {'title': 'Radiación PAR (µmol m-2 s-1)', 'range': [-25, axis_max], 'dtick': dtick}
+    return {'title': PPFD_DISPLAY_LABEL_ASCII, 'range': [-25, axis_max], 'dtick': dtick}
 
 
 def _tighten_comparison_y_axis(comparison, sensor_names, y_axis, variable_name):
@@ -4398,7 +4409,7 @@ def _make_marley_hourly_metric_chart(grouped_df, variable, metric_column):
 
     yaxis_title = config['unit'] if metric_column == 'Promedio' else f"Varianza ({config['unit']})"
     fig.update_layout(
-        title=dict(text=f"{metric_column} por franja horaria - {config['title'].replace('Comparativa de ', '').capitalize()}", x=0, xanchor='left'),
+        title=dict(text=f"{metric_column} por franja horaria - {_format_variable_display_title(config['title'])}", x=0, xanchor='left'),
         height=470,
         margin=dict(l=28, r=28, t=74, b=75),
         paper_bgcolor="rgba(255,255,255,0)",
@@ -4468,7 +4479,7 @@ def _make_marley_individual_variable_chart(df, variable, source_name, selected_r
     config = MARLEY_VARIABLES[variable]
     time_axis = _get_marley_time_axis_config(series_df)
     start_date, end_date = selected_range
-    variable_title = config['title'].replace('Comparativa de ', '').capitalize()
+    variable_title = _format_variable_display_title(config['title'])
     point_mode = resolution_label == COMPARISON_RESOLUTION_OPTIONS[1]
     trace_type = go.Scattergl if point_mode and len(series_df) > 250 else go.Scatter
 
@@ -4554,7 +4565,7 @@ def _make_source_all_variables_chart(
         shared_xaxes=True,
         vertical_spacing=0.045,
         subplot_titles=[
-            variable_configs[variable]['title'].replace('Comparativa de ', '').capitalize()
+            _format_variable_display_title(variable_configs[variable]['title'])
             for variable, _ in rendered_series
         ],
     )
@@ -4563,7 +4574,7 @@ def _make_source_all_variables_chart(
 
     for row_index, (variable, series_df) in enumerate(rendered_series, start=1):
         config = variable_configs[variable]
-        variable_title = config['title'].replace('Comparativa de ', '').capitalize()
+        variable_title = _format_variable_display_title(config['title'])
         color = config['colors'].get(source_name, config.get('accent', BRAND_COLORS['hero']))
         trace_type = go.Scattergl if point_mode and len(series_df) > 250 else go.Scatter
         fig.add_trace(
@@ -4860,7 +4871,7 @@ def _render_marley_dashboard(dashboard_mode):
     selected_variable = st.segmented_control(
         "Variable Marly",
         options=list(MARLEY_VARIABLES.keys()),
-        format_func=lambda value: MARLEY_VARIABLES[value]['title'].replace("Comparativa de ", "").capitalize(),
+        format_func=lambda value: _format_variable_display_title(MARLEY_VARIABLES[value]['title']),
         default=list(MARLEY_VARIABLES.keys())[0],
         key="marley_variable",
     )
@@ -5587,7 +5598,7 @@ def _get_ponderosa_y_axis_config(df, variable):
     axis_max = int(vmax * 1.05) if vmax > 0 else 10
     spread = max(axis_max, 1)
     dtick = 10 if spread <= 100 else 25 if spread <= 300 else 50 if spread <= 800 else 100
-    return {'title': 'Radiación PAR (µmol m-2 s-1)', 'range': [-25, axis_max], 'dtick': dtick}
+    return {'title': PPFD_DISPLAY_LABEL_ASCII, 'range': [-25, axis_max], 'dtick': dtick}
 
 
 def _make_ponderosa_comparison_chart(comparison, variable, selected_range, resolution_label=COMPARISON_RESOLUTION_OPTIONS[0]):
@@ -5982,7 +5993,7 @@ def _get_ponderosa_light_y_axis_config(comparison, variable):
     axis_max = vmax + max(span * 0.08, 15)
     dtick = 10 if axis_max <= 120 else 25 if axis_max <= 350 else 50 if axis_max <= 900 else 100
     return {
-        'title': 'Radiación PAR (µmol m-2 s-1)',
+        'title': PPFD_DISPLAY_LABEL_ASCII,
         'range': [axis_min, axis_max],
         'dtick': dtick,
         'tickformat': ',.0f',
@@ -6102,7 +6113,7 @@ def _make_ponderosa_light_individual_chart(comparison, variable, sensor_name, se
         )
     )
     fig.update_layout(
-        title=dict(text=f"{config['title'].replace('Comparativa de ', '').capitalize()} - {sensor_name}", x=0, xanchor='left'),
+        title=dict(text=f"{_format_variable_display_title(config['title'])} - {sensor_name}", x=0, xanchor='left'),
         height=300,
         margin=dict(l=24, r=18, t=54, b=42),
         paper_bgcolor="rgba(255,255,255,0)",
@@ -6159,7 +6170,7 @@ def _build_ponderosa_light_comparison_table(filtered_df, selected_range, resolut
             rows.append({
                 'Fecha': timestamp.strftime('%Y-%m-%d'),
                 'Hora': timestamp.strftime('%H:%M'),
-                'Variable': config['title'].replace('Comparativa de ', '').capitalize(),
+                'Variable': _format_variable_display_title(config['title']),
                 'Unidad': config['unit'],
                 'WIGA': round(float(wiga_value), 2) if pd.notna(wiga_value) else pd.NA,
                 'MCI': round(float(mci_value), 2) if pd.notna(mci_value) else pd.NA,
@@ -6791,7 +6802,7 @@ def _render_ponderosa_ecowitt_values_dashboard():
     )
 
     st.markdown("## La Ponderosa - ECOWITT")
-    st.caption("Lectura de temperatura, humedad, radiación PAR y LUX medidas por ECOWITT en el Bloque 35.")
+    st.caption("Lectura de temperatura, humedad, PPFD (PAR, µmol m-2 s-1) y LUX medidas por ECOWITT en el Bloque 35.")
     ecowitt_resolution = st.radio(
         "Resolución de las gráficas ECOWITT:",
         options=SOURCE_RESOLUTION_OPTIONS,
@@ -6826,7 +6837,7 @@ def _render_ponderosa_ecowitt_values_dashboard():
         block_label=f"ECOWITT Bloque {PONDEROSA_ECOWITT_BLOCK_CODE}",
         chart_title='Variables ECOWITT - La Ponderosa',
         explanation_title='Variables ECOWITT',
-        explanation_text='Esta gráfica reúne temperatura, humedad, radiación PAR y LUX de ECOWITT sobre la misma línea de tiempo. Cada color conserva su propia escala a la derecha para comparar el comportamiento de las lecturas.'
+        explanation_text='Esta gráfica reúne temperatura, humedad, PPFD (PAR, µmol m-2 s-1) y LUX de ECOWITT sobre la misma línea de tiempo. Cada color conserva su propia escala a la derecha para comparar el comportamiento de las lecturas.'
     )
 
     if st.checkbox(
@@ -6996,13 +7007,13 @@ def _render_ponderosa_apogi_mci_wiga_dashboard(df_variables_all, df_cortinas_all
 
     block_label = _format_block_display_name(selected_source_code)
     st.markdown("## La Ponderosa - APOGI / MCI / WIGA")
-    st.caption(f"Comparación de luz y radiación para {block_label}. WIGA usa Datos_Variables; MCI y APOGI usan ECOWITT Ponderosa.")
+    st.caption(f"Comparación de LUX y PPFD (PAR, µmol m-2 s-1) para {block_label}. WIGA usa Datos_Variables; MCI y APOGI usan ECOWITT Ponderosa.")
     _render_chart_explanation(
         'Origen de los valores',
         (
-            f"WIGA toma la radiación PAR real del Bloque 35 y calcula LUX estimado con PAR x {PAR_TO_LUX_FACTOR:.0f}. "
-            f"MCI toma la radiación PAR del archivo ECOWITT Ponderosa y calcula LUX con el mismo factor. "
-            f"APOGI toma la columna luz_lux y calcula radiación PAR estimada dividiendo entre {PAR_TO_LUX_FACTOR:.0f}."
+            f"WIGA toma el PPFD (PAR, µmol m-2 s-1) real del Bloque 35 y calcula LUX estimado con PPFD x {PAR_TO_LUX_FACTOR:.0f}. "
+            f"MCI toma el PPFD (PAR) del archivo ECOWITT Ponderosa y calcula LUX con el mismo factor. "
+            f"APOGI toma la columna luz_lux y calcula PPFD (PAR) estimado dividiendo entre {PAR_TO_LUX_FACTOR:.0f}."
         ),
         accent=BRAND_COLORS['hero'],
         kicker='Cálculo'
@@ -7378,7 +7389,7 @@ def _render_ponderosa_ecowitt_dashboard(df_variables_all, df_cortinas_all, selec
     selected_variable = st.segmented_control(
         "Variable comparada",
         options=list(PONDEROSA_COMPARISON_VARIABLES.keys()),
-        format_func=lambda value: PONDEROSA_COMPARISON_VARIABLES[value]['title'].replace("Comparativa de ", "").capitalize(),
+        format_func=lambda value: _format_variable_display_title(PONDEROSA_COMPARISON_VARIABLES[value]['title']),
         default=list(PONDEROSA_COMPARISON_VARIABLES.keys())[0],
         key="ponderosa_ecowitt_variable",
     )
@@ -7846,6 +7857,7 @@ def _render_correlacion(
 
     for order, var_name in enumerate(selected_vars):
         if var_name in selected_sensors:
+            display_var_name = VARIABLE_SELECTOR_LABELS.get(var_name, var_name)
             serie = df_plot[['DateTime', var_name]].dropna(subset=[var_name]).copy()
             if serie.empty:
                 continue
@@ -7859,7 +7871,7 @@ def _render_correlacion(
             trace = dict(
                 x=serie_plot['DateTime'],
                 y=serie_plot[var_name],
-                name=var_name,
+                name=display_var_name,
                 mode='lines+markers',
                 line=dict(
                     color=VARIABLE_COLORS.get(var_name, palette[order % len(palette)]),
@@ -7873,7 +7885,7 @@ def _render_correlacion(
                 legendrank=order,
                 hovertemplate=(
                     f'<b>%{{x|{hover_time_format}}}</b><br>' +
-                    var_name + ': %{y:.2f} ' +
+                    display_var_name + ': %{y:.2f} ' +
                     VARIABLE_UNITS.get(var_name, '') +
                     '<extra></extra>'
                 ),
@@ -7898,7 +7910,7 @@ def _render_correlacion(
                     almacen_trace = dict(
                         x=serie_almacen_plot['DateTime'],
                         y=serie_almacen_plot[var_name],
-                        name=f'{var_name} - Estación externa',
+                        name=f'{display_var_name} - Estación externa',
                         mode='lines' if multi_day_view else 'lines+markers',
                         line=dict(
                             color=VARIABLE_COLORS.get(var_name, palette[order % len(palette)]),
@@ -7914,7 +7926,7 @@ def _render_correlacion(
                         legendrank=order + 0.5,
                         hovertemplate=(
                             f'<b>%{{x|{hover_time_format}}}</b><br>' +
-                            f'{var_name} - Estación externa: ' +
+                            f'{display_var_name} - Estación externa: ' +
                             '%{y:.2f} ' +
                             VARIABLE_UNITS.get(var_name, '') +
                             '<extra></extra>'
