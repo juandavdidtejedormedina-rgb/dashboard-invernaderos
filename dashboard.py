@@ -250,7 +250,7 @@ PONDEROSA_ECOWITT_RECORDS_DEFAULT = False
 PONDEROSA_ECOWITT_DETAILS_DEFAULT = False
 PAR_TO_LUX_FACTOR = 54.0
 PONDEROSA_LIGHT_SENSOR_NAMES = ("WIGA", "MCI", "APOGEE")
-PONDEROSA_LIGHT_VIEW_NAME = "APOGEE MCI WIGGA"
+PONDEROSA_LIGHT_VIEW_NAME = "APOGEE MCI WIGA"
 PONDEROSA_VIEW_GROUPS = {
     "Comparativas": ["WIGA con cortinas", "WIGA relacion ECOWITT", PONDEROSA_LIGHT_VIEW_NAME],
     "Análisis": ["Varianza", "Promedio"],
@@ -4085,12 +4085,214 @@ def _render_difference_table_30min(
         return
 
     st.caption(f"Tabla calculada con: {table_mode}. La diferencia se calcula como WIGA - ECOWITT.")
-    _render_variable_split_tables(table, default_expanded=True)
+    _render_comparison_table_summary(table, title="Resumen ejecutivo de diferencias")
+    _render_variable_split_tables(
+        table,
+        default_expanded=True,
+        download_label="Descargar reporte WIGA vs ECOWITT",
+        download_file_name=f"reporte_wiga_ecowitt_{_build_normalized_text_key(table_mode).replace(' ', '_')}.xlsx",
+        download_key=f"{state_key}_download"
+    )
 
 
-def _render_variable_split_tables(table, variable_column='Variable', default_expanded=True):
+def _sanitize_excel_sheet_name(name, existing_names=None):
+    existing_names = set(existing_names or [])
+    clean = re.sub(r'[\[\]\:\*\?\/\\]', ' ', str(name or 'Hoja')).strip()
+    clean = re.sub(r'\s+', ' ', clean) or 'Hoja'
+    clean = clean[:31]
+    candidate = clean
+    suffix = 2
+    while candidate in existing_names:
+        suffix_text = f" {suffix}"
+        candidate = f"{clean[:31 - len(suffix_text)]}{suffix_text}"
+        suffix += 1
+    return candidate
+
+
+def _build_report_slug(*parts):
+    text = " ".join(str(part) for part in parts if part not in (None, ""))
+    slug = _build_normalized_text_key(text).replace(' ', '_')
+    return slug or "reporte"
+
+
+def _build_variable_split_excel_bytes(table, variable_column='Variable'):
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        sheets_written = []
+        if variable_column in table.columns:
+            for variable_name in table[variable_column].dropna().unique().tolist():
+                variable_table = (
+                    table[table[variable_column] == variable_name]
+                    .drop(columns=[variable_column], errors='ignore')
+                    .reset_index(drop=True)
+                )
+                if variable_table.empty:
+                    continue
+                sheet_name = _sanitize_excel_sheet_name(variable_name, sheets_written)
+                variable_table.to_excel(writer, index=False, sheet_name=sheet_name)
+                sheets_written.append(sheet_name)
+
+        consolidated_name = _sanitize_excel_sheet_name('Consolidado', sheets_written)
+        table.to_excel(writer, index=False, sheet_name=consolidated_name)
+        sheets_written.append(consolidated_name)
+
+        workbook = writer.book
+        for worksheet in workbook.worksheets:
+            worksheet.freeze_panes = 'A2'
+            worksheet.auto_filter.ref = worksheet.dimensions
+            for column_cells in worksheet.columns:
+                max_length = 0
+                column_letter = column_cells[0].column_letter
+                for cell in column_cells:
+                    value = cell.value
+                    if value is None:
+                        continue
+                    max_length = max(max_length, len(str(value)))
+                worksheet.column_dimensions[column_letter].width = min(max(max_length + 2, 11), 34)
+
+    output.seek(0)
+    return output.getvalue()
+
+
+def _render_table_download_button(table, label, file_name, key, variable_column='Variable', help_text=None):
     if table.empty:
         return
+
+    try:
+        report_bytes = _build_variable_split_excel_bytes(table, variable_column=variable_column)
+    except Exception as error:
+        st.info(f"No fue posible preparar el Excel descargable. Detalle: {error}")
+        return
+
+    st.download_button(
+        label,
+        data=report_bytes,
+        file_name=file_name,
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        key=key,
+        help=help_text or "Descarga un Excel con una hoja por variable y una hoja consolidada."
+    )
+
+
+def _render_comparison_table_summary(table, title="Resumen ejecutivo"):
+    if table.empty or 'Variable' not in table.columns:
+        return
+
+    summary_rows = []
+    for variable_name, variable_table in table.groupby('Variable', sort=False):
+        unit = ''
+        if 'Unidad' in variable_table.columns:
+            units = variable_table['Unidad'].dropna().astype(str)
+            unit = units.iloc[0] if not units.empty else ''
+
+        if 'Diferencia absoluta' in variable_table.columns:
+            abs_diff = pd.to_numeric(variable_table['Diferencia absoluta'], errors='coerce')
+            signed_diff = pd.to_numeric(variable_table.get('Diferencia WIGA - ECOWITT'), errors='coerce')
+            valid_abs = abs_diff.dropna()
+            if valid_abs.empty:
+                continue
+            max_idx = valid_abs.idxmax()
+            max_row = variable_table.loc[max_idx]
+            mean_signed = signed_diff.mean()
+            tendency = (
+                "WIGA mayor"
+                if pd.notna(mean_signed) and mean_signed > 0 else
+                "ECOWITT mayor"
+                if pd.notna(mean_signed) and mean_signed < 0 else
+                "Alineados"
+            )
+            summary_rows.append({
+                'Variable': variable_name,
+                'Registros comparados': int(valid_abs.count()),
+                'Diferencia media abs.': round(float(valid_abs.mean()), 2),
+                'Diferencia media': round(float(mean_signed), 2) if pd.notna(mean_signed) else pd.NA,
+                'Mayor diferencia': round(float(valid_abs.max()), 2),
+                'Momento mayor diferencia': f"{max_row.get('Fecha', '')} {max_row.get('Hora', '')}".strip(),
+                'Lectura general': tendency,
+                'Unidad': unit,
+            })
+            continue
+
+        diff_columns = [
+            column
+            for column in variable_table.columns
+            if ' - ' in str(column) and column not in ('Fecha', 'Hora')
+        ]
+        if not diff_columns:
+            continue
+
+        diff_frame = variable_table[diff_columns].apply(pd.to_numeric, errors='coerce')
+        if diff_frame.dropna(how='all').empty:
+            continue
+        abs_frame = diff_frame.abs()
+        max_column = abs_frame.max().idxmax()
+        max_idx = abs_frame[max_column].idxmax()
+        max_row = variable_table.loc[max_idx]
+        summary_rows.append({
+            'Variable': variable_name,
+            'Registros comparados': int(abs_frame.dropna(how='all').shape[0]),
+            'Diferencia media abs.': round(float(abs_frame.stack().mean()), 2),
+            'Diferencia media': round(float(diff_frame[max_column].mean()), 2) if diff_frame[max_column].notna().any() else pd.NA,
+            'Mayor diferencia': round(float(abs_frame.loc[max_idx, max_column]), 2),
+            'Momento mayor diferencia': f"{max_row.get('Fecha', '')} {max_row.get('Hora', '')}".strip(),
+            'Lectura general': max_column,
+            'Unidad': unit,
+        })
+
+    if not summary_rows:
+        return
+
+    st.markdown(f"### {title}")
+    summary_df = pd.DataFrame(summary_rows)
+    cols = st.columns(min(3, len(summary_rows)))
+    for idx, row in enumerate(summary_rows):
+        with cols[idx % len(cols)]:
+            unit_label = f" {row['Unidad']}" if row.get('Unidad') else ""
+            st.markdown(
+                f"""
+                <div style="
+                    background: rgba(255,255,255,0.94);
+                    border: 1px solid rgba(84, 83, 134, 0.10);
+                    border-left: 4px solid {BRAND_COLORS['hero']};
+                    border-radius: 16px;
+                    padding: 0.9rem 1rem;
+                    margin-bottom: 0.8rem;
+                    box-shadow: 0 12px 28px rgba(44,46,42,0.06);
+                    min-height: 150px;
+                ">
+                    <div style="font-size:0.78rem;font-weight:800;letter-spacing:0.04em;text-transform:uppercase;color:{BRAND_COLORS['hero']};">
+                        {html.escape(str(row['Variable']))}
+                    </div>
+                    <div style="font-size:1.75rem;font-weight:800;line-height:1.05;margin:0.35rem 0;color:{BRAND_COLORS['graphite']};">
+                        {html.escape(str(row['Mayor diferencia']))}{html.escape(unit_label)}
+                    </div>
+                    <div style="font-size:0.9rem;line-height:1.45;color:rgba(56,58,53,0.82);">
+                        Mayor diferencia en {html.escape(str(row['Momento mayor diferencia']))}.<br>
+                        Media absoluta: {html.escape(str(row['Diferencia media abs.']))}{html.escape(unit_label)}.<br>
+                        Lectura: {html.escape(str(row['Lectura general']))}.
+                    </div>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+
+    with st.expander("Ver resumen ejecutivo en tabla", expanded=False):
+        _dataframe(summary_df, hide_index=True)
+
+
+def _render_variable_split_tables(
+    table,
+    variable_column='Variable',
+    default_expanded=True,
+    download_label=None,
+    download_file_name=None,
+    download_key=None,
+):
+    if table.empty:
+        return
+
+    if download_label and download_file_name and download_key:
+        _render_table_download_button(table, download_label, download_file_name, download_key, variable_column)
 
     if variable_column not in table.columns:
         _dataframe(table, hide_index=True)
@@ -4851,6 +5053,14 @@ def _render_graphed_series_table(
             f"Datos usados por la gráfica{caption_source}. Resolución: {resolution_label}. "
             "La tabla queda ordenada por fecha y hora para facilitar revisión o reporte."
         )
+        download_slug = _build_report_slug(title, source_label, resolution_label)
+        _render_table_download_button(
+            table,
+            "Descargar datos graficados",
+            f"datos_graficados_{download_slug}.xlsx",
+            f"descargar_datos_graficados_{download_slug}",
+            help_text="Descarga un Excel con los mismos datos que alimentan esta gráfica."
+        )
         _dataframe(table, hide_index=True)
 
 
@@ -5115,9 +5325,18 @@ def _render_marley_dashboard(dashboard_mode):
             accent=MARLEY_VARIABLES[selected_variable]['accent']
         )
         _plotly_chart(_make_marley_hourly_metric_chart(grouped_metric, selected_variable, dashboard_mode))
+        metric_table = _prepare_marley_hourly_metric_table(grouped_metric)
         with st.expander(f"Ver tabla ordenada de {dashboard_mode.lower()}", expanded=True):
             st.caption("Tabla calculada con los mismos valores de la gráfica, ordenada por franja horaria.")
-            _dataframe(_prepare_marley_hourly_metric_table(grouped_metric), hide_index=True)
+            report_slug = _build_report_slug("marly", dashboard_mode, selected_variable)
+            _render_table_download_button(
+                metric_table,
+                f"Descargar tabla de {dashboard_mode.lower()}",
+                f"marly_{dashboard_mode.lower()}_{report_slug}.xlsx",
+                f"descargar_marley_{dashboard_mode.lower()}_{report_slug}",
+                help_text="Descarga un Excel con la tabla calculada a partir de la gráfica visible."
+            )
+            _dataframe(metric_table, hide_index=True)
         if show_marley_details:
             detail_resolution = st.radio(
                 "Resolución de las gráficas individuales:",
@@ -7695,7 +7914,14 @@ def _render_ponderosa_apogee_mci_wiga_dashboard(df_variables_all, df_cortinas_al
             st.info("No hay datos suficientes para construir la tabla comparativa.")
         else:
             st.caption(f"Tabla calculada con: {table_mode}. Las diferencias se leen como sensor comparado menos WIGA o APOGEE menos MCI.")
-            _render_variable_split_tables(table, default_expanded=True)
+            _render_comparison_table_summary(table, title="Resumen ejecutivo APOGEE / MCI / WIGA")
+            _render_variable_split_tables(
+                table,
+                default_expanded=True,
+                download_label="Descargar reporte APOGEE / MCI / WIGA",
+                download_file_name=f"reporte_apogee_mci_wiga_{_build_normalized_text_key(comparison_resolution).replace(' ', '_')}.xlsx",
+                download_key="descargar_ponderosa_light_reporte"
+            )
 
     if show_details:
         _render_ponderosa_light_individual_charts(comparisons, selected_range, comparison_resolution)
@@ -9679,8 +9905,17 @@ def _render_hourly_analysis_view(
 
     if tab_label == "Promedio":
         _render_hourly_metric_chart(grouped_df, variable_name, 'Promedio')
+        promedio_table = _prepare_hourly_pivot_display(pivot_promedio)
         with st.expander('Ver tabla dinámica de promedio', expanded=False):
-            _dataframe(_prepare_hourly_pivot_display(pivot_promedio))
+            report_slug = _build_report_slug("ponderosa", "promedio", variable_name, period_text, variable_state_key)
+            _render_table_download_button(
+                promedio_table,
+                "Descargar tabla de promedio",
+                f"ponderosa_promedio_{report_slug}.xlsx",
+                f"descargar_ponderosa_promedio_{report_slug}",
+                help_text="Descarga un Excel con la tabla calculada a partir de la gráfica visible."
+            )
+            _dataframe(promedio_table)
     elif single_day_analysis:
         _render_chart_explanation(
             f'Varianza por franja horaria - {VARIABLE_SELECTOR_LABELS.get(variable_name, variable_name)}',
@@ -9693,8 +9928,17 @@ def _render_hourly_analysis_view(
         )
     else:
         _render_hourly_metric_chart(grouped_df, variable_name, 'Varianza')
+        varianza_table = _prepare_hourly_pivot_display(pivot_varianza)
         with st.expander('Ver tabla dinámica de varianza', expanded=False):
-            _dataframe(_prepare_hourly_pivot_display(pivot_varianza))
+            report_slug = _build_report_slug("ponderosa", "varianza", variable_name, period_text, variable_state_key)
+            _render_table_download_button(
+                varianza_table,
+                "Descargar tabla de varianza",
+                f"ponderosa_varianza_{report_slug}.xlsx",
+                f"descargar_ponderosa_varianza_{report_slug}",
+                help_text="Descarga un Excel con la tabla calculada a partir de la gráfica visible."
+            )
+            _dataframe(varianza_table)
 
     metrics_data = _collect_analysis_metrics(df_variables, tab_label, variable_options)
     _render_analysis_metric_cards_row(metrics_data, tab_label, single_day_analysis, variable_options=variable_options)
