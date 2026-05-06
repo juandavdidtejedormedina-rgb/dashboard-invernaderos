@@ -4085,7 +4085,32 @@ def _render_difference_table_30min(
         return
 
     st.caption(f"Tabla calculada con: {table_mode}. La diferencia se calcula como WIGA - ECOWITT.")
-    _dataframe(table, hide_index=True)
+    _render_variable_split_tables(table, default_expanded=True)
+
+
+def _render_variable_split_tables(table, variable_column='Variable', default_expanded=True):
+    if table.empty:
+        return
+
+    if variable_column not in table.columns:
+        _dataframe(table, hide_index=True)
+        return
+
+    variable_names = [name for name in table[variable_column].dropna().unique().tolist()]
+    if not variable_names:
+        _dataframe(table, hide_index=True)
+        return
+
+    for variable_name in variable_names:
+        variable_table = (
+            table[table[variable_column] == variable_name]
+            .drop(columns=[variable_column], errors='ignore')
+            .reset_index(drop=True)
+        )
+        if variable_table.empty:
+            continue
+        with st.expander(f"Tabla de {variable_name}", expanded=default_expanded):
+            _dataframe(variable_table, hide_index=True)
 
 
 def _get_marley_time_axis_config(df):
@@ -7597,7 +7622,7 @@ def _render_ponderosa_apogee_mci_wiga_dashboard(df_variables_all, df_cortinas_al
             st.info("No hay datos suficientes para construir la tabla comparativa.")
         else:
             st.caption(f"Tabla calculada con: {table_mode}. Las diferencias se leen como sensor comparado menos WIGA o APOGEE menos MCI.")
-            _dataframe(table, hide_index=True)
+            _render_variable_split_tables(table, default_expanded=True)
 
     if show_details:
         _render_ponderosa_light_individual_charts(comparisons, selected_range, comparison_resolution)
