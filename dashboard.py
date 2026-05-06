@@ -5979,8 +5979,9 @@ def _get_ponderosa_light_y_axis_config(comparison, variable):
     span = max(vmax - vmin, 1)
 
     if variable == "LUX":
-        axis_min = 0 if vmin >= 0 else vmin - span * 0.08
         axis_max = vmax + max(span * 0.08, 500)
+        zero_padding = max(axis_max * 0.025, 500)
+        axis_min = -zero_padding if vmin >= 0 else vmin - span * 0.08
         dtick = 1000 if axis_max <= 12000 else 2500 if axis_max <= 30000 else 5000 if axis_max <= 70000 else 10000
         return {
             'title': 'LUX',
@@ -5989,8 +5990,9 @@ def _get_ponderosa_light_y_axis_config(comparison, variable):
             'tickformat': ',.0f',
         }
 
-    axis_min = 0 if vmin >= 0 else vmin - span * 0.08
     axis_max = vmax + max(span * 0.08, 15)
+    zero_padding = max(axis_max * 0.025, 5)
+    axis_min = -zero_padding if vmin >= 0 else vmin - span * 0.08
     dtick = 10 if axis_max <= 120 else 25 if axis_max <= 350 else 50 if axis_max <= 900 else 100
     return {
         'title': PPFD_DISPLAY_LABEL_ASCII,
