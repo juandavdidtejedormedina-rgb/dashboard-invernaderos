@@ -4315,7 +4315,7 @@ def _make_marley_difference_chart(comparison, variable, selected_range, resoluti
             hovertemplate="<b>%{x|%Y-%m-%d %H:%M}</b><br>Diferencia: %{y:+.2f} " + config['unit'] + "<extra></extra>",
         )
     )
-    fig.add_hline(y=0, line_width=1.4, line_dash='dash', line_color="rgba(45, 48, 64, 0.45)")
+    fig.add_hline(y=0, line_width=1.4, line_dash='solid', line_color="rgba(45, 48, 64, 0.45)")
     fig.update_layout(
         title=dict(
             text=(
@@ -4384,7 +4384,7 @@ def _make_marley_scatter_chart(comparison, variable):
             y=[axis_min, axis_max],
             mode='lines',
             name='Referencia y = x',
-            line=dict(color="#D39A58", width=2, dash='dash'),
+        line=dict(color="#D39A58", width=2),
             hoverinfo='skip',
         )
     )
@@ -5917,7 +5917,7 @@ def _make_ponderosa_difference_chart(comparison, variable, selected_range, resol
             hovertemplate="<b>%{x|%Y-%m-%d %H:%M}</b><br>Diferencia: %{y:+.2f} " + config['unit'] + "<extra></extra>",
         )
     )
-    fig.add_hline(y=0, line_width=1.4, line_dash='dash', line_color="rgba(45, 48, 64, 0.45)")
+    fig.add_hline(y=0, line_width=1.4, line_dash='solid', line_color="rgba(45, 48, 64, 0.45)")
     fig.update_layout(
         title=dict(
             text=(
@@ -5986,7 +5986,7 @@ def _make_ponderosa_scatter_chart(comparison, variable):
             y=[axis_min, axis_max],
             mode='lines',
             name='Referencia y = x',
-            line=dict(color="#D39A58", width=2, dash='dash'),
+        line=dict(color="#D39A58", width=2),
             hoverinfo='skip',
         )
     )
@@ -6353,7 +6353,7 @@ def _make_ponderosa_light_difference_chart(comparison, variable, selected_range,
                 y=diff_df[diff_name],
                 name=diff_name,
                 mode='lines+markers',
-                line=dict(color=config['colors'][sensor_name], width=2.8, dash='dash' if sensor_name == 'MCI' else 'dot'),
+                line=dict(color=config['colors'][sensor_name], width=2.8),
                 marker=dict(size=5.5),
                 connectgaps=False,
                 hovertemplate=(
@@ -8448,11 +8448,10 @@ def _render_correlacion(
                         y=serie_almacen_plot[var_name],
                         name=f'{display_var_name} - Estación externa',
                         mode='lines' if multi_day_view else 'lines+markers',
-                        line=dict(
-                            color=VARIABLE_COLORS.get(var_name, palette[order % len(palette)]),
-                            width=2,
-                            dash='dot'
-                        ),
+                    line=dict(
+                        color=VARIABLE_COLORS.get(var_name, palette[order % len(palette)]),
+                        width=2,
+                    ),
                         marker=dict(
                             size=4,
                             color=VARIABLE_COLORS.get(var_name, palette[order % len(palette)]),
@@ -8543,7 +8542,7 @@ def _render_correlacion(
                         y=df_state['Apertura_ideal_m2'],
                         name=f'{var_name} ideal',
                         mode='lines',
-                        line=dict(color=color, width=2.2, shape='hv', dash='dot'),
+                    line=dict(color=color, width=2.2, shape='hv'),
                         opacity=0.68,
                         hoverinfo='skip',
                         legendgroup=str(var_name),
