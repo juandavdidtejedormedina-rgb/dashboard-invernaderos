@@ -5082,13 +5082,6 @@ def _render_marley_dashboard(dashboard_mode):
         kicker='Orientación'
     )
 
-    selected_variable = st.segmented_control(
-        "Variable Marly",
-        options=list(MARLEY_VARIABLES.keys()),
-        format_func=lambda value: _format_variable_display_title(MARLEY_VARIABLES[value]['title']),
-        default=list(MARLEY_VARIABLES.keys())[0],
-        key="marley_variable",
-    )
     show_marley_details = st.checkbox(
         "Cargar variables individuales",
         key="mostrar_marley_detalles",
@@ -5096,6 +5089,13 @@ def _render_marley_dashboard(dashboard_mode):
     )
 
     if dashboard_mode in ("Varianza", "Promedio"):
+        selected_variable = st.segmented_control(
+            "Variable Marly",
+            options=list(MARLEY_VARIABLES.keys()),
+            format_func=lambda value: _format_variable_display_title(MARLEY_VARIABLES[value]['title']),
+            default=list(MARLEY_VARIABLES.keys())[0],
+            key="marley_variable",
+        )
         if dashboard_mode == "Varianza" and selected_range[0] == selected_range[1]:
             st.warning("Para ver la varianza en Marly selecciona un rango de al menos 2 días.")
             st.stop()
@@ -5140,6 +5140,79 @@ def _render_marley_dashboard(dashboard_mode):
         key="marley_comparison_resolution",
         help="Promedio agrupa ambos sensores cada 30 minutos; punto por punto usa lecturas crudas; WIGA 30 min mantiene WIGA como base y toma el ECOWITT más cercano a cada hora WIGA."
     )
+    point_mode = comparison_resolution == COMPARISON_RESOLUTION_OPTIONS[1]
+    nearest_wiga_mode = comparison_resolution == COMPARISON_RESOLUTION_OPTIONS[2]
+    compared_variables = [
+        "Temperatura (°C)",
+        "Humedad Relativa (%)",
+        "Radiación PAR (µmol m-2 s-1)",
+    ]
+    _render_chart_explanation(
+        'Comparación directa WIGA vs ECOWITT',
+        (
+            'Se muestran todas las variables compartidas, una debajo de otra. Cada gráfica superpone WIGA y ECOWITT con la resolución seleccionada para revisar diferencias sin cambiar de pestaña.'
+        ),
+        accent=BRAND_COLORS['hero']
+    )
+    for variable_name in compared_variables:
+        comparison = (
+            _build_point_comparison(filtered_df, variable_name, MARLEY_SENSOR_NAMES)
+            if point_mode else
+            _build_wiga_anchor_nearest_comparison(
+                filtered_df,
+                variable_name,
+                MARLEY_SENSOR_NAMES,
+                selected_range,
+                _build_marley_hourly_series
+            )
+            if nearest_wiga_mode else
+            _build_marley_hourly_comparison(filtered_df, variable_name, selected_range)
+        )
+        if comparison.empty or comparison.dropna(how='all', subset=list(MARLEY_SENSOR_NAMES)).empty:
+            st.info(f"No hay datos suficientes para graficar {_format_variable_display_title(MARLEY_VARIABLES[variable_name]['title'])}.")
+            continue
+        _plotly_chart(_make_marley_comparison_chart(comparison, variable_name, selected_range, comparison_resolution))
+        difference_chart = _make_marley_difference_chart(comparison, variable_name, selected_range, comparison_resolution)
+        if difference_chart is not None:
+            _plotly_chart(difference_chart)
+
+    _render_difference_table_30min(
+        filtered_df,
+        compared_variables,
+        MARLEY_SENSOR_NAMES,
+        selected_range,
+        comparison_resolution,
+        _build_marley_hourly_comparison,
+        _build_marley_hourly_series,
+        MARLEY_VARIABLES,
+        "mostrar_marley_tabla_diferencias_30min"
+    )
+
+    if show_marley_details:
+        _render_marley_individual_variable_charts(
+            filtered_df,
+            selected_range,
+            resolution_label=comparison_resolution
+        )
+
+    if st.checkbox(
+        "Cargar registros consolidados de Marly",
+        key="mostrar_marley_registros",
+        help=FILTER_HELP_TEXTS['registros']
+    ):
+        _dataframe(filtered_df.drop(columns=['Fecha_Filtro'], errors='ignore'), hide_index=True)
+        summary_rows = []
+        for source_name, source_df in marley_source_data.items():
+            current = source_df[source_df['Fecha_Filtro'].between(*selected_range)]
+            summary_rows.append({
+                'Equipo': source_name,
+                'Registros': len(current),
+                'Inicio': current['FechaHora'].min().strftime('%Y-%m-%d %H:%M') if not current.empty else '-',
+                'Fin': current['FechaHora'].max().strftime('%Y-%m-%d %H:%M') if not current.empty else '-',
+            })
+        _dataframe(pd.DataFrame(summary_rows), hide_index=True)
+
+    st.stop()
     point_mode = comparison_resolution == COMPARISON_RESOLUTION_OPTIONS[1]
     nearest_wiga_mode = comparison_resolution == COMPARISON_RESOLUTION_OPTIONS[2]
     comparison = (
@@ -7942,18 +8015,11 @@ def _render_ponderosa_ecowitt_dashboard(df_variables_all, df_cortinas_all, selec
     st.caption(f"Comparación entre {block_label} en Datos_Variables y la estación ECOWITT Ponderosa.")
     _render_chart_explanation(
         'Cómo usar esta comparación',
-        'Selecciona una variable para comparar la fuente WIGA elegida contra ECOWITT. Las lecturas se agrupan en franjas de 30 minutos para que ambos equipos queden sobre la misma línea de tiempo.',
+        'Se muestran todas las variables compartidas entre WIGA y ECOWITT, una debajo de otra. Las lecturas se agrupan o se alinean según la resolución seleccionada para que ambos equipos queden sobre la misma línea de tiempo.',
         accent=BRAND_COLORS['hero'],
         kicker='Orientación'
     )
 
-    selected_variable = st.segmented_control(
-        "Variable comparada",
-        options=list(PONDEROSA_COMPARISON_VARIABLES.keys()),
-        format_func=lambda value: _format_variable_display_title(PONDEROSA_COMPARISON_VARIABLES[value]['title']),
-        default=list(PONDEROSA_COMPARISON_VARIABLES.keys())[0],
-        key="ponderosa_ecowitt_variable",
-    )
     show_details = st.checkbox(
         "Cargar detalle individual WIGA / ECOWITT",
         key="mostrar_ponderosa_ecowitt_detalles",
@@ -7967,6 +8033,72 @@ def _render_ponderosa_ecowitt_dashboard(df_variables_all, df_cortinas_all, selec
         key="ponderosa_ecowitt_comparison_resolution",
         help="Promedio agrupa ambos sensores cada 30 minutos; punto por punto usa lecturas crudas; WIGA 30 min mantiene WIGA como base y toma el ECOWITT más cercano a cada hora WIGA."
     )
+    point_mode = comparison_resolution == COMPARISON_RESOLUTION_OPTIONS[1]
+    nearest_wiga_mode = comparison_resolution == COMPARISON_RESOLUTION_OPTIONS[2]
+    compared_variables = list(PONDEROSA_COMPARISON_VARIABLES.keys())
+    for variable_name in compared_variables:
+        comparison = (
+            _build_point_comparison(filtered_df, variable_name, PONDEROSA_SENSOR_NAMES)
+            if point_mode else
+            _build_wiga_anchor_nearest_comparison(
+                filtered_df,
+                variable_name,
+                PONDEROSA_SENSOR_NAMES,
+                selected_range,
+                _build_ponderosa_hourly_series
+            )
+            if nearest_wiga_mode else
+            _build_ponderosa_hourly_comparison(filtered_df, variable_name, selected_range)
+        )
+        if comparison.empty or comparison.dropna(how='all', subset=list(PONDEROSA_SENSOR_NAMES)).empty:
+            st.info(f"No hay datos suficientes para graficar {_format_variable_display_title(PONDEROSA_COMPARISON_VARIABLES[variable_name]['title'])}.")
+            continue
+        _plotly_chart(_make_ponderosa_comparison_chart(comparison, variable_name, selected_range, comparison_resolution))
+        difference_chart = _make_ponderosa_difference_chart(comparison, variable_name, selected_range, comparison_resolution)
+        if difference_chart is not None:
+            _plotly_chart(difference_chart)
+
+    _render_difference_table_30min(
+        filtered_df,
+        compared_variables,
+        PONDEROSA_SENSOR_NAMES,
+        selected_range,
+        comparison_resolution,
+        _build_ponderosa_hourly_comparison,
+        _build_ponderosa_hourly_series,
+        PONDEROSA_COMPARISON_VARIABLES,
+        "mostrar_ponderosa_tabla_diferencias_30min"
+    )
+
+    if show_details:
+        _render_ponderosa_source_individual_charts(
+            filtered_df,
+            selected_range,
+            compared_variables,
+            PONDEROSA_SENSOR_NAMES,
+            "Variables individuales WIGA / ECOWITT Ponderosa",
+            "Estas gráficas separan cada variable compartida por sensor para revisar la forma de cada lectura sin la superposición de la comparativa.",
+            comparison_resolution
+        )
+
+    if st.checkbox(
+        "Cargar registros consolidados de Ponderosa",
+        key="mostrar_ponderosa_ecowitt_registros",
+        help=FILTER_HELP_TEXTS['registros']
+    ):
+        _dataframe(filtered_df.drop(columns=['Fecha_Filtro'], errors='ignore'), hide_index=True)
+        summary_rows = []
+        for source_name, source_df in source_frames.items():
+            current = source_df[source_df['Fecha_Filtro'].between(*selected_range)] if not source_df.empty else pd.DataFrame()
+            summary_rows.append({
+                'Equipo': source_name,
+                'Registros': len(current),
+                'Inicio': current['FechaHora'].min().strftime('%Y-%m-%d %H:%M') if not current.empty else '-',
+                'Fin': current['FechaHora'].max().strftime('%Y-%m-%d %H:%M') if not current.empty else '-',
+            })
+        _dataframe(pd.DataFrame(summary_rows), hide_index=True)
+
+    st.stop()
     point_mode = comparison_resolution == COMPARISON_RESOLUTION_OPTIONS[1]
     nearest_wiga_mode = comparison_resolution == COMPARISON_RESOLUTION_OPTIONS[2]
     comparison = (
