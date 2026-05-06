@@ -171,7 +171,7 @@ VARIABLE_SELECTOR_LABELS = {
     'PUERTA 2': 'Puerta 2'
 }
 FILTER_HELP_TEXTS = {
-    'modo_dashboard': 'Elige la vista principal: WIGA con cortinas, relación WIGA / ECOWITT, APOGI / MCI / WIGA, APOGI, varianza, promedio o fuentes individuales.',
+    'modo_dashboard': 'Elige la vista principal: WIGA con cortinas, relación WIGA / ECOWITT, APOGEE / MCI / WIGA, APOGEE, varianza, promedio o fuentes individuales.',
     'finca': 'Selecciona la finca que quieres explorar en el dashboard. Los bloques y fechas disponibles se ajustan según esa finca.',
     'modo_fechas': 'Define si quieres analizar un solo día o un rango de varios días.',
     'fecha': 'Selecciona la fecha o el rango que se usará para filtrar los registros visibles en la vista actual.',
@@ -228,7 +228,11 @@ COMPARISON_RESOLUTION_OPTIONS = (
     "Punto por punto",
     "WIGA 30 min + ECOWITT cercano",
 )
-SOURCE_RESOLUTION_OPTIONS = COMPARISON_RESOLUTION_OPTIONS[:2]
+SOURCE_RESOLUTION_OPTIONS = (
+    "Promedio cada 30 min",
+    "Punto por punto",
+    "Valor más cercano cada 30 min",
+)
 PONDEROSA_ECOWITT_LOCAL_EXCEL_PATHS = [
     APP_DIR / 'ECOWITT Ponderosa.xlsx'
 ]
@@ -245,8 +249,8 @@ PONDEROSA_ECOWITT_BLOCK_CODE = "35"
 PONDEROSA_ECOWITT_RECORDS_DEFAULT = False
 PONDEROSA_ECOWITT_DETAILS_DEFAULT = False
 PAR_TO_LUX_FACTOR = 54.0
-PONDEROSA_LIGHT_SENSOR_NAMES = ("WIGA", "MCI", "APOGI")
-PONDEROSA_LIGHT_VIEW_NAME = "APOGI MCI WIGGA"
+PONDEROSA_LIGHT_SENSOR_NAMES = ("WIGA", "MCI", "APOGEE")
+PONDEROSA_LIGHT_VIEW_NAME = "APOGEE MCI WIGGA"
 MARLEY_SHEETS = {
     "WIGA": ["WIGGA MONTAÑA", "WIGA MARLEY"],
     "ECOWITT": ["ECOWITT MONTAÑA", "ECOWIT MARLEY"],
@@ -332,29 +336,29 @@ PONDEROSA_WIGA_VARIABLES = {
 PONDEROSA_ECOWITT_VARIABLES = {
     **PONDEROSA_COMPARISON_VARIABLES,
 }
-PONDEROSA_APOGI_VARIABLES = {
+PONDEROSA_APOGEE_VARIABLES = {
     "LUX": {
         "title": "Luminosidad LUX",
         "unit": "lux",
-        "colors": {"APOGI": "#B9832F"},
+        "colors": {"APOGEE": "#B9832F"},
         "accent": "#B9832F",
     },
 }
 PONDEROSA_ECOWITT_DATA_VARIABLES = {
     **PONDEROSA_ECOWITT_VARIABLES,
-    **PONDEROSA_APOGI_VARIABLES,
+    **PONDEROSA_APOGEE_VARIABLES,
 }
 PONDEROSA_LIGHT_VARIABLES = {
     "LUX": {
         "title": "Comparativa de LUX",
         "unit": "lux",
-        "colors": {"WIGA": "#B9832F", "MCI": "#5AA6A6", "APOGI": "#D39A58"},
+        "colors": {"WIGA": "#B9832F", "MCI": "#5AA6A6", "APOGEE": "#D39A58"},
         "accent": "#B9832F",
     },
     "Radiación PAR": {
         "title": "Comparativa de PPFD (PAR)",
         "unit": "PPFD µmol m-2 s-1",
-        "colors": {"WIGA": "#6BEA5B", "MCI": "#524B82", "APOGI": "#4E8D7C"},
+        "colors": {"WIGA": "#6BEA5B", "MCI": "#524B82", "APOGEE": "#4E8D7C"},
         "accent": "#6BEA5B",
     },
 }
@@ -3884,6 +3888,42 @@ def _build_wiga_anchor_nearest_comparison(
     return _finalize_sensor_comparison(comparison, sensor_names)
 
 
+def _build_nearest_series_to_time_grid(
+    df,
+    column_name,
+    selected_range,
+    tolerance=POINT_COMPARISON_TOLERANCE
+):
+    if df.empty or column_name not in df.columns:
+        return pd.DataFrame(columns=['FechaHora', column_name])
+
+    source_df = df[['FechaHora', column_name]].dropna(subset=[column_name]).copy()
+    if source_df.empty:
+        return pd.DataFrame(columns=['FechaHora', column_name])
+
+    source_df['FechaHora'] = pd.to_datetime(source_df['FechaHora'], errors='coerce')
+    source_df[column_name] = pd.to_numeric(source_df[column_name], errors='coerce')
+    source_df = (
+        source_df
+        .dropna(subset=['FechaHora', column_name])
+        .groupby('FechaHora', as_index=False)[column_name]
+        .mean()
+        .sort_values('FechaHora')
+    )
+    if source_df.empty:
+        return pd.DataFrame(columns=['FechaHora', column_name])
+
+    anchors = pd.DataFrame({'FechaHora': _build_ponderosa_full_time_index(selected_range)})
+    nearest_df = pd.merge_asof(
+        anchors.sort_values('FechaHora'),
+        source_df.sort_values('FechaHora'),
+        on='FechaHora',
+        direction='nearest',
+        tolerance=tolerance
+    )
+    return nearest_df
+
+
 def _build_difference_table_30min(
     df,
     variables,
@@ -4468,6 +4508,8 @@ def _build_marley_individual_series(df, variable, source_name, selected_range, r
             .sort_values('FechaHora')
             .reset_index(drop=True)
         )
+    elif resolution_label == SOURCE_RESOLUTION_OPTIONS[2]:
+        series_df = _build_nearest_series_to_time_grid(df, column_name, selected_range)
     else:
         series_df = _build_marley_hourly_series(df, column_name, selected_range)
 
@@ -4487,6 +4529,7 @@ def _make_marley_individual_variable_chart(df, variable, source_name, selected_r
     start_date, end_date = selected_range
     variable_title = _format_variable_display_title(config['title'])
     point_mode = resolution_label == COMPARISON_RESOLUTION_OPTIONS[1]
+    nearest_mode = resolution_label == SOURCE_RESOLUTION_OPTIONS[2]
     trace_type = go.Scattergl if point_mode and len(series_df) > 250 else go.Scatter
 
     fig = go.Figure()
@@ -4511,7 +4554,13 @@ def _make_marley_individual_variable_chart(df, variable, source_name, selected_r
     )
     fig.update_layout(
         title=dict(
-            text=f"{variable_title} - {source_name}" + (" - punto por punto" if point_mode else ""),
+            text=(
+                f"{variable_title} - {source_name} - punto por punto"
+                if point_mode else
+                f"{variable_title} - {source_name} - valor más cercano cada 30 min"
+                if nearest_mode else
+                f"{variable_title} - {source_name}"
+            ),
             x=0,
             xanchor='left'
         ),
@@ -4577,6 +4626,7 @@ def _make_source_all_variables_chart(
     )
     start_date, end_date = selected_range
     point_mode = resolution_label == COMPARISON_RESOLUTION_OPTIONS[1]
+    nearest_mode = resolution_label == SOURCE_RESOLUTION_OPTIONS[2]
 
     for row_index, (variable, series_df) in enumerate(rendered_series, start=1):
         config = variable_configs[variable]
@@ -4625,7 +4675,17 @@ def _make_source_all_variables_chart(
     )
     fig.update_xaxes(title_text=time_axis['title'], row=len(rendered_series), col=1)
     fig.update_layout(
-        title=dict(text=title + (" - punto por punto" if point_mode else ""), x=0, xanchor='left'),
+        title=dict(
+            text=(
+                title + " - punto por punto"
+                if point_mode else
+                title + " - valor más cercano cada 30 min"
+                if nearest_mode else
+                title
+            ),
+            x=0,
+            xanchor='left'
+        ),
         height=max(540, 235 * len(rendered_series)),
         margin=dict(l=36, r=28, t=82, b=48),
         paper_bgcolor="rgba(255,255,255,0)",
@@ -4821,7 +4881,7 @@ def _render_marley_dashboard(dashboard_mode):
             options=SOURCE_RESOLUTION_OPTIONS,
             horizontal=True,
             key=f"marley_{source_name.lower()}_source_resolution",
-            help="Usa el promedio para una lectura limpia por media hora, o punto por punto para ver las lecturas reales sin agrupar."
+            help="Usa promedio para agrupar por media hora, punto por punto para ver las lecturas crudas, o valor más cercano para tomar el registro más próximo a cada marca exacta de 30 minutos."
         )
 
         combined_chart = _make_source_all_variables_chart(
@@ -4911,7 +4971,7 @@ def _render_marley_dashboard(dashboard_mode):
                 options=SOURCE_RESOLUTION_OPTIONS,
                 horizontal=True,
                 key="marley_varianza_detail_resolution",
-                help="La varianza se mantiene por franja horaria; este control aplica solo a las gráficas individuales."
+                help="La varianza se mantiene por franja horaria; este control aplica solo a las gráficas individuales con promedio, punto por punto o valor más cercano cada 30 minutos."
             )
             _render_marley_individual_variable_charts(
                 filtered_df,
@@ -5275,13 +5335,13 @@ def _build_ponderosa_ecowitt_source(ecowitt_df):
     return df
 
 
-def _build_ponderosa_apogi_source(ecowitt_df):
+def _build_ponderosa_apogee_source(ecowitt_df):
     if ecowitt_df.empty:
         return pd.DataFrame()
 
-    df = ecowitt_df[['FechaHora', 'Fecha_Filtro', *PONDEROSA_APOGI_VARIABLES.keys()]].copy()
-    for variable in PONDEROSA_APOGI_VARIABLES:
-        df.rename(columns={variable: f"{variable} - APOGI"}, inplace=True)
+    df = ecowitt_df[['FechaHora', 'Fecha_Filtro', *PONDEROSA_APOGEE_VARIABLES.keys()]].copy()
+    for variable in PONDEROSA_APOGEE_VARIABLES:
+        df.rename(columns={variable: f"{variable} - APOGEE"}, inplace=True)
     return df
 
 
@@ -5325,7 +5385,7 @@ def _build_ponderosa_light_sensor_dataset(df_variables_all, ecowitt_df, bloque_v
         wiga_source['LUX - WIGA'] = wiga_source['Radiación PAR - WIGA'] * PAR_TO_LUX_FACTOR
 
     mci_source = pd.DataFrame()
-    apogi_source = pd.DataFrame()
+    apogee_source = pd.DataFrame()
     if not ecowitt_df.empty:
         base_ecowitt = ecowitt_df[['FechaHora', 'Fecha_Filtro', 'Radiación PAR', 'LUX']].copy()
         base_ecowitt['Radiación PAR'] = pd.to_numeric(base_ecowitt['Radiación PAR'], errors='coerce')
@@ -5335,20 +5395,20 @@ def _build_ponderosa_light_sensor_dataset(df_variables_all, ecowitt_df, bloque_v
         mci_source.rename(columns={'Radiación PAR': 'Radiación PAR - MCI'}, inplace=True)
         mci_source['LUX - MCI'] = mci_source['Radiación PAR - MCI'] * PAR_TO_LUX_FACTOR
 
-        apogi_source = base_ecowitt[['FechaHora', 'Fecha_Filtro', 'LUX']].copy()
-        apogi_source.rename(columns={'LUX': 'LUX - APOGI'}, inplace=True)
-        apogi_source['Radiación PAR - APOGI'] = apogi_source['LUX - APOGI'] / PAR_TO_LUX_FACTOR
+        apogee_source = base_ecowitt[['FechaHora', 'Fecha_Filtro', 'LUX']].copy()
+        apogee_source.rename(columns={'LUX': 'LUX - APOGEE'}, inplace=True)
+        apogee_source['Radiación PAR - APOGEE'] = apogee_source['LUX - APOGEE'] / PAR_TO_LUX_FACTOR
 
     merge_frames = [
         frame.drop(columns=['Fecha_Filtro'], errors='ignore')
-        for frame in (wiga_source, mci_source, apogi_source)
+        for frame in (wiga_source, mci_source, apogee_source)
         if not frame.empty
     ]
     if not merge_frames:
         return pd.DataFrame(columns=light_columns), {
             'WIGA': wiga_source,
             'MCI': mci_source,
-            'APOGI': apogi_source,
+            'APOGEE': apogee_source,
         }
 
     merged = merge_frames[0]
@@ -5363,7 +5423,7 @@ def _build_ponderosa_light_sensor_dataset(df_variables_all, ecowitt_df, bloque_v
     return merged[light_columns].copy(), {
         'WIGA': wiga_source,
         'MCI': mci_source,
-        'APOGI': apogi_source,
+        'APOGEE': apogee_source,
     }
 
 
@@ -5575,10 +5635,10 @@ def _get_ponderosa_y_axis_config(df, variable):
         PONDEROSA_WIGA_VARIABLES.get(variable) or
         PONDEROSA_COMPARISON_VARIABLES.get(variable) or
         PONDEROSA_ECOWITT_VARIABLES.get(variable) or
-        PONDEROSA_APOGI_VARIABLES.get(variable, {})
+        PONDEROSA_APOGEE_VARIABLES.get(variable, {})
     )
     series = []
-    for source_name in (*PONDEROSA_SENSOR_NAMES, "APOGI"):
+    for source_name in (*PONDEROSA_SENSOR_NAMES, "APOGEE"):
         column_name = f"{variable} - {source_name}"
         if column_name in df.columns:
             clean = pd.to_numeric(df[column_name], errors='coerce').dropna()
@@ -5821,9 +5881,9 @@ def _get_ponderosa_source_variable_configs(source_name):
         return PONDEROSA_WIGA_VARIABLES
     if source_name == "ECOWITT":
         return PONDEROSA_ECOWITT_VARIABLES
-    if source_name == "APOGI":
-        return PONDEROSA_APOGI_VARIABLES
-    return {**PONDEROSA_WIGA_VARIABLES, **PONDEROSA_ECOWITT_VARIABLES, **PONDEROSA_APOGI_VARIABLES}
+    if source_name == "APOGEE":
+        return PONDEROSA_APOGEE_VARIABLES
+    return {**PONDEROSA_WIGA_VARIABLES, **PONDEROSA_ECOWITT_VARIABLES, **PONDEROSA_APOGEE_VARIABLES}
 
 
 def _build_ponderosa_source_individual_series(df, variable, source_name, selected_range, resolution_label=COMPARISON_RESOLUTION_OPTIONS[0]):
@@ -5841,6 +5901,8 @@ def _build_ponderosa_source_individual_series(df, variable, source_name, selecte
             .sort_values('FechaHora')
             .reset_index(drop=True)
         )
+    elif resolution_label == SOURCE_RESOLUTION_OPTIONS[2]:
+        series_df = _build_nearest_series_to_time_grid(df, column_name, selected_range)
     else:
         series_df = _build_ponderosa_hourly_series(df, column_name, selected_range)
 
@@ -5853,8 +5915,8 @@ def _build_ponderosa_ecowitt_individual_series(df, variable, selected_range, res
     return _build_ponderosa_source_individual_series(df, variable, "ECOWITT", selected_range, resolution_label)
 
 
-def _build_ponderosa_apogi_individual_series(df, variable, selected_range, resolution_label=COMPARISON_RESOLUTION_OPTIONS[0]):
-    return _build_ponderosa_source_individual_series(df, variable, "APOGI", selected_range, resolution_label)
+def _build_ponderosa_apogee_individual_series(df, variable, selected_range, resolution_label=COMPARISON_RESOLUTION_OPTIONS[0]):
+    return _build_ponderosa_source_individual_series(df, variable, "APOGEE", selected_range, resolution_label)
 
 
 def _make_ponderosa_source_individual_chart(df, variable, source_name, selected_range, resolution_label=COMPARISON_RESOLUTION_OPTIONS[0]):
@@ -5867,6 +5929,7 @@ def _make_ponderosa_source_individual_chart(df, variable, source_name, selected_
     time_axis = _get_marley_time_axis_config(series_df)
     start_date, end_date = selected_range
     point_mode = resolution_label == COMPARISON_RESOLUTION_OPTIONS[1]
+    nearest_mode = resolution_label == SOURCE_RESOLUTION_OPTIONS[2]
     trace_type = go.Scattergl if point_mode and len(series_df) > 250 else go.Scatter
     y_axis = _get_ponderosa_y_axis_config(
         series_df.rename(columns={'Valor': f"{variable} - {source_name}"}),
@@ -5895,7 +5958,13 @@ def _make_ponderosa_source_individual_chart(df, variable, source_name, selected_
     )
     fig.update_layout(
         title=dict(
-            text=f"{config['title']} - {source_name}" + (" - punto por punto" if point_mode else ""),
+            text=(
+                f"{config['title']} - {source_name} - punto por punto"
+                if point_mode else
+                f"{config['title']} - {source_name} - valor más cercano cada 30 min"
+                if nearest_mode else
+                f"{config['title']} - {source_name}"
+            ),
             x=0,
             xanchor='left'
         ),
@@ -5979,19 +6048,19 @@ def _render_ponderosa_ecowitt_individual_charts(filtered_df, selected_range, res
         list(PONDEROSA_ECOWITT_VARIABLES.keys()),
         ("ECOWITT",),
         "Variables individuales ECOWITT Ponderosa",
-        "Estas gráficas muestran temperatura, humedad y PPFD (PAR) de ECOWITT/MCI, sin mezclar la luminosidad de APOGI.",
+        "Estas gráficas muestran temperatura, humedad y PPFD (PAR) de ECOWITT/MCI, sin mezclar la luminosidad de APOGEE.",
         resolution_label
     )
 
 
-def _render_ponderosa_apogi_individual_charts(filtered_df, selected_range, resolution_label=COMPARISON_RESOLUTION_OPTIONS[0]):
+def _render_ponderosa_apogee_individual_charts(filtered_df, selected_range, resolution_label=COMPARISON_RESOLUTION_OPTIONS[0]):
     _render_ponderosa_source_individual_charts(
         filtered_df,
         selected_range,
-        list(PONDEROSA_APOGI_VARIABLES.keys()),
-        ("APOGI",),
-        "Variables individuales APOGI Ponderosa",
-        "Estas gráficas muestran la luminosidad LUX medida por APOGI desde la columna luz_lux.",
+        list(PONDEROSA_APOGEE_VARIABLES.keys()),
+        ("APOGEE",),
+        "Variables individuales APOGEE Ponderosa",
+        "Estas gráficas muestran la luminosidad LUX medida por APOGEE desde la columna luz_lux.",
         resolution_label
     )
 
@@ -6203,7 +6272,7 @@ def _build_ponderosa_light_comparison_table(filtered_df, selected_range, resolut
 
             wiga_value = values.get('WIGA')
             mci_value = values.get('MCI')
-            apogi_value = values.get('APOGI')
+            apogee_value = values.get('APOGEE')
             rows.append({
                 'Fecha': timestamp.strftime('%Y-%m-%d'),
                 'Hora': timestamp.strftime('%H:%M'),
@@ -6211,10 +6280,10 @@ def _build_ponderosa_light_comparison_table(filtered_df, selected_range, resolut
                 'Unidad': config['unit'],
                 'WIGA': round(float(wiga_value), 2) if pd.notna(wiga_value) else pd.NA,
                 'MCI': round(float(mci_value), 2) if pd.notna(mci_value) else pd.NA,
-                'APOGI': round(float(apogi_value), 2) if pd.notna(apogi_value) else pd.NA,
+                'APOGEE': round(float(apogee_value), 2) if pd.notna(apogee_value) else pd.NA,
                 'MCI - WIGA': round(float(mci_value - wiga_value), 2) if pd.notna(mci_value) and pd.notna(wiga_value) else pd.NA,
-                'APOGI - WIGA': round(float(apogi_value - wiga_value), 2) if pd.notna(apogi_value) and pd.notna(wiga_value) else pd.NA,
-                'APOGI - MCI': round(float(apogi_value - mci_value), 2) if pd.notna(apogi_value) and pd.notna(mci_value) else pd.NA,
+                'APOGEE - WIGA': round(float(apogee_value - wiga_value), 2) if pd.notna(apogee_value) and pd.notna(wiga_value) else pd.NA,
+                'APOGEE - MCI': round(float(apogee_value - mci_value), 2) if pd.notna(apogee_value) and pd.notna(mci_value) else pd.NA,
             })
 
     if not rows:
@@ -6239,7 +6308,7 @@ def _render_ponderosa_light_individual_charts(comparisons, selected_range, resol
     if not rendered_charts:
         return
 
-    st.markdown("### Lecturas individuales APOGI / MCI / WIGA")
+    st.markdown("### Lecturas individuales APOGEE / MCI / WIGA")
     _render_chart_explanation(
         'Detalle individual',
         'Cada tarjeta separa una variable por sensor usando la misma resolución seleccionada arriba.',
@@ -6483,7 +6552,7 @@ def _render_ponderosa_wiga_values_dashboard(df_variables_all, df_cortinas_all, s
     options=SOURCE_RESOLUTION_OPTIONS,
         horizontal=True,
         key="ponderosa_wiga_only_resolution",
-        help="Usa el promedio para una lectura limpia por media hora, o punto por punto para ver las lecturas reales sin agrupar."
+        help="Usa promedio para agrupar por media hora, punto por punto para ver las lecturas crudas, o valor más cercano para tomar el registro más próximo a cada marca exacta de 30 minutos."
     )
 
     wiga_variables = list(PONDEROSA_WIGA_VARIABLES.keys())
@@ -6839,13 +6908,13 @@ def _render_ponderosa_ecowitt_values_dashboard():
     )
 
     st.markdown("## La Ponderosa - ECOWITT")
-    st.caption("Lectura de temperatura, humedad y PPFD (PAR, µmol m-2 s-1) de ECOWITT/MCI. La luminosidad LUX se muestra aparte en la vista APOGI.")
+    st.caption("Lectura de temperatura, humedad y PPFD (PAR, µmol m-2 s-1) de ECOWITT/MCI. La luminosidad LUX se muestra aparte en la vista APOGEE.")
     ecowitt_resolution = st.radio(
         "Resolución de las gráficas ECOWITT:",
         options=SOURCE_RESOLUTION_OPTIONS,
         horizontal=True,
         key="ponderosa_ecowitt_only_resolution",
-        help="Usa el promedio para una lectura limpia por media hora, o punto por punto para ver las lecturas reales sin agrupar."
+        help="Usa promedio para agrupar por media hora, punto por punto para ver las lecturas crudas, o valor más cercano para tomar el registro más próximo a cada marca exacta de 30 minutos."
     )
 
     ecowitt_variables = list(PONDEROSA_ECOWITT_VARIABLES.keys())
@@ -6874,7 +6943,7 @@ def _render_ponderosa_ecowitt_values_dashboard():
         block_label=f"ECOWITT Bloque {PONDEROSA_ECOWITT_BLOCK_CODE}",
         chart_title='Variables ECOWITT - La Ponderosa',
         explanation_title='Variables ECOWITT',
-        explanation_text='Esta gráfica reúne temperatura, humedad y PPFD (PAR, µmol m-2 s-1) de ECOWITT/MCI sobre la misma línea de tiempo. La luminosidad LUX pertenece a APOGI y se consulta en su propia vista.'
+        explanation_text='Esta gráfica reúne temperatura, humedad y PPFD (PAR, µmol m-2 s-1) de ECOWITT/MCI sobre la misma línea de tiempo. La luminosidad LUX pertenece a APOGEE y se consulta en su propia vista.'
     )
 
     if st.checkbox(
@@ -6894,31 +6963,31 @@ def _render_ponderosa_ecowitt_values_dashboard():
     st.stop()
 
 
-def _render_ponderosa_apogi_values_dashboard():
+def _render_ponderosa_apogee_values_dashboard():
     try:
         ecowitt_df = _load_ponderosa_ecowitt_data()
     except Exception as error:
-        st.error(f"No fue posible cargar los datos de APOGI desde ECOWITT Ponderosa. Detalle: {error}")
+        st.error(f"No fue posible cargar los datos de APOGEE desde ECOWITT Ponderosa. Detalle: {error}")
         st.stop()
 
     if ecowitt_df.empty:
-        st.warning("No hay datos disponibles para APOGI.")
+        st.warning("No hay datos disponibles para APOGEE.")
         st.stop()
 
-    source_df = _build_ponderosa_apogi_source(ecowitt_df)
+    source_df = _build_ponderosa_apogee_source(ecowitt_df)
     available_dates = sorted(source_df['Fecha_Filtro'].dropna().unique())
     if not available_dates:
-        st.warning("No hay fechas disponibles para APOGI.")
+        st.warning("No hay fechas disponibles para APOGEE.")
         st.stop()
 
     min_date = available_dates[0]
     max_date = available_dates[-1]
     navigation_state_key = None
     date_state_keys = (
-        "ponderosa_apogi_fecha_unica",
-        "ponderosa_apogi_fecha_un_dia",
-        "ponderosa_apogi_fecha_inicio",
-        "ponderosa_apogi_fecha_fin",
+        "ponderosa_apogee_fecha_unica",
+        "ponderosa_apogee_fecha_un_dia",
+        "ponderosa_apogee_fecha_inicio",
+        "ponderosa_apogee_fecha_fin",
     )
     for state_key in date_state_keys:
         if state_key in st.session_state and st.session_state[state_key] not in available_dates:
@@ -6929,54 +6998,54 @@ def _render_ponderosa_apogi_values_dashboard():
             fecha_unica = _date_input_with_state(
                 "Seleccionar fecha:",
                 default_value=max_date,
-                key="ponderosa_apogi_fecha_unica",
+                key="ponderosa_apogee_fecha_unica",
                 min_value=min_date,
                 max_value=max_date,
                 help_text=FILTER_HELP_TEXTS['fecha']
             )
             fecha_unica = _get_nearest_available_date(fecha_unica, available_dates)
             selected_range = (fecha_unica, fecha_unica)
-            navigation_state_key = "ponderosa_apogi_fecha_unica"
+            navigation_state_key = "ponderosa_apogee_fecha_unica"
         else:
             modo_fechas = st.radio(
                 "Modo de fechas:",
                 options=["Un día", "Varios días"],
                 horizontal=True,
-                key="ponderosa_apogi_modo_fechas",
+                key="ponderosa_apogee_modo_fechas",
                 help=FILTER_HELP_TEXTS['modo_fechas']
             )
             if modo_fechas == "Un día":
                 fecha_unica_default = _get_nearest_available_date(
-                    st.session_state.get("ponderosa_apogi_fecha_un_dia", max_date),
+                    st.session_state.get("ponderosa_apogee_fecha_un_dia", max_date),
                     available_dates
                 )
                 _sidebar_field_label("calendar", "Seleccionar fecha")
                 fecha_unica = _date_input_with_state(
                     "Seleccionar fecha:",
                     default_value=fecha_unica_default,
-                    key="ponderosa_apogi_fecha_un_dia",
+                    key="ponderosa_apogee_fecha_un_dia",
                     min_value=min_date,
                     max_value=max_date,
                     help_text=FILTER_HELP_TEXTS['fecha']
                 )
                 fecha_unica = _get_nearest_available_date(fecha_unica, available_dates)
                 selected_range = (fecha_unica, fecha_unica)
-                navigation_state_key = "ponderosa_apogi_fecha_un_dia"
+                navigation_state_key = "ponderosa_apogee_fecha_un_dia"
             else:
                 default_range_end = _get_sidebar_default_range_end(min_date, max_date, default_days=5)
                 fecha_inicio_default = _get_nearest_available_date(
-                    st.session_state.get("ponderosa_apogi_fecha_inicio", min_date),
+                    st.session_state.get("ponderosa_apogee_fecha_inicio", min_date),
                     available_dates
                 )
                 fecha_fin_default = _get_nearest_available_date(
-                    st.session_state.get("ponderosa_apogi_fecha_fin", default_range_end),
+                    st.session_state.get("ponderosa_apogee_fecha_fin", default_range_end),
                     available_dates
                 )
                 _sidebar_field_label("calendar", "Fecha inicio")
                 fecha_inicio = _date_input_with_state(
                     "Fecha inicio:",
                     default_value=fecha_inicio_default,
-                    key="ponderosa_apogi_fecha_inicio",
+                    key="ponderosa_apogee_fecha_inicio",
                     min_value=min_date,
                     max_value=max_date,
                     help_text=FILTER_HELP_TEXTS['fecha']
@@ -6985,7 +7054,7 @@ def _render_ponderosa_apogi_values_dashboard():
                 fecha_fin = _date_input_with_state(
                     "Fecha fin:",
                     default_value=fecha_fin_default,
-                    key="ponderosa_apogi_fecha_fin",
+                    key="ponderosa_apogee_fecha_fin",
                     min_value=min_date,
                     max_value=max_date,
                     help_text=FILTER_HELP_TEXTS['fecha']
@@ -6996,7 +7065,7 @@ def _render_ponderosa_apogi_values_dashboard():
 
     filtered_df = source_df[source_df['Fecha_Filtro'].between(*selected_range)].copy()
     if filtered_df.empty:
-        st.warning("No hay datos APOGI en el periodo seleccionado.")
+        st.warning("No hay datos APOGEE en el periodo seleccionado.")
         st.stop()
 
     _render_selected_period_banner(
@@ -7004,59 +7073,59 @@ def _render_ponderosa_apogi_values_dashboard():
         min_fecha=min_date,
         max_fecha=max_date,
         navigation_state_key=navigation_state_key,
-        title_text='Periodo APOGI Ponderosa',
+        title_text='Periodo APOGEE Ponderosa',
         available_dates=available_dates
     )
 
-    st.markdown("## La Ponderosa - APOGI")
-    st.caption("Lectura de luminosidad LUX medida por APOGI desde la columna luz_lux del archivo ECOWITT Ponderosa.")
-    apogi_resolution = st.radio(
-        "Resolución de las gráficas APOGI:",
+    st.markdown("## La Ponderosa - APOGEE")
+    st.caption("Lectura de luminosidad LUX medida por APOGEE desde la columna luz_lux del archivo ECOWITT Ponderosa.")
+    apogee_resolution = st.radio(
+        "Resolución de las gráficas APOGEE:",
         options=SOURCE_RESOLUTION_OPTIONS,
         horizontal=True,
-        key="ponderosa_apogi_resolution",
-        help="Usa el promedio para una lectura limpia por media hora, o punto por punto para ver las lecturas reales sin agrupar."
+        key="ponderosa_apogee_resolution",
+        help="Usa promedio para agrupar por media hora, punto por punto para ver las lecturas crudas, o valor más cercano para tomar el registro más próximo a cada marca exacta de 30 minutos."
     )
 
-    apogi_variables = list(PONDEROSA_APOGI_VARIABLES.keys())
+    apogee_variables = list(PONDEROSA_APOGEE_VARIABLES.keys())
     correlation_df = _build_single_source_correlacion_frame(
         filtered_df,
         selected_range,
-        apogi_variables,
-        "APOGI",
-        lambda df, variable, source_name, current_range, resolution: _build_ponderosa_apogi_individual_series(
+        apogee_variables,
+        "APOGEE",
+        lambda df, variable, source_name, current_range, resolution: _build_ponderosa_apogee_individual_series(
             df,
             variable,
             current_range,
             resolution
         ),
-        apogi_resolution,
+        apogee_resolution,
     )
     if correlation_df.empty:
-        st.warning("No hay datos suficientes para graficar la luminosidad de APOGI.")
+        st.warning("No hay datos suficientes para graficar la luminosidad de APOGEE.")
         st.stop()
 
     _render_correlacion(
         correlation_df,
         pd.DataFrame(),
         selected_range,
-        variables_seleccionadas=apogi_variables,
-        block_label="APOGI",
-        chart_title='Luminosidad APOGI - La Ponderosa',
-        explanation_title='Luminosidad APOGI',
-        explanation_text='Esta gráfica muestra únicamente la luminosidad LUX medida por APOGI. Esta serie no pertenece a ECOWITT/MCI; solo comparte el archivo de origen.'
+        variables_seleccionadas=apogee_variables,
+        block_label="APOGEE",
+        chart_title='Luminosidad APOGEE - La Ponderosa',
+        explanation_title='Luminosidad APOGEE',
+        explanation_text='Esta gráfica muestra únicamente la luminosidad LUX medida por APOGEE. Esta serie no pertenece a ECOWITT/MCI; solo comparte el archivo de origen.'
     )
 
     if st.checkbox(
-        "Cargar detalle individual APOGI",
-        key="mostrar_ponderosa_apogi_detalle",
+        "Cargar detalle individual APOGEE",
+        key="mostrar_ponderosa_apogee_detalle",
         help=FILTER_HELP_TEXTS['graficas_detalladas']
     ):
-        _render_ponderosa_apogi_individual_charts(filtered_df, selected_range, apogi_resolution)
+        _render_ponderosa_apogee_individual_charts(filtered_df, selected_range, apogee_resolution)
 
     if st.checkbox(
-        "Cargar registros APOGI Ponderosa",
-        key="mostrar_ponderosa_apogi_registros",
+        "Cargar registros APOGEE Ponderosa",
+        key="mostrar_ponderosa_apogee_registros",
         help=FILTER_HELP_TEXTS['registros']
     ):
         _dataframe(filtered_df.drop(columns=['Fecha_Filtro'], errors='ignore'), hide_index=True)
@@ -7064,7 +7133,7 @@ def _render_ponderosa_apogi_values_dashboard():
     st.stop()
 
 
-def _render_ponderosa_apogi_mci_wiga_dashboard(df_variables_all, df_cortinas_all, selected_finca):
+def _render_ponderosa_apogee_mci_wiga_dashboard(df_variables_all, df_cortinas_all, selected_finca):
     try:
         ecowitt_df = _load_ponderosa_ecowitt_data()
     except Exception as error:
@@ -7077,7 +7146,7 @@ def _render_ponderosa_apogi_mci_wiga_dashboard(df_variables_all, df_cortinas_all
         selected_finca=selected_finca
     )
     if PONDEROSA_ECOWITT_BLOCK_CODE not in block_codes:
-        st.warning("No hay datos WIGA del Bloque 35 disponibles para comparar APOGI / MCI / WIGA.")
+        st.warning("No hay datos WIGA del Bloque 35 disponibles para comparar APOGEE / MCI / WIGA.")
         st.stop()
 
     selected_source_code = PONDEROSA_ECOWITT_BLOCK_CODE
@@ -7088,7 +7157,7 @@ def _render_ponderosa_apogi_mci_wiga_dashboard(df_variables_all, df_cortinas_all
         bloque_variables
     )
     if comparison_df.empty:
-        st.warning("No fue posible construir la comparación APOGI / MCI / WIGA.")
+        st.warning("No fue posible construir la comparación APOGEE / MCI / WIGA.")
         st.stop()
 
     date_sets = []
@@ -7100,7 +7169,7 @@ def _render_ponderosa_apogi_mci_wiga_dashboard(df_variables_all, df_cortinas_all
             date_sets.append(set(source_df['Fecha_Filtro'].dropna().unique()))
     available_dates = sorted(set.intersection(*date_sets)) if date_sets and all(date_sets) else []
     if not available_dates:
-        st.warning("No hay fechas comunes entre APOGI, MCI y WIGA para esta comparación.")
+        st.warning("No hay fechas comunes entre APOGEE, MCI y WIGA para esta comparación.")
         st.stop()
 
     min_date = available_dates[0]
@@ -7122,7 +7191,7 @@ def _render_ponderosa_apogi_mci_wiga_dashboard(df_variables_all, df_cortinas_all
             f"""
             <div class="sidebar-helper-text">
                 La comparación usa WIGA del {_format_block_display_name(selected_source_code)}.
-                MCI y APOGI salen de ECOWITT Ponderosa para cruzar los tres sensores sobre el mismo periodo.
+                MCI y APOGEE salen de ECOWITT Ponderosa para cruzar los tres sensores sobre el mismo periodo.
             </div>
             """,
             unsafe_allow_html=True
@@ -7200,7 +7269,7 @@ def _render_ponderosa_apogi_mci_wiga_dashboard(df_variables_all, df_cortinas_all
 
     filtered_df = comparison_df[comparison_df['Fecha_Filtro'].between(*selected_range)].copy()
     if filtered_df.empty:
-        st.warning("No hay datos APOGI / MCI / WIGA en el periodo seleccionado.")
+        st.warning("No hay datos APOGEE / MCI / WIGA en el periodo seleccionado.")
         st.stop()
 
     _render_selected_period_banner(
@@ -7208,33 +7277,33 @@ def _render_ponderosa_apogi_mci_wiga_dashboard(df_variables_all, df_cortinas_all
         min_fecha=min_date,
         max_fecha=max_date,
         navigation_state_key=navigation_state_key,
-        title_text='Periodo APOGI / MCI / WIGA',
+        title_text='Periodo APOGEE / MCI / WIGA',
         available_dates=available_dates
     )
 
     block_label = _format_block_display_name(selected_source_code)
-    st.markdown("## La Ponderosa - APOGI / MCI / WIGA")
-    st.caption(f"Comparación de LUX y PPFD (PAR, µmol m-2 s-1) para {block_label}. WIGA usa Datos_Variables; MCI y APOGI usan ECOWITT Ponderosa.")
+    st.markdown("## La Ponderosa - APOGEE / MCI / WIGA")
+    st.caption(f"Comparación de LUX y PPFD (PAR, µmol m-2 s-1) para {block_label}. WIGA usa Datos_Variables; MCI y APOGEE usan ECOWITT Ponderosa.")
     _render_chart_explanation(
         'Origen de los valores',
         (
             f"WIGA toma el PPFD (PAR, µmol m-2 s-1) real del Bloque 35 y calcula LUX estimado con PPFD x {PAR_TO_LUX_FACTOR:.0f}. "
             f"MCI toma el PPFD (PAR) del archivo ECOWITT Ponderosa y calcula LUX con el mismo factor. "
-            f"APOGI toma la columna luz_lux y calcula PPFD (PAR) estimado dividiendo entre {PAR_TO_LUX_FACTOR:.0f}."
+            f"APOGEE toma la columna luz_lux y calcula PPFD (PAR) estimado dividiendo entre {PAR_TO_LUX_FACTOR:.0f}."
         ),
         accent=BRAND_COLORS['hero'],
         kicker='Cálculo'
     )
 
     comparison_resolution = st.radio(
-        "Resolución de APOGI / MCI / WIGA:",
+        "Resolución de APOGEE / MCI / WIGA:",
         options=COMPARISON_RESOLUTION_OPTIONS,
         horizontal=True,
         key="ponderosa_light_resolution",
-        help="Promedio agrupa todos los sensores cada 30 minutos; punto por punto usa WIGA como ancla cruda y toma el registro más cercano de MCI/APOGI; WIGA 30 min toma WIGA por media hora y busca los registros cercanos de MCI/APOGI."
+        help="Promedio agrupa todos los sensores cada 30 minutos; punto por punto usa WIGA como ancla cruda y toma el registro más cercano de MCI/APOGEE; WIGA 30 min toma WIGA por media hora y busca los registros cercanos de MCI/APOGEE."
     )
     show_details = st.checkbox(
-        "Cargar detalle individual APOGI / MCI / WIGA",
+        "Cargar detalle individual APOGEE / MCI / WIGA",
         key="mostrar_ponderosa_light_detalles",
         help=FILTER_HELP_TEXTS['graficas_detalladas']
     )
@@ -7253,9 +7322,9 @@ def _render_ponderosa_apogi_mci_wiga_dashboard(df_variables_all, df_cortinas_all
     table_mode = (
         "Promedio de cada sensor en bloques de 30 minutos"
         if comparison_resolution == COMPARISON_RESOLUTION_OPTIONS[0] else
-        "WIGA crudo con MCI/APOGI más cercanos"
+        "WIGA crudo con MCI/APOGEE más cercanos"
         if comparison_resolution == COMPARISON_RESOLUTION_OPTIONS[1] else
-        "WIGA 30 min con MCI/APOGI más cercanos"
+        "WIGA 30 min con MCI/APOGEE más cercanos"
     )
     if st.checkbox(
         "Mostrar tabla comparativa de registros",
@@ -7267,14 +7336,14 @@ def _render_ponderosa_apogi_mci_wiga_dashboard(df_variables_all, df_cortinas_all
         if table.empty:
             st.info("No hay datos suficientes para construir la tabla comparativa.")
         else:
-            st.caption(f"Tabla calculada con: {table_mode}. Las diferencias se leen como sensor comparado menos WIGA o APOGI menos MCI.")
+            st.caption(f"Tabla calculada con: {table_mode}. Las diferencias se leen como sensor comparado menos WIGA o APOGEE menos MCI.")
             _dataframe(table, hide_index=True)
 
     if show_details:
         _render_ponderosa_light_individual_charts(comparisons, selected_range, comparison_resolution)
 
     if st.checkbox(
-        "Cargar registros base APOGI / MCI / WIGA",
+        "Cargar registros base APOGEE / MCI / WIGA",
         key="mostrar_ponderosa_light_registros",
         help=FILTER_HELP_TEXTS['registros']
     ):
@@ -9538,7 +9607,7 @@ with st.sidebar.expander("Finca", expanded=True):
 dashboard_view_options = (
     ["Comparativa", "Solo WIGA", "Solo ECOWITT", "Varianza"]
     if selected_finca == 'Marly' else
-    ["WIGA con cortinas", "WIGA relacion ECOWITT", PONDEROSA_LIGHT_VIEW_NAME, "Varianza", "Promedio", "WIGA", "ECOWITT", "APOGI", "Cortinas"]
+    ["WIGA con cortinas", "WIGA relacion ECOWITT", PONDEROSA_LIGHT_VIEW_NAME, "Varianza", "Promedio", "WIGA", "ECOWITT", "APOGEE", "Cortinas"]
 )
 if st.session_state.get("modo_dashboard") not in dashboard_view_options:
     st.session_state["modo_dashboard"] = dashboard_view_options[0]
@@ -9555,7 +9624,7 @@ with st.sidebar.expander("Vista", expanded=True):
         help=(
             "Elige cómo quieres analizar Marly: comparativa, varianza o lecturas individuales por sensor."
             if selected_finca == 'Marly' else
-            "Elige la vista de Ponderosa: WIGA con cortinas, relación WIGA / ECOWITT, APOGI / MCI / WIGA, varianza, promedio, WIGA, ECOWITT, APOGI o cortinas."
+            "Elige la vista de Ponderosa: WIGA con cortinas, relación WIGA / ECOWITT, APOGEE / MCI / WIGA, varianza, promedio, WIGA, ECOWITT, APOGEE o cortinas."
         )
     )
 
@@ -9600,9 +9669,9 @@ if dashboard_mode == "WIGA relacion ECOWITT":
 if dashboard_mode == PONDEROSA_LIGHT_VIEW_NAME:
     with _loading_context(
         st.session_state.get("ponderosa_light_modo_fechas") == "Varios días",
-        "Cargando comparativa APOGI / MCI / WIGA de Ponderosa..."
+        "Cargando comparativa APOGEE / MCI / WIGA de Ponderosa..."
     ):
-        _render_ponderosa_apogi_mci_wiga_dashboard(_df_variables_all, _df_cortinas_all, selected_finca)
+        _render_ponderosa_apogee_mci_wiga_dashboard(_df_variables_all, _df_cortinas_all, selected_finca)
     st.stop()
 
 if dashboard_mode == "ECOWITT":
@@ -9613,12 +9682,12 @@ if dashboard_mode == "ECOWITT":
         _render_ponderosa_ecowitt_values_dashboard()
     st.stop()
 
-if dashboard_mode == "APOGI":
+if dashboard_mode == "APOGEE":
     with _loading_context(
-        st.session_state.get("ponderosa_apogi_modo_fechas") == "Varios días",
-        "Cargando luminosidad APOGI de Ponderosa..."
+        st.session_state.get("ponderosa_apogee_modo_fechas") == "Varios días",
+        "Cargando luminosidad APOGEE de Ponderosa..."
     ):
-        _render_ponderosa_apogi_values_dashboard()
+        _render_ponderosa_apogee_values_dashboard()
     st.stop()
 
 if dashboard_mode in ("Varianza", "Promedio"):
