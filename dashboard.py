@@ -6254,7 +6254,6 @@ def _make_ponderosa_light_comparison_chart(comparison, variable, selected_range,
     )
 
     fig = go.Figure()
-    line_dashes = {"WIGA": "solid", "MCI": "dash", "APOGEE": "dot"}
     for sensor_name in PONDEROSA_LIGHT_SENSOR_NAMES:
         if sensor_name not in comparison.columns or comparison[sensor_name].dropna().empty:
             continue
@@ -6268,11 +6267,10 @@ def _make_ponderosa_light_comparison_chart(comparison, variable, selected_range,
                 mode='lines+markers' if point_mode or not multi_day_view else 'lines',
                 line=dict(
                     color=config['colors'][sensor_name],
-                    width=2.4 if point_mode else 3.3,
-                    dash=line_dashes.get(sensor_name, 'solid')
+                    width=2.2 if point_mode else 3
                 ),
-                marker=dict(size=4.5 if point_mode else 6.5, symbol='circle'),
-                opacity=0.9 if point_mode else 1,
+                marker=dict(size=4 if point_mode else 6),
+                opacity=0.86 if point_mode else 1,
                 connectgaps=False,
                 hovertemplate=(
                     "<b>%{x|%Y-%m-%d %H:%M}</b><br>"
