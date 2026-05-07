@@ -676,7 +676,7 @@ section[data-testid="stSidebar"] > div {{
     width: 300px !important;
 }}
 [data-testid="stSidebar"] .block-container {{
-    padding: 4.2rem 0.7rem 1rem 0.7rem;
+    padding: 5.1rem 0.7rem 1rem 0.7rem;
 }}
 [data-testid="stSidebar"] {{
     background:
@@ -742,7 +742,7 @@ section[data-testid="stSidebar"] > div {{
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    margin: 3.4rem 0 1.45rem 0.15rem;
+    margin: 4.1rem 0 1.45rem 0.15rem;
     color: #ffffff;
     font-family: var(--font-display);
     font-size: 1.42rem;
