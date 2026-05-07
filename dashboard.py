@@ -631,12 +631,11 @@ st.markdown(f"""
     background:
         radial-gradient(circle at 12% 18%, rgba(244, 199, 206, 0.18), transparent 22%),
         radial-gradient(circle at 88% 10%, rgba(194, 223, 234, 0.28), transparent 28%),
-        radial-gradient(circle at 50% 41%, rgba(255, 255, 255, 0.94) 0%, rgba(255, 255, 255, 0.78) 28%, rgba(247, 244, 238, 0.88) 52%, rgba(247, 244, 238, 0.97) 74%, rgba(247, 244, 238, 1) 100%),
         url("{BACKGROUND_LOGO_URL}"),
         linear-gradient(180deg, #fcfaf7 0%, #f7f3eb 58%, #efe8dc 100%);
-    background-repeat: no-repeat, no-repeat, no-repeat, no-repeat, no-repeat;
-    background-position: 12% 18%, 88% 10%, center 41%, center 40%, center center;
-    background-size: auto, auto, 100% 100%, min(44vw, 620px) auto, cover;
+    background-repeat: no-repeat, no-repeat, no-repeat, no-repeat;
+    background-position: 12% 18%, 88% 10%, center 150px, center center;
+    background-size: auto, auto, min(18vw, 240px) auto, cover;
     color: var(--elite-ink);
     font-family: var(--font-body);
 }}
@@ -1752,8 +1751,8 @@ div[data-testid="stDataFrame"] {{
 }}
 @media (max-width: 980px) {{
     .stApp {{
-        background-position: 12% 18%, 88% 10%, center 34%, center 34%, center center;
-        background-size: auto, auto, 100% 100%, min(66vw, 340px) auto, cover;
+        background-position: 12% 18%, 88% 10%, center 120px, center center;
+        background-size: auto, auto, min(34vw, 160px) auto, cover;
     }}
     .hero-card {{
         grid-template-columns: 1fr;
