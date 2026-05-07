@@ -418,6 +418,12 @@ PONDEROSA_ECOWITT_CANONICAL_COLUMNS = {
 }
 LOGO_URL_LARGE = "https://raw.githubusercontent.com/juandavdidtejedormedina-rgb/dashboard-invernaderos/main/logo%20elite.png"
 LOGO_URL_SMALL = LOGO_URL_LARGE
+FLOWER_BACKGROUND_URL = (
+    "https://raw.githubusercontent.com/"
+    "juandavdidtejedormedina-rgb/dashboard-invernaderos/"
+    "84d4f54be895d019ed02dcb967b7181b377f63b0/"
+    "imagen%20fondo%20dashboard.png"
+)
 DASHBOARD_MEDIA = {
     'La Ponderosa': {
         'video_url': (
@@ -622,6 +628,7 @@ st.markdown(f"""
 }}
 
 .stApp {{
+    position: relative;
     background:
         radial-gradient(circle at 12% 18%, rgba(244, 199, 206, 0.18), transparent 22%),
         radial-gradient(circle at 88% 10%, rgba(194, 223, 234, 0.28), transparent 28%),
@@ -629,7 +636,36 @@ st.markdown(f"""
     color: var(--elite-ink);
     font-family: var(--font-body);
 }}
+.stApp::before {{
+    content: "";
+    position: fixed;
+    inset: auto 0 0 0;
+    height: 28px;
+    background: linear-gradient(90deg, rgba(84, 83, 134, 0.92) 0%, rgba(84, 83, 134, 0.82) 100%);
+    pointer-events: none;
+    z-index: 0;
+}}
+.stApp::after {{
+    content: "";
+    position: fixed;
+    right: clamp(10px, 2.6vw, 34px);
+    bottom: 18px;
+    width: min(30vw, 390px);
+    aspect-ratio: 1 / 1;
+    background-image:
+        radial-gradient(circle at 46% 52%, rgba(255, 255, 255, 0.62) 0%, rgba(255, 255, 255, 0.18) 38%, transparent 72%),
+        url("{FLOWER_BACKGROUND_URL}");
+    background-repeat: no-repeat;
+    background-position: center center, bottom right;
+    background-size: 82% 82%, contain;
+    opacity: 0.88;
+    pointer-events: none;
+    z-index: 0;
+    filter: drop-shadow(0 18px 26px rgba(84, 83, 134, 0.12));
+}}
 [data-testid="stAppViewContainer"] > .main {{
+    position: relative;
+    z-index: 1;
     padding-top: 1.4rem;
 }}
 [data-testid="stAppViewContainer"] > .main .block-container {{
@@ -638,6 +674,11 @@ st.markdown(f"""
     margin-right: auto;
     padding-left: 1rem;
     padding-right: 1rem;
+}}
+header[data-testid="stHeader"],
+section[data-testid="stSidebar"] {{
+    position: relative;
+    z-index: 2;
 }}
 [data-testid="stAppViewContainer"] > section[data-testid="stSidebar"][aria-expanded="false"] {{
     min-width: 0 !important;
@@ -1740,6 +1781,11 @@ div[data-testid="stDataFrame"] {{
     fill: var(--elite-hero) !important;
 }}
 @media (max-width: 980px) {{
+    .stApp::after {{
+        width: min(48vw, 260px);
+        bottom: 24px;
+        opacity: 0.32;
+    }}
     .hero-card {{
         grid-template-columns: 1fr;
     }}
