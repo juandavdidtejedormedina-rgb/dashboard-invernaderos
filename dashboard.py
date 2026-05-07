@@ -418,11 +418,11 @@ PONDEROSA_ECOWITT_CANONICAL_COLUMNS = {
 }
 LOGO_URL_LARGE = "https://raw.githubusercontent.com/juandavdidtejedormedina-rgb/dashboard-invernaderos/main/logo%20elite.png"
 LOGO_URL_SMALL = LOGO_URL_LARGE
-FLOWER_BACKGROUND_URL = (
+BACKGROUND_LOGO_URL = (
     "https://raw.githubusercontent.com/"
     "juandavdidtejedormedina-rgb/dashboard-invernaderos/"
-    "84d4f54be895d019ed02dcb967b7181b377f63b0/"
-    "imagen%20fondo%20dashboard.png"
+    "781040e0fab508f875f6479380a274755bdf71e0/"
+    "logo%20elite.png"
 )
 DASHBOARD_MEDIA = {
     'La Ponderosa': {
@@ -631,11 +631,12 @@ st.markdown(f"""
     background:
         radial-gradient(circle at 12% 18%, rgba(244, 199, 206, 0.18), transparent 22%),
         radial-gradient(circle at 88% 10%, rgba(194, 223, 234, 0.28), transparent 28%),
-        url("{FLOWER_BACKGROUND_URL}"),
-        linear-gradient(180deg, #fcfaf7 0%, var(--elite-paper) 58%, #f1ede5 100%);
-    background-repeat: no-repeat, no-repeat, no-repeat, no-repeat;
-    background-position: 12% 18%, 88% 10%, right 28px bottom 18px, center center;
-    background-size: auto, auto, min(28vw, 360px), cover;
+        radial-gradient(circle at 50% 41%, rgba(255, 255, 255, 0.94) 0%, rgba(255, 255, 255, 0.78) 28%, rgba(247, 244, 238, 0.88) 52%, rgba(247, 244, 238, 0.97) 74%, rgba(247, 244, 238, 1) 100%),
+        url("{BACKGROUND_LOGO_URL}"),
+        linear-gradient(180deg, #fcfaf7 0%, #f7f3eb 58%, #efe8dc 100%);
+    background-repeat: no-repeat, no-repeat, no-repeat, no-repeat, no-repeat;
+    background-position: 12% 18%, 88% 10%, center 41%, center 40%, center center;
+    background-size: auto, auto, 100% 100%, min(44vw, 620px) auto, cover;
     color: var(--elite-ink);
     font-family: var(--font-body);
 }}
@@ -1751,8 +1752,8 @@ div[data-testid="stDataFrame"] {{
 }}
 @media (max-width: 980px) {{
     .stApp {{
-        background-size: auto, auto, min(42vw, 220px), cover;
-        background-position: 12% 18%, 88% 10%, right 10px bottom 12px, center center;
+        background-position: 12% 18%, 88% 10%, center 34%, center 34%, center center;
+        background-size: auto, auto, 100% 100%, min(66vw, 340px) auto, cover;
     }}
     .hero-card {{
         grid-template-columns: 1fr;
