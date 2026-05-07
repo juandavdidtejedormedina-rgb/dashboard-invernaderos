@@ -531,48 +531,11 @@ BLOCK_VENTILATION_DATA = {
     ]
 }
 BLOCK_ANALYSIS_COLORS = {
-'27': '#7DB7FF',
-'34': '#4A4A4A',
-'35': '#6BEA5B',
-'38': '#F2A04B',
-'ALMACEN': '#5E5AAE'
-}
-ANALYSIS_BLOCK_COLOR_PALETTES = {
-    'Temperatura': {
-        '27': '#7DB7FF',
-        '34': '#5F9BF5',
-        '35': '#8CC6FF',
-        '38': '#A8D6FF',
-        'ALMACEN': '#4E7FD3'
-    },
-    'Humedad Relativa': {
-        '27': '#4A4A4A',
-        '34': '#626262',
-        '35': '#7A7A7A',
-        '38': '#929292',
-        'ALMACEN': '#2F2F2F'
-    },
-    'Radiación PAR': {
-        '27': '#6BEA5B',
-        '34': '#55D94A',
-        '35': '#82F073',
-        '38': '#9BF48D',
-        'ALMACEN': '#39B93D'
-    },
-    'Gramos de agua': {
-        '27': '#F2A04B',
-        '34': '#E58B30',
-        '35': '#F7B46A',
-        '38': '#F9C589',
-        'ALMACEN': '#C97925'
-    },
-    'LUX': {
-        '27': '#B9832F',
-        '34': '#9E6D1F',
-        '35': '#C8954A',
-        '38': '#D7A96A',
-        'ALMACEN': '#7D5512'
-    }
+'27': '#6FA8FF',
+'34': '#4F4A85',
+'35': '#53C66F',
+'38': '#E39A46',
+'ALMACEN': '#C86F8F'
 }
 SPECIAL_BLOCK_LABELS = {
 'ALMACEN': 'Estación externa'
@@ -9491,10 +9454,6 @@ def _sort_block_names(block_names):
 
 def _get_block_analysis_color(block_name, variable_name=None):
     block_identifier = _extract_block_identifier(block_name)
-    if variable_name:
-        palette = ANALYSIS_BLOCK_COLOR_PALETTES.get(variable_name, {})
-        if block_identifier in palette:
-            return palette[block_identifier]
     return BLOCK_ANALYSIS_COLORS.get(block_identifier, VARIABLE_COLORS.get(variable_name, BRAND_COLORS['hero']))
 
 
@@ -9573,6 +9532,59 @@ def _prepare_hourly_pivot_display(pivot_df):
     display_df = display_df.rename(columns=rename_map)
     display_df.columns.name = None
     return display_df.round(2)
+
+
+def _render_analysis_block_color_reference(grouped_df, variable_name=None):
+    if grouped_df.empty or 'Bloque' not in grouped_df.columns:
+        return
+
+    ordered_blocks = _sort_block_names(grouped_df['Bloque'].dropna().unique().tolist())
+    if not ordered_blocks:
+        return
+
+    chips_html = []
+    for block_name in ordered_blocks:
+        block_label = _format_block_display_name(block_name)
+        color = _get_block_analysis_color(block_name, variable_name)
+        chips_html.append(
+            f'''
+            <span style="
+                display:inline-flex;
+                align-items:center;
+                gap:0.45rem;
+                padding:0.38rem 0.74rem;
+                border-radius:999px;
+                background:rgba(255,255,255,0.86);
+                border:1px solid rgba(76, 70, 120, 0.10);
+                box-shadow:0 8px 18px rgba(42, 46, 53, 0.05);
+                margin:0 0.42rem 0.42rem 0;
+                font-family:'Manrope', sans-serif;
+                font-size:0.86rem;
+                color:{BRAND_COLORS['graphite']};
+                white-space:nowrap;
+            ">
+                <span style="
+                    width:0.72rem;
+                    height:0.72rem;
+                    border-radius:999px;
+                    background:{color};
+                    box-shadow:inset 0 0 0 1px rgba(255,255,255,0.78);
+                    flex:0 0 auto;
+                "></span>
+                <span>{html.escape(block_label)}</span>
+            </span>
+            '''
+        )
+
+    st.markdown(
+        (
+            '<div style="margin:0.35rem 0 0.9rem 0;">'
+            '<p class="analysis-note" style="margin-bottom:0.5rem;"><strong>Referencia de colores por bloque</strong></p>'
+            f'{"".join(chips_html)}'
+            '</div>'
+        ),
+        unsafe_allow_html=True
+    )
 
 
 def _render_hourly_metric_chart(grouped_df, variable_name, metric_column):
@@ -9694,6 +9706,7 @@ def _render_hourly_metric_chart(grouped_df, variable_name, metric_column):
             'modeBarButtonsToRemove': ['lasso2d', 'select2d']
         }
     )
+    _render_analysis_block_color_reference(grouped_df, variable_name)
     _render_chart_explanation(
         f'{metric_title} - {metric_label}',
         metric_description,
