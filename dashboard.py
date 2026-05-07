@@ -7866,12 +7866,6 @@ def _render_ponderosa_apogee_mci_wiga_dashboard(df_variables_all, df_cortinas_al
         key="ponderosa_light_resolution",
         help="Promedio agrupa todos los sensores cada 30 minutos; punto por punto usa WIGA como ancla cruda y toma el registro más cercano de MCI/APOGEE; WIGA 30 min toma WIGA por media hora y busca los registros cercanos de MCI/APOGEE."
     )
-    show_details = st.checkbox(
-        "Cargar detalle individual APOGEE / MCI / WIGA",
-        key="mostrar_ponderosa_light_detalles",
-        help=FILTER_HELP_TEXTS['graficas_detalladas']
-    )
-
     comparisons = {}
     for variable in PONDEROSA_LIGHT_VARIABLES:
         comparison = _build_ponderosa_light_comparison(filtered_df, variable, selected_range, comparison_resolution)
@@ -7923,6 +7917,11 @@ def _render_ponderosa_apogee_mci_wiga_dashboard(df_variables_all, df_cortinas_al
                 download_key="descargar_ponderosa_light_reporte"
             )
 
+    show_details = st.checkbox(
+        "Mostrar gráficas individuales APOGEE / MCI / WIGA",
+        key="mostrar_ponderosa_light_detalles",
+        help="Activa esta sección para ver cada variable por separado debajo de la comparativa principal."
+    )
     if show_details:
         _render_ponderosa_light_individual_charts(comparisons, selected_range, comparison_resolution)
 
@@ -8246,12 +8245,6 @@ def _render_ponderosa_ecowitt_dashboard(df_variables_all, df_cortinas_all, selec
         kicker='Orientación'
     )
 
-    show_details = st.checkbox(
-        "Cargar detalle individual WIGA / ECOWITT",
-        key="mostrar_ponderosa_ecowitt_detalles",
-        help=FILTER_HELP_TEXTS['graficas_detalladas']
-    )
-
     comparison_resolution = st.radio(
         "Resolución de la gráfica WIGA vs ECOWITT:",
         options=COMPARISON_RESOLUTION_OPTIONS,
@@ -8296,6 +8289,11 @@ def _render_ponderosa_ecowitt_dashboard(df_variables_all, df_cortinas_all, selec
         "mostrar_ponderosa_tabla_diferencias_30min"
     )
 
+    show_details = st.checkbox(
+        "Mostrar gráficas individuales WIGA / ECOWITT",
+        key="mostrar_ponderosa_ecowitt_detalles",
+        help="Activa esta sección para ver cada variable por separado debajo de la comparativa principal."
+    )
     if show_details:
         _render_ponderosa_source_individual_charts(
             filtered_df,
@@ -10336,19 +10334,11 @@ if dashboard_mode == "Cortinas":
     st.stop()
 
 if dashboard_mode == "WIGA relacion ECOWITT":
-    with _loading_context(
-        st.session_state.get("ponderosa_ecowitt_modo_fechas") == "Varios días",
-        "Cargando comparativa WIGA / ECOWITT de Ponderosa..."
-    ):
-        _render_ponderosa_ecowitt_dashboard(_df_variables_all, _df_cortinas_all, selected_finca)
+    _render_ponderosa_ecowitt_dashboard(_df_variables_all, _df_cortinas_all, selected_finca)
     st.stop()
 
 if dashboard_mode == PONDEROSA_LIGHT_VIEW_NAME:
-    with _loading_context(
-        st.session_state.get("ponderosa_light_modo_fechas") == "Varios días",
-        "Cargando comparativa APOGEE / MCI / WIGA de Ponderosa..."
-    ):
-        _render_ponderosa_apogee_mci_wiga_dashboard(_df_variables_all, _df_cortinas_all, selected_finca)
+    _render_ponderosa_apogee_mci_wiga_dashboard(_df_variables_all, _df_cortinas_all, selected_finca)
     st.stop()
 
 if dashboard_mode == "ECOWITT":
