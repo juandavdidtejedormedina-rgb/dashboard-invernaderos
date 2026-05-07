@@ -531,14 +531,51 @@ BLOCK_VENTILATION_DATA = {
     ]
 }
 BLOCK_ANALYSIS_COLORS = {
-    '27': '#8A88B3',
-    '34': '#545386',
-    '35': '#7FA8B8',
-    '38': '#C78F9B',
-    'ALMACEN': '#8F8A7D'
+'27': '#7DB7FF',
+'34': '#4A4A4A',
+'35': '#6BEA5B',
+'38': '#F2A04B',
+'ALMACEN': '#5E5AAE'
+}
+ANALYSIS_BLOCK_COLOR_PALETTES = {
+    'Temperatura': {
+        '27': '#7DB7FF',
+        '34': '#5F9BF5',
+        '35': '#8CC6FF',
+        '38': '#A8D6FF',
+        'ALMACEN': '#4E7FD3'
+    },
+    'Humedad Relativa': {
+        '27': '#4A4A4A',
+        '34': '#626262',
+        '35': '#7A7A7A',
+        '38': '#929292',
+        'ALMACEN': '#2F2F2F'
+    },
+    'Radiación PAR': {
+        '27': '#6BEA5B',
+        '34': '#55D94A',
+        '35': '#82F073',
+        '38': '#9BF48D',
+        'ALMACEN': '#39B93D'
+    },
+    'Gramos de agua': {
+        '27': '#F2A04B',
+        '34': '#E58B30',
+        '35': '#F7B46A',
+        '38': '#F9C589',
+        'ALMACEN': '#C97925'
+    },
+    'LUX': {
+        '27': '#B9832F',
+        '34': '#9E6D1F',
+        '35': '#C8954A',
+        '38': '#D7A96A',
+        'ALMACEN': '#7D5512'
+    }
 }
 SPECIAL_BLOCK_LABELS = {
-    'ALMACEN': 'Estación externa'
+'ALMACEN': 'Estación externa'
 }
 WEEKDAY_ES = {
     0: 'Lunes',
@@ -9452,9 +9489,13 @@ def _sort_block_names(block_names):
     )
 
 
-def _get_block_analysis_color(block_name):
+def _get_block_analysis_color(block_name, variable_name=None):
     block_identifier = _extract_block_identifier(block_name)
-    return BLOCK_ANALYSIS_COLORS.get(block_identifier, BRAND_COLORS['hero'])
+    if variable_name:
+        palette = ANALYSIS_BLOCK_COLOR_PALETTES.get(variable_name, {})
+        if block_identifier in palette:
+            return palette[block_identifier]
+    return BLOCK_ANALYSIS_COLORS.get(block_identifier, VARIABLE_COLORS.get(variable_name, BRAND_COLORS['hero']))
 
 
 def _format_block_display_name(block_name):
@@ -9568,7 +9609,7 @@ def _render_hourly_metric_chart(grouped_df, variable_name, metric_column):
             continue
 
         block_label = _format_block_display_name(block_name)
-        color = _get_block_analysis_color(block_name)
+        color = _get_block_analysis_color(block_name, variable_name)
         fig.add_trace(go.Scatter(
             x=serie['Franja'],
             y=serie[metric_column],
