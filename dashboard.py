@@ -9548,7 +9548,7 @@ def _render_analysis_block_color_reference(grouped_df, variable_name=None):
         color = _get_block_analysis_color(block_name, variable_name)
         chips_html.append(
             f'''
-            <span style="
+            <div style="
                 display:inline-flex;
                 align-items:center;
                 gap:0.45rem;
@@ -9563,16 +9563,16 @@ def _render_analysis_block_color_reference(grouped_df, variable_name=None):
                 color:{BRAND_COLORS['graphite']};
                 white-space:nowrap;
             ">
-                <span style="
+                <div style="
                     width:0.72rem;
                     height:0.72rem;
                     border-radius:999px;
                     background:{color};
                     box-shadow:inset 0 0 0 1px rgba(255,255,255,0.78);
                     flex:0 0 auto;
-                "></span>
-                <span>{html.escape(block_label)}</span>
-            </span>
+                "></div>
+                <div>{html.escape(block_label)}</div>
+            </div>
             '''
         )
 
@@ -9580,7 +9580,9 @@ def _render_analysis_block_color_reference(grouped_df, variable_name=None):
         (
             '<div style="margin:0.35rem 0 0.9rem 0;">'
             '<p class="analysis-note" style="margin-bottom:0.5rem;"><strong>Referencia de colores por bloque</strong></p>'
+            '<div style="display:flex; flex-wrap:wrap; align-items:center; gap:0.18rem 0.22rem;">'
             f'{"".join(chips_html)}'
+            '</div>'
             '</div>'
         ),
         unsafe_allow_html=True
