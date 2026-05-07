@@ -67,7 +67,7 @@ def _render_autoplay_video(video_url, height=430):
                 height: {height}px;
                 object-fit: cover;
                 display: block;
-                border-radius: 18px;
+                border-radius: 8px;
                 background: #111;
             "
         >
@@ -418,12 +418,6 @@ PONDEROSA_ECOWITT_CANONICAL_COLUMNS = {
 }
 LOGO_URL_LARGE = "https://raw.githubusercontent.com/juandavdidtejedormedina-rgb/dashboard-invernaderos/main/logo%20elite.png"
 LOGO_URL_SMALL = LOGO_URL_LARGE
-BACKGROUND_LOGO_URL = (
-    "https://raw.githubusercontent.com/"
-    "juandavdidtejedormedina-rgb/dashboard-invernaderos/"
-    "781040e0fab508f875f6479380a274755bdf71e0/"
-    "logo%20elite.png"
-)
 DASHBOARD_MEDIA = {
     'La Ponderosa': {
         'video_url': (
@@ -460,7 +454,7 @@ BLOCK_FARMS = {
 }
 STREAMLIT_LOGO_WIDTH = 108
 STREAMLIT_LOGO_HEIGHT = 108
-STREAMLIT_LOGO_BORDER_RADIUS = 14
+STREAMLIT_LOGO_BORDER_RADIUS = 8
 TEMP_FOCUS_CHART_ENABLED = True
 TEMP_FOCUS_CHART_PLACEMENT = 'below'  # Opciones: 'below', 'left', 'right'
 TEMP_FOCUS_CHART_HEIGHT = 260
@@ -603,7 +597,7 @@ logo_html = (
 
 st.markdown(f"""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=Manrope:wght@400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap');
 
 :root {{
     --elite-hero: {BRAND_COLORS['hero']};
@@ -614,14 +608,19 @@ st.markdown(f"""
     --elite-ink: {BRAND_COLORS['ink']};
     --elite-paper: {BRAND_COLORS['paper']};
     --elite-white: {BRAND_COLORS['white']};
+    --elite-surface: rgba(255, 255, 255, 0.91);
+    --elite-surface-strong: #FFFFFF;
+    --elite-line: rgba(84, 83, 134, 0.14);
+    --elite-line-soft: rgba(84, 83, 134, 0.08);
+    --elite-shadow: 0 12px 28px rgba(56, 58, 53, 0.08);
     --control-idle: rgba(255, 255, 255, 0.10);
     --control-idle-strong: rgba(255, 255, 255, 0.15);
-    --control-active: #6C6AA0;
-    --control-active-deep: #545386;
-    --control-hover: rgba(194, 223, 234, 0.22);
-    --font-display: 'Manrope', sans-serif;
-    --font-body: 'Manrope', sans-serif;
-    --font-brand: 'Cormorant Garamond', serif;
+    --control-active: #545386;
+    --control-active-deep: #454575;
+    --control-hover: rgba(194, 223, 234, 0.18);
+    --font-display: 'Montserrat', sans-serif;
+    --font-body: 'Montserrat', sans-serif;
+    --font-brand: 'Montserrat', sans-serif;
     --streamlit-logo-width: {STREAMLIT_LOGO_WIDTH}px;
     --streamlit-logo-height: {STREAMLIT_LOGO_HEIGHT}px;
     --streamlit-logo-radius: {STREAMLIT_LOGO_BORDER_RADIUS}px;
@@ -629,14 +628,16 @@ st.markdown(f"""
 
 .stApp {{
     background:
-        radial-gradient(circle at 12% 18%, rgba(244, 199, 206, 0.18), transparent 22%),
-        radial-gradient(circle at 88% 10%, rgba(194, 223, 234, 0.28), transparent 28%),
-        url("{BACKGROUND_LOGO_URL}"),
-        linear-gradient(180deg, #fcfaf7 0%, #f7f3eb 58%, #efe8dc 100%);
-    background-repeat: no-repeat, no-repeat, no-repeat, no-repeat;
-    background-position: 12% 18%, 88% 10%, center 150px, center center;
-    background-size: auto, auto, min(18vw, 240px) auto, cover;
+        linear-gradient(90deg, rgba(84, 83, 134, 0.035) 1px, transparent 1px),
+        linear-gradient(180deg, rgba(255,255,255,0.94) 0%, rgba(255,255,255,0.76) 24%, rgba(247,244,238,0.96) 100%),
+        linear-gradient(180deg, #fbfaf7 0%, #f3eee5 100%);
+    background-repeat: repeat, no-repeat, no-repeat;
+    background-position: center top, center center, center center;
+    background-size: 56px 56px, cover, cover;
     color: var(--elite-ink);
+    font-family: var(--font-body);
+}}
+html, body, [data-testid="stAppViewContainer"] {{
     font-family: var(--font-body);
 }}
 [data-testid="stAppViewContainer"] > .main {{
@@ -679,10 +680,9 @@ section[data-testid="stSidebar"] > div {{
 }}
 [data-testid="stSidebar"] {{
     background:
-        radial-gradient(circle at top left, rgba(244, 199, 206, 0.16), transparent 24%),
-        linear-gradient(180deg, rgba(84, 83, 134, 0.99) 0%, rgba(56, 58, 53, 0.99) 100%);
+        linear-gradient(180deg, rgba(84, 83, 134, 0.99) 0%, rgba(73, 73, 125, 0.99) 52%, rgba(56, 58, 53, 0.99) 100%);
     border-right: 1px solid rgba(255, 255, 255, 0.08);
-    box-shadow: 18px 0 42px rgba(31, 36, 48, 0.18);
+    box-shadow: 10px 0 28px rgba(31, 36, 48, 0.14);
 }}
 [data-testid="stSidebar"] * {{
     color: #f7f7fb;
@@ -721,14 +721,13 @@ section[data-testid="stSidebar"] > div {{
     margin: 2rem auto 1.25rem auto !important;
     padding: 0.42rem;
     border: 1px solid rgba(255, 255, 255, 0.58);
-    border-radius: calc(var(--streamlit-logo-radius) + 10px);
+    border-radius: 8px;
     background:
-        radial-gradient(circle at 50% 18%, rgba(255, 255, 255, 0.34), rgba(255, 255, 255, 0.06) 54%),
-        linear-gradient(180deg, rgba(255, 255, 255, 0.24) 0%, rgba(247, 244, 238, 0.13) 100%);
+        linear-gradient(180deg, rgba(255, 255, 255, 0.30) 0%, rgba(247, 244, 238, 0.13) 100%);
     box-shadow:
-        0 18px 34px rgba(18, 20, 38, 0.26),
+        0 12px 24px rgba(18, 20, 38, 0.22),
         inset 0 1px 0 rgba(255, 255, 255, 0.42);
-    backdrop-filter: blur(12px);
+    backdrop-filter: blur(8px);
     transform: translateY(18px);
 }}
 [data-testid="stSidebarHeader"] img,
@@ -789,11 +788,11 @@ section[data-testid="stSidebar"] > div {{
     stroke-linejoin: round;
 }}
 [data-testid="stSidebar"] .stExpander {{
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.10), rgba(255, 255, 255, 0.05));
-    border: 1px solid rgba(255, 255, 255, 0.10);
-    border-radius: 18px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.105), rgba(255, 255, 255, 0.055));
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 8px;
     overflow: hidden;
-    box-shadow: 0 18px 34px rgba(0, 0, 0, 0.16);
+    box-shadow: 0 10px 22px rgba(0, 0, 0, 0.11);
     margin-bottom: 0.9rem;
 }}
 [data-testid="stSidebar"] .stExpander details summary {{
@@ -811,7 +810,7 @@ section[data-testid="stSidebar"] > div {{
 [data-testid="stSidebar"] [data-testid="stCheckbox"] label {{
     width: 100%;
     padding: 0.38rem 0.56rem;
-    border-radius: 18px;
+    border-radius: 8px;
     border: 1px solid var(--control-idle-strong);
     background: linear-gradient(180deg, rgba(255,255,255,0.11), rgba(255,255,255,0.055));
     box-shadow: 0 8px 18px rgba(0, 0, 0, 0.10);
@@ -821,7 +820,7 @@ section[data-testid="stSidebar"] > div {{
     background: linear-gradient(180deg, var(--control-hover), rgba(255,255,255,0.08));
     border-color: rgba(214, 229, 236, 0.50);
     box-shadow: 0 12px 24px rgba(0, 0, 0, 0.14);
-    transform: translateX(2px);
+    transform: translateY(-1px);
 }}
 [data-testid="stSidebar"] [data-testid="stCheckbox"] label:has([aria-checked="true"]) {{
     border-color: rgba(194, 223, 234, 0.58);
@@ -837,12 +836,12 @@ section[data-testid="stSidebar"] > div {{
     fill: var(--elite-white);
 }}
 [data-testid="stSidebar"] .stCheckbox [role="checkbox"] {{
-    border-radius: 12px;
+    border-radius: 8px;
 }}
 [data-testid="stSidebar"] div.stButton > button {{
     width: 100%;
     min-height: 2.95rem;
-    border-radius: 999px;
+    border-radius: 8px;
     border: 1px solid rgba(214, 229, 236, 0.26);
     background: linear-gradient(135deg, var(--control-active) 0%, var(--control-active-deep) 100%);
     color: var(--elite-white);
@@ -850,35 +849,34 @@ section[data-testid="stSidebar"] > div {{
     font-weight: 800;
     font-size: 0.92rem;
     letter-spacing: 0.02em;
-    box-shadow: inset 0 1px 0 rgba(255,255,255,0.18), 0 16px 30px rgba(25, 48, 83, 0.30);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.18), 0 12px 24px rgba(25, 48, 83, 0.22);
 }}
 [data-testid="stSidebar"] div.stButton > button:hover {{
     border-color: rgba(214, 229, 236, 0.42);
-    background: linear-gradient(135deg, #7A78AF 0%, #5C5A8E 100%);
+    background: linear-gradient(135deg, #64639A 0%, #5C5A8E 100%);
     color: var(--elite-white);
     transform: translateY(-1px);
 }}
 .hero-card {{
     position: relative;
-    display: none;
-    grid-template-columns: 200px minmax(0, 1fr);
-    gap: 1.15rem;
+    display: grid;
+    grid-template-columns: 168px minmax(0, 1fr);
+    gap: 1rem;
     align-items: stretch;
-    padding: 1.45rem 1.5rem;
-    margin: 0 0 1.35rem 0;
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    border-radius: 30px;
+    padding: 1.05rem 1.15rem;
+    margin: 0 0 1rem 0;
+    border: 1px solid rgba(84, 83, 134, 0.16);
+    border-radius: 8px;
     background:
-        radial-gradient(circle at 18% 18%, rgba(255,255,255,0.16), transparent 18%),
-        linear-gradient(135deg, #7A78AF 0%, #545386 42%, #383A35 100%);
-    box-shadow: 0 28px 68px rgba(35, 30, 58, 0.22);
+        linear-gradient(90deg, rgba(84, 83, 134, 0.98) 0%, rgba(84, 83, 134, 0.92) 54%, rgba(56, 58, 53, 0.95) 100%);
+    box-shadow: var(--elite-shadow);
     overflow: hidden;
 }}
 .hero-card::before {{
     content: '';
     position: absolute;
     inset: 1px;
-    border-radius: 29px;
+    border-radius: 8px;
     border: 1px solid rgba(255, 255, 255, 0.08);
     pointer-events: none;
 }}
@@ -886,12 +884,12 @@ section[data-testid="stSidebar"] > div {{
     display: flex;
     align-items: center;
     justify-content: center;
-    border-radius: 24px;
+    border-radius: 8px;
     border: 1px solid rgba(255, 255, 255, 0.18);
     background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(247, 244, 238, 0.95));
-    min-height: 150px;
-    padding: 1.1rem;
-    box-shadow: inset 0 1px 0 rgba(255,255,255,0.70), 0 20px 34px rgba(36, 31, 61, 0.18);
+    min-height: 116px;
+    padding: 0.9rem;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.70), 0 12px 24px rgba(36, 31, 61, 0.14);
 }}
 .hero-logo-image {{
     width: 100%;
@@ -926,9 +924,9 @@ section[data-testid="stSidebar"] > div {{
     color: var(--elite-white);
     font-family: var(--font-display);
     font-weight: 800;
-    font-size: 2.35rem;
-    line-height: 1.02;
-    letter-spacing: -0.04em;
+    font-size: 2rem;
+    line-height: 1.08;
+    letter-spacing: 0;
 }}
 .hero-subtitle {{
     margin: 0.85rem 0 0.1rem 0;
@@ -940,7 +938,7 @@ section[data-testid="stSidebar"] > div {{
 .video-panel {{
     margin: -0.35rem 0 1.25rem 0;
     padding: 1rem;
-    border-radius: 20px;
+    border-radius: 8px;
     border: 1px solid rgba(76, 70, 120, 0.12);
     background: rgba(255, 255, 255, 0.78);
     box-shadow: 0 16px 36px rgba(45, 48, 64, 0.08);
@@ -963,10 +961,10 @@ section[data-testid="stSidebar"] > div {{
     display: flex;
     flex-direction: column;
     padding: 1.08rem 1.08rem 1rem 1.08rem;
-    border-radius: 24px;
-    border: 1px solid rgba(76, 70, 120, 0.10);
-    background: linear-gradient(180deg, rgba(255,255,255,0.92) 0%, rgba(247,244,238,0.96) 100%);
-    box-shadow: 0 18px 40px rgba(45, 48, 64, 0.09);
+    border-radius: 8px;
+    border: 1px solid var(--elite-line-soft);
+    background: linear-gradient(180deg, var(--elite-surface-strong) 0%, rgba(255,255,255,0.90) 100%);
+    box-shadow: var(--elite-shadow);
     overflow: hidden;
     backdrop-filter: blur(12px);
 }}
@@ -984,7 +982,7 @@ section[data-testid="stSidebar"] > div {{
     right: -20px;
     width: 118px;
     height: 118px;
-    background: radial-gradient(circle, var(--summary-accent-soft) 0%, rgba(255,255,255,0) 72%);
+    background: transparent;
     pointer-events: none;
 }}
 .summary-card-header {{
@@ -1001,7 +999,7 @@ section[data-testid="stSidebar"] > div {{
     justify-content: center;
     width: 2.45rem;
     height: 2.45rem;
-    border-radius: 16px;
+    border-radius: 8px;
     background: var(--summary-accent-soft);
     color: var(--summary-accent);
     box-shadow: inset 0 1px 0 rgba(255,255,255,0.62), 0 10px 22px rgba(56, 58, 53, 0.06);
@@ -1040,7 +1038,7 @@ section[data-testid="stSidebar"] > div {{
     font-weight: 800;
     line-height: 1;
     font-variant-numeric: tabular-nums;
-    letter-spacing: -0.04em;
+    letter-spacing: 0;
 }}
 .summary-card-unit {{
     margin-bottom: 0.3rem;
@@ -1166,7 +1164,7 @@ section[data-testid="stSidebar"] > div {{
     font-size: 0.96rem;
     font-weight: 800;
     line-height: 1;
-    letter-spacing: -0.02em;
+    letter-spacing: 0;
 }}
 .summary-card-day-unit {{
     color: #6a6e78;
@@ -1195,12 +1193,12 @@ section[data-testid="stSidebar"] > div {{
     overflow: hidden;
     min-height: 232px;
     padding: 1.18rem 1.22rem 1.14rem 1.22rem;
-    border-radius: 26px;
-    border: 1px solid rgba(76, 70, 120, 0.08);
+    border-radius: 8px;
+    border: 1px solid var(--elite-line-soft);
     background:
         linear-gradient(180deg, rgba(255,255,255,0.94) 0%, rgba(247,244,238,0.96) 100%);
     box-shadow:
-        0 20px 42px rgba(45, 48, 64, 0.08),
+        0 12px 28px rgba(45, 48, 64, 0.07),
         inset 0 1px 0 rgba(255,255,255,0.70);
     backdrop-filter: blur(12px);
 }}
@@ -1218,7 +1216,7 @@ section[data-testid="stSidebar"] > div {{
     bottom: -30px;
     width: 165px;
     height: 165px;
-    background: radial-gradient(circle, var(--info-accent-soft) 0%, rgba(255,255,255,0) 70%);
+    background: transparent;
     pointer-events: none;
 }}
 .info-panel-card--compact {{
@@ -1257,7 +1255,7 @@ section[data-testid="stSidebar"] > div {{
     justify-content: center;
     width: 2.55rem;
     height: 2.55rem;
-    border-radius: 17px;
+    border-radius: 8px;
     background: var(--info-accent-soft);
     color: var(--info-accent);
     box-shadow: inset 0 1px 0 rgba(255,255,255,0.62), 0 10px 22px rgba(56, 58, 53, 0.05);
@@ -1278,7 +1276,7 @@ section[data-testid="stSidebar"] > div {{
     font-size: 1.02rem;
     font-weight: 800;
     line-height: 1.16;
-    letter-spacing: -0.03em;
+    letter-spacing: 0;
     word-break: keep-all;
     overflow-wrap: normal;
     hyphens: none;
@@ -1330,7 +1328,7 @@ section[data-testid="stSidebar"] > div {{
     font-size: 2.15rem;
     font-weight: 800;
     line-height: 1;
-    letter-spacing: -0.04em;
+    letter-spacing: 0;
 }}
 .info-panel-stat-caption {{
     margin-bottom: 0.22rem;
@@ -1384,7 +1382,7 @@ section[data-testid="stSidebar"] > div {{
 }}
 .info-panel-day-card {{
     padding: 0.72rem 0.78rem;
-    border-radius: 16px;
+    border-radius: 8px;
     border: 1px solid rgba(76, 70, 120, 0.07);
     background: linear-gradient(180deg, rgba(255,255,255,0.86), rgba(246,242,235,0.84));
 }}
@@ -1489,7 +1487,7 @@ section[data-testid="stSidebar"] > div {{
     line-height: 1.5;
 }}
 div.stButton > button {{
-    border-radius: 999px;
+    border-radius: 8px;
     border: 1px solid rgba(76, 70, 120, 0.18);
     background: linear-gradient(135deg, #6C6AA0 0%, #545386 100%);
     color: var(--elite-white);
@@ -1497,19 +1495,19 @@ div.stButton > button {{
     font-weight: 800;
     padding: 0.56rem 1.1rem;
     letter-spacing: 0.01em;
-    box-shadow: 0 14px 30px rgba(60, 58, 102, 0.24);
+    box-shadow: 0 12px 24px rgba(60, 58, 102, 0.18);
 }}
 div.stButton > button:hover {{
     border-color: rgba(76, 70, 120, 0.30);
     color: var(--elite-white);
-    background: linear-gradient(135deg, #7A78AF 0%, #5C5A8E 100%);
+    background: linear-gradient(135deg, #64639A 0%, #5C5A8E 100%);
     transform: translateY(-1px);
 }}
 div[data-testid="stTabs"] [data-baseweb="tab-list"] {{
     gap: 0.55rem;
 }}
 button[data-baseweb="tab"] {{
-    border-radius: 999px;
+    border-radius: 8px;
     padding: 0.58rem 0.96rem;
     border: 1px solid rgba(76, 70, 120, 0.12) !important;
     background: linear-gradient(180deg, rgba(255,255,255,0.74), rgba(247,244,238,0.94));
@@ -1535,16 +1533,16 @@ div[data-testid="stTabs"] [data-baseweb="tab-border"] {{
 }}
 div[data-testid="stPlotlyChart"],
 div[data-testid="stDataFrame"] {{
-    border-radius: 24px;
-    border: 1px solid rgba(76, 70, 120, 0.08);
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.86), rgba(247, 244, 238, 0.82));
-    box-shadow: 0 20px 46px rgba(45, 48, 64, 0.07);
+    border-radius: 8px;
+    border: 1px solid var(--elite-line-soft);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(255, 255, 255, 0.86));
+    box-shadow: var(--elite-shadow);
     padding: 0.45rem 0.45rem 0.2rem 0.45rem;
     backdrop-filter: blur(12px);
 }}
 [data-testid="stMetric"] {{
     background: rgba(255, 255, 255, 0.82);
-    border-radius: 18px;
+    border-radius: 8px;
     border: 1px solid rgba(76, 70, 120, 0.08);
     box-shadow: 0 12px 28px rgba(45, 48, 64, 0.06);
     padding: 0.35rem 0.6rem;
@@ -1553,7 +1551,7 @@ div[data-testid="stDataFrame"] {{
 [data-testid="stWarning"],
 [data-testid="stSuccess"],
 [data-testid="stError"] {{
-    border-radius: 18px;
+    border-radius: 8px;
     border-width: 1px;
 }}
 .analysis-hero {{
@@ -1561,12 +1559,11 @@ div[data-testid="stDataFrame"] {{
     overflow: hidden;
     margin: 0.2rem 0 1rem 0;
     padding: 1.2rem 1.22rem 1.08rem 1.22rem;
-    border-radius: 28px;
-    border: 1px solid rgba(76, 70, 120, 0.10);
+    border-radius: 8px;
+    border: 1px solid var(--elite-line-soft);
     background:
-        radial-gradient(circle at top right, rgba(214, 229, 236, 0.45), rgba(255,255,255,0) 34%),
         linear-gradient(180deg, rgba(255,255,255,0.94), rgba(247,244,238,0.96));
-    box-shadow: 0 24px 48px rgba(45, 48, 64, 0.08);
+    box-shadow: var(--elite-shadow);
 }}
 .analysis-hero::before {{
     content: '';
@@ -1651,8 +1648,8 @@ div[data-testid="stDataFrame"] {{
     position: relative;
     overflow: hidden;
     padding: 0.95rem 1rem 1rem 1rem;
-    border-radius: 22px;
-    border: 1px solid rgba(76, 70, 120, 0.08);
+    border-radius: 8px;
+    border: 1px solid var(--elite-line-soft);
     background: linear-gradient(180deg, rgba(255,255,255,0.90), rgba(247,244,238,0.94));
     box-shadow: 0 18px 36px rgba(45, 48, 64, 0.06);
 }}
@@ -1678,7 +1675,7 @@ div[data-testid="stDataFrame"] {{
     font-size: 2.42rem;
     font-weight: 800;
     line-height: 1;
-    letter-spacing: -0.04em;
+    letter-spacing: 0;
 }}
 .analysis-note {{
     margin: 0.1rem 0 0.95rem 0;
@@ -1695,7 +1692,7 @@ div[data-testid="stDataFrame"] {{
 [data-testid="stSidebar"] .stDateInput > div,
 [data-testid="stSidebar"] .stSelectbox > div[data-baseweb="select"] {{
     background: rgba(255, 255, 255, 0.08);
-    border-radius: 13px;
+    border-radius: 8px;
 }}
 [data-testid="stSidebar"] [data-testid="stRadio"] div[role="radiogroup"] {{
     display: grid;
@@ -1705,7 +1702,7 @@ div[data-testid="stDataFrame"] {{
     width: 100%;
     margin: 0;
     padding: 0.42rem 0.56rem;
-    border-radius: 18px;
+    border-radius: 8px;
     border: 1px solid var(--control-idle-strong);
     background: linear-gradient(180deg, rgba(255,255,255,0.11), rgba(255,255,255,0.055));
     box-shadow: 0 8px 18px rgba(0, 0, 0, 0.10);
@@ -1715,7 +1712,7 @@ div[data-testid="stDataFrame"] {{
     background: linear-gradient(180deg, var(--control-hover), rgba(255,255,255,0.08));
     border-color: rgba(214, 229, 236, 0.50);
     box-shadow: 0 12px 24px rgba(0, 0, 0, 0.14);
-    transform: translateX(2px);
+    transform: translateY(-1px);
 }}
 [data-testid="stSidebar"] [data-testid="stRadio"] div[role="radiogroup"] > label:has(input:checked) {{
     border-color: rgba(214, 229, 236, 0.58);
@@ -1751,8 +1748,7 @@ div[data-testid="stDataFrame"] {{
 }}
 @media (max-width: 980px) {{
     .stApp {{
-        background-position: 12% 18%, 88% 10%, center 120px, center center;
-        background-size: auto, auto, min(34vw, 160px) auto, cover;
+        background-size: 48px 48px, cover, cover;
     }}
     .hero-card {{
         grid-template-columns: 1fr;
@@ -2168,12 +2164,12 @@ def _render_selected_period_banner(
             <div style="
                 margin: 0.2rem 0 1rem 0;
                 padding: 0.95rem 1rem;
-                border-radius: 18px;
+                border-radius: 8px;
                 background: linear-gradient(135deg, rgba(194,223,234,0.18) 0%, rgba(244,199,206,0.14) 100%);
                 border: 1px solid rgba(84, 83, 134, 0.08);
             ">
                 <div style="
-                    font-family: 'Manrope', sans-serif;
+                    font-family: 'Montserrat', sans-serif;
                     font-size: 0.78rem;
                     font-weight: 800;
                     letter-spacing: 0.04em;
@@ -2184,7 +2180,7 @@ def _render_selected_period_banner(
                     {html.escape(title_text)}
                 </div>
                 <div style="
-                    font-family: 'Manrope', sans-serif;
+                    font-family: 'Montserrat', sans-serif;
                     font-size: 1.3rem;
                     font-weight: 800;
                     color: {BRAND_COLORS['graphite']};
@@ -2193,7 +2189,7 @@ def _render_selected_period_banner(
                     {html.escape(period_label)}
                 </div>
                 <div style="
-                    font-family: 'Manrope', sans-serif;
+                    font-family: 'Montserrat', sans-serif;
                     font-size: 0.92rem;
                     line-height: 1.5;
                     color: rgba(56, 58, 53, 0.78);
@@ -2250,16 +2246,15 @@ def _render_chart_explanation(title, description, accent=None, kicker='Guía de 
             overflow: hidden;
             margin: 0.35rem 0 0.8rem 0;
             padding: 0.86rem 1rem 0.84rem 1.05rem;
-            border-radius: 18px;
+            border-radius: 8px;
             border: 1px solid rgba(84, 83, 134, 0.09);
             border-left: 4px solid {accent_color};
             background:
-                radial-gradient(circle at top right, rgba(194,223,234,0.18), rgba(255,255,255,0) 42%),
                 linear-gradient(135deg, rgba(255,255,255,0.94) 0%, rgba(247,244,238,0.90) 100%);
             box-shadow: 0 14px 32px rgba(45, 48, 64, 0.055);
         ">
             <div style="
-                font-family: 'Manrope', sans-serif;
+                font-family: 'Montserrat', sans-serif;
                 font-size: 0.70rem;
                 font-weight: 800;
                 letter-spacing: 0.10em;
@@ -2270,7 +2265,7 @@ def _render_chart_explanation(title, description, accent=None, kicker='Guía de 
                 {html.escape(kicker)}
             </div>
             <div style="
-                font-family: 'Manrope', sans-serif;
+                font-family: 'Montserrat', sans-serif;
                 font-size: 1rem;
                 font-weight: 800;
                 color: {BRAND_COLORS['ink']};
@@ -2279,7 +2274,7 @@ def _render_chart_explanation(title, description, accent=None, kicker='Guía de 
                 {html.escape(title)}
             </div>
             <div style="
-                font-family: 'Manrope', sans-serif;
+                font-family: 'Montserrat', sans-serif;
                 font-size: 0.91rem;
                 line-height: 1.55;
                 color: rgba(56, 58, 53, 0.82);
@@ -2332,6 +2327,32 @@ def _sidebar_field_label(icon_name, text):
 
 
 def _plotly_chart(fig, **kwargs):
+    if fig is not None:
+        try:
+            fig.update_layout(
+                font=dict(family='Montserrat, sans-serif', color=BRAND_COLORS['graphite']),
+                paper_bgcolor='rgba(255,255,255,0)',
+                plot_bgcolor='rgba(255,255,255,0.66)',
+                hoverlabel=dict(
+                    bgcolor='rgba(255,255,255,0.96)',
+                    bordercolor='rgba(84,83,134,0.18)',
+                    font=dict(family='Montserrat, sans-serif', color=BRAND_COLORS['ink'])
+                )
+            )
+            fig.update_xaxes(
+                gridcolor='rgba(84,83,134,0.08)',
+                zerolinecolor='rgba(84,83,134,0.18)',
+                linecolor='rgba(84,83,134,0.16)',
+                tickfont=dict(family='Montserrat, sans-serif', color=BRAND_COLORS['graphite'])
+            )
+            fig.update_yaxes(
+                gridcolor='rgba(84,83,134,0.08)',
+                zerolinecolor='rgba(84,83,134,0.18)',
+                linecolor='rgba(84,83,134,0.16)',
+                tickfont=dict(family='Montserrat, sans-serif', color=BRAND_COLORS['graphite'])
+            )
+        except Exception:
+            pass
     st.plotly_chart(fig, width='stretch', **kwargs)
 
 
@@ -4268,7 +4289,7 @@ def _render_comparison_table_summary(table, title="Resumen ejecutivo"):
                     background: rgba(255,255,255,0.94);
                     border: 1px solid rgba(84, 83, 134, 0.10);
                     border-left: 4px solid {BRAND_COLORS['hero']};
-                    border-radius: 16px;
+                    border-radius: 8px;
                     padding: 0.9rem 1rem;
                     margin-bottom: 0.8rem;
                     box-shadow: 0 12px 28px rgba(44,46,42,0.06);
@@ -4968,7 +4989,7 @@ def _make_source_all_variables_chart(
         hovermode='x unified',
         template='plotly_white',
         showlegend=False,
-        font=dict(family='Manrope, sans-serif', color=BRAND_COLORS['graphite']),
+        font=dict(family='Montserrat, sans-serif', color=BRAND_COLORS['graphite']),
     )
     return fig
 
@@ -5551,13 +5572,13 @@ def _render_marley_dashboard(dashboard_mode):
                     background: linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(247,244,238,0.96) 100%);
                     border: 1px solid rgba(84, 83, 134, 0.10);
                     border-top: 4px solid {metric['accent']};
-                    border-radius: 24px;
+                    border-radius: 8px;
                     padding: 1.15rem 1.1rem 1rem 1.1rem;
                     box-shadow: 0 18px 36px rgba(44, 46, 42, 0.08);
                     min-height: 255px;
                 ">
                     <div style="
-                        font-family: 'Manrope', sans-serif;
+                        font-family: 'Montserrat', sans-serif;
                         font-size: 0.82rem;
                         font-weight: 800;
                         letter-spacing: 0.03em;
@@ -5568,7 +5589,7 @@ def _render_marley_dashboard(dashboard_mode):
                         {html.escape(metric['title'])}
                     </div>
                     <div style="
-                        font-family: 'Manrope', sans-serif;
+                        font-family: 'Montserrat', sans-serif;
                         font-size: 2.6rem;
                         line-height: 1;
                         font-weight: 800;
@@ -5578,7 +5599,7 @@ def _render_marley_dashboard(dashboard_mode):
                         {html.escape(metric['value'])}
                     </div>
                     <div style="
-                        font-family: 'Manrope', sans-serif;
+                        font-family: 'Montserrat', sans-serif;
                         font-size: 0.94rem;
                         line-height: 1.55;
                         color: rgba(56, 58, 53, 0.82);
@@ -5589,11 +5610,11 @@ def _render_marley_dashboard(dashboard_mode):
                     <div style="
                         background: rgba(84, 83, 134, 0.05);
                         border: 1px solid rgba(84, 83, 134, 0.08);
-                        border-radius: 16px;
+                        border-radius: 8px;
                         padding: 0.8rem 0.85rem;
                     ">
                         <div style="
-                            font-family: 'Manrope', sans-serif;
+                            font-family: 'Montserrat', sans-serif;
                             font-size: 0.76rem;
                             font-weight: 800;
                             letter-spacing: 0.04em;
@@ -5604,7 +5625,7 @@ def _render_marley_dashboard(dashboard_mode):
                             Cómo leerlo
                         </div>
                         <div style="
-                            font-family: 'Manrope', sans-serif;
+                            font-family: 'Montserrat', sans-serif;
                             font-size: 0.9rem;
                             line-height: 1.55;
                             color: {BRAND_COLORS['ink']};
@@ -5622,11 +5643,11 @@ def _render_marley_dashboard(dashboard_mode):
         <div style="
             margin: 0.95rem 0 0.65rem 0;
             padding: 0.95rem 1rem;
-            border-radius: 18px;
+            border-radius: 8px;
             background: linear-gradient(135deg, rgba(194,223,234,0.20) 0%, rgba(244,199,206,0.12) 100%);
             border: 1px solid rgba(84, 83, 134, 0.08);
             color: rgba(56, 58, 53, 0.88);
-            font-family: 'Manrope', sans-serif;
+            font-family: 'Montserrat', sans-serif;
             font-size: 0.94rem;
             line-height: 1.6;
         ">
@@ -8015,13 +8036,13 @@ def _render_ponderosa_comparison_metric_cards(overlap, selected_variable):
                     background: linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(247,244,238,0.96) 100%);
                     border: 1px solid rgba(84, 83, 134, 0.10);
                     border-top: 4px solid {metric['accent']};
-                    border-radius: 24px;
+                    border-radius: 8px;
                     padding: 1.15rem 1.1rem 1rem 1.1rem;
                     box-shadow: 0 18px 36px rgba(44, 46, 42, 0.08);
                     min-height: 235px;
                 ">
                     <div style="
-                        font-family: 'Manrope', sans-serif;
+                        font-family: 'Montserrat', sans-serif;
                         font-size: 0.82rem;
                         font-weight: 800;
                         letter-spacing: 0.03em;
@@ -8039,7 +8060,7 @@ def _render_ponderosa_comparison_metric_cards(overlap, selected_variable):
                         margin-bottom: 0.95rem;
                     ">
                         <span style="
-                            font-family: 'Manrope', sans-serif;
+                            font-family: 'Montserrat', sans-serif;
                             font-size: 2rem;
                             line-height: 1.08;
                             font-weight: 800;
@@ -8048,7 +8069,7 @@ def _render_ponderosa_comparison_metric_cards(overlap, selected_variable):
                             {html.escape(metric['value'])}
                         </span>
                         <span style="
-                            font-family: 'Manrope', sans-serif;
+                            font-family: 'Montserrat', sans-serif;
                             font-size: 1.02rem;
                             line-height: 1.15;
                             font-weight: 800;
@@ -8059,7 +8080,7 @@ def _render_ponderosa_comparison_metric_cards(overlap, selected_variable):
                         </span>
                     </div>
                     <div style="
-                        font-family: 'Manrope', sans-serif;
+                        font-family: 'Montserrat', sans-serif;
                         font-size: 0.94rem;
                         line-height: 1.55;
                         color: rgba(56, 58, 53, 0.82);
@@ -8070,11 +8091,11 @@ def _render_ponderosa_comparison_metric_cards(overlap, selected_variable):
                     <div style="
                         background: rgba(84, 83, 134, 0.05);
                         border: 1px solid rgba(84, 83, 134, 0.08);
-                        border-radius: 16px;
+                        border-radius: 8px;
                         padding: 0.8rem 0.85rem;
                     ">
                         <div style="
-                            font-family: 'Manrope', sans-serif;
+                            font-family: 'Montserrat', sans-serif;
                             font-size: 0.76rem;
                             font-weight: 800;
                             letter-spacing: 0.04em;
@@ -8085,7 +8106,7 @@ def _render_ponderosa_comparison_metric_cards(overlap, selected_variable):
                             Cómo leerlo
                         </div>
                         <div style="
-                            font-family: 'Manrope', sans-serif;
+                            font-family: 'Montserrat', sans-serif;
                             font-size: 0.9rem;
                             line-height: 1.55;
                             color: {BRAND_COLORS['ink']};
@@ -9012,9 +9033,9 @@ def _render_correlacion(
         axis_kwargs = dict(
             title=dict(
                 text=CORR_AXIS_TITLES.get(axis_var_name, axis_var_name),
-                font=dict(color=color, size=11, family='Manrope, sans-serif')
+                font=dict(color=color, size=11, family='Montserrat, sans-serif')
             ),
-            tickfont=dict(color=color, size=10, family='Manrope, sans-serif'),
+            tickfont=dict(color=color, size=10, family='Montserrat, sans-serif'),
             tickcolor=color,
             range=axis_range,
             autorange=False,
@@ -9065,9 +9086,9 @@ def _render_correlacion(
             axis_configs['y2'] = dict(
                 title=dict(
                     text='Frentes / Puertas (m2)',
-                    font=dict(color=cortina_color, size=11, family='Manrope, sans-serif')
+                    font=dict(color=cortina_color, size=11, family='Montserrat, sans-serif')
                 ),
-                tickfont=dict(color=cortina_color, size=10, family='Manrope, sans-serif'),
+                tickfont=dict(color=cortina_color, size=10, family='Montserrat, sans-serif'),
                 tickcolor=cortina_color,
                 range=[axis_range_min, axis_range_max],
                 autorange=False,
@@ -9090,9 +9111,9 @@ def _render_correlacion(
             axis_configs['y2'] = dict(
                 title=dict(
                     text=CORR_AXIS_TITLES['% Apertura Cortinas'],
-                    font=dict(color=cortina_color, size=11, family='Manrope, sans-serif')
+                    font=dict(color=cortina_color, size=11, family='Montserrat, sans-serif')
                 ),
-                tickfont=dict(color=cortina_color, size=10, family='Manrope, sans-serif'),
+                tickfont=dict(color=cortina_color, size=10, family='Montserrat, sans-serif'),
                 tickcolor=cortina_color,
                 range=[-4, 100],
                 autorange=False,
@@ -9120,18 +9141,18 @@ def _render_correlacion(
             y=0.98,
             yanchor='top',
             pad=dict(b=8),
-            font=dict(size=22, color=BRAND_COLORS['graphite'], family='Manrope, sans-serif')
+            font=dict(size=22, color=BRAND_COLORS['graphite'], family='Montserrat, sans-serif')
         ),
         xaxis=dict(
             title=dict(
                 text=xaxis_title_text,
-                font=dict(size=14, family='Manrope, sans-serif', color=BRAND_COLORS['graphite'])
+                font=dict(size=14, family='Montserrat, sans-serif', color=BRAND_COLORS['graphite'])
             ),
             tickmode='linear' if not multi_day_view else 'auto',
             dtick=30 * 60 * 1000 if not multi_day_view else None,
             tickformat=xaxis_tickformat,
             range=single_day_xaxis_range,
-            tickfont=dict(size=11, family='Manrope, sans-serif', color=BRAND_COLORS['graphite']),
+            tickfont=dict(size=11, family='Montserrat, sans-serif', color=BRAND_COLORS['graphite']),
             domain=[0, x_domain_end],
             showgrid=True,
             gridcolor='rgba(76, 70, 120, 0.07)',
@@ -9139,13 +9160,13 @@ def _render_correlacion(
         ),
         hovermode='x unified',
         template='plotly_white',
-        font=dict(family='Manrope, sans-serif', color=BRAND_COLORS['graphite']),
+        font=dict(family='Montserrat, sans-serif', color=BRAND_COLORS['graphite']),
         paper_bgcolor='rgba(255,255,255,0)',
         plot_bgcolor='rgba(250,248,243,0.65)',
         hoverlabel=dict(
             bgcolor='rgba(249, 246, 240, 0.98)',
             bordercolor='rgba(76, 70, 120, 0.16)',
-            font=dict(family='Manrope, sans-serif', color=BRAND_COLORS['graphite'], size=12)
+            font=dict(family='Montserrat, sans-serif', color=BRAND_COLORS['graphite'], size=12)
         ),
         height=600,
         legend=dict(
@@ -9155,8 +9176,8 @@ def _render_correlacion(
             xanchor='left',
             x=0,
             traceorder='normal',
-            font=dict(size=11, family='Manrope, sans-serif', color=BRAND_COLORS['graphite']),
-            grouptitlefont=dict(size=11, family='Manrope, sans-serif', color=BRAND_COLORS['hero']),
+            font=dict(size=11, family='Montserrat, sans-serif', color=BRAND_COLORS['graphite']),
+            grouptitlefont=dict(size=11, family='Montserrat, sans-serif', color=BRAND_COLORS['hero']),
             bgcolor='rgba(255,255,255,0.76)',
             bordercolor='rgba(76, 70, 120, 0.08)',
             borderwidth=1
@@ -9233,7 +9254,7 @@ def _build_focus_variable_chart(df_variables, fecha_variables, variable_name, ch
             text=resolved_title,
             x=0,
             xanchor='left',
-            font=dict(size=16, color=BRAND_COLORS['graphite'], family='Manrope, sans-serif')
+            font=dict(size=16, color=BRAND_COLORS['graphite'], family='Montserrat, sans-serif')
         ),
         xaxis=dict(
             title=xaxis_title,
@@ -9244,14 +9265,14 @@ def _build_focus_variable_chart(df_variables, fecha_variables, variable_name, ch
             showgrid=True,
             gridcolor='rgba(76, 70, 120, 0.07)',
             zeroline=False,
-            tickfont=dict(size=10, family='Manrope, sans-serif', color=BRAND_COLORS['graphite'])
+            tickfont=dict(size=10, family='Montserrat, sans-serif', color=BRAND_COLORS['graphite'])
         ),
         yaxis=dict(
             title=yaxis_title,
             showgrid=True,
             gridcolor='rgba(76, 70, 120, 0.07)',
             zeroline=False,
-            tickfont=dict(size=10, family='Manrope, sans-serif', color=BRAND_COLORS['graphite'])
+            tickfont=dict(size=10, family='Montserrat, sans-serif', color=BRAND_COLORS['graphite'])
         ),
         template='plotly_white',
         paper_bgcolor='rgba(255,255,255,0)',
@@ -9260,7 +9281,7 @@ def _build_focus_variable_chart(df_variables, fecha_variables, variable_name, ch
         showlegend=False,
         height=TEMP_FOCUS_CHART_HEIGHT,
         margin=dict(l=52, r=24, t=58, b=44),
-        font=dict(family='Manrope, sans-serif', color=BRAND_COLORS['graphite'])
+        font=dict(family='Montserrat, sans-serif', color=BRAND_COLORS['graphite'])
     )
     return fig
 
@@ -9373,7 +9394,7 @@ def _build_motor_focus_chart(datos_cortinas_sel, fecha_variables, block_label=No
             text=resolved_title,
             x=0,
             xanchor='left',
-            font=dict(size=16, color=BRAND_COLORS['graphite'], family='Manrope, sans-serif')
+            font=dict(size=16, color=BRAND_COLORS['graphite'], family='Montserrat, sans-serif')
         ),
         xaxis=dict(
             title=xaxis_title,
@@ -9384,7 +9405,7 @@ def _build_motor_focus_chart(datos_cortinas_sel, fecha_variables, block_label=No
             showgrid=True,
             gridcolor='rgba(76, 70, 120, 0.07)',
             zeroline=False,
-            tickfont=dict(size=10, family='Manrope, sans-serif', color=BRAND_COLORS['graphite'])
+            tickfont=dict(size=10, family='Montserrat, sans-serif', color=BRAND_COLORS['graphite'])
         ),
         yaxis=dict(
             title='Apertura (%)',
@@ -9392,7 +9413,7 @@ def _build_motor_focus_chart(datos_cortinas_sel, fecha_variables, block_label=No
             showgrid=True,
             gridcolor='rgba(76, 70, 120, 0.07)',
             zeroline=False,
-            tickfont=dict(size=10, family='Manrope, sans-serif', color=BRAND_COLORS['graphite'])
+            tickfont=dict(size=10, family='Montserrat, sans-serif', color=BRAND_COLORS['graphite'])
         ),
         template='plotly_white',
         paper_bgcolor='rgba(255,255,255,0)',
@@ -9400,14 +9421,14 @@ def _build_motor_focus_chart(datos_cortinas_sel, fecha_variables, block_label=No
         hovermode='x unified',
         height=TEMP_FOCUS_CHART_HEIGHT + 20,
         margin=dict(l=52, r=24, t=58, b=44),
-        font=dict(family='Manrope, sans-serif', color=BRAND_COLORS['graphite']),
+        font=dict(family='Montserrat, sans-serif', color=BRAND_COLORS['graphite']),
         legend=dict(
             orientation='h',
             yanchor='bottom',
             y=1.02,
             xanchor='left',
             x=0,
-            font=dict(size=11, family='Manrope, sans-serif', color=BRAND_COLORS['graphite'])
+            font=dict(size=11, family='Montserrat, sans-serif', color=BRAND_COLORS['graphite'])
         )
     )
     return fig_motor
@@ -9566,7 +9587,7 @@ def _render_analysis_block_color_reference(grouped_df, variable_name=None):
                 'padding:0.38rem 0.74rem;border-radius:999px;'
                 'background:rgba(255,255,255,0.86);border:1px solid rgba(76, 70, 120, 0.10);'
                 'box-shadow:0 8px 18px rgba(42, 46, 53, 0.05);'
-                'margin:0 0.42rem 0.42rem 0;font-family:\'Manrope\', sans-serif;'
+                'margin:0 0.42rem 0.42rem 0;font-family:\'Montserrat\', sans-serif;'
                 f'font-size:0.86rem;color:{BRAND_COLORS["graphite"]};white-space:nowrap;">'
                 f'<div style="width:0.72rem;height:0.72rem;border-radius:999px;background:{color};'
                 'box-shadow:inset 0 0 0 1px rgba(255,255,255,0.78);flex:0 0 auto;"></div>'
@@ -9646,15 +9667,15 @@ def _render_hourly_metric_chart(grouped_df, variable_name, metric_column):
             x=0.01,
             xanchor='left',
             y=0.97,
-            font=dict(family='Manrope', size=20, color=BRAND_COLORS['ink'])
+            font=dict(family='Montserrat', size=20, color=BRAND_COLORS['ink'])
         ),
         hovermode='x unified',
         template='plotly_white',
-        font=dict(family='Manrope, sans-serif', color=BRAND_COLORS['graphite']),
+        font=dict(family='Montserrat, sans-serif', color=BRAND_COLORS['graphite']),
         hoverlabel=dict(
             bgcolor='rgba(249, 246, 240, 0.98)',
             bordercolor='rgba(76, 70, 120, 0.16)',
-            font=dict(family='Manrope, sans-serif', color=BRAND_COLORS['graphite'], size=12)
+            font=dict(family='Montserrat, sans-serif', color=BRAND_COLORS['graphite'], size=12)
         ),
         legend=dict(
             orientation='h',
@@ -9663,7 +9684,7 @@ def _render_hourly_metric_chart(grouped_df, variable_name, metric_column):
             xanchor='left',
             x=0,
             traceorder='normal',
-            font=dict(size=11, family='Manrope, sans-serif', color=BRAND_COLORS['graphite']),
+            font=dict(size=11, family='Montserrat, sans-serif', color=BRAND_COLORS['graphite']),
             bgcolor='rgba(255,255,255,0.74)',
             bordercolor='rgba(76, 70, 120, 0.08)',
             borderwidth=1
@@ -9677,7 +9698,7 @@ def _render_hourly_metric_chart(grouped_df, variable_name, metric_column):
             tickvals=display_slots,
             ticktext=display_slots,
             tickangle=-90,
-            tickfont=dict(size=10, family='Manrope, sans-serif', color=BRAND_COLORS['graphite']),
+            tickfont=dict(size=10, family='Montserrat, sans-serif', color=BRAND_COLORS['graphite']),
             gridcolor='rgba(76, 70, 120, 0.07)',
             linecolor='rgba(45, 48, 64, 0.18)',
             zeroline=False,
@@ -9685,7 +9706,7 @@ def _render_hourly_metric_chart(grouped_df, variable_name, metric_column):
         ),
         yaxis=dict(
             title=f'<b>{metric_column}</b>',
-            tickfont=dict(size=11, family='Manrope, sans-serif', color=BRAND_COLORS['graphite']),
+            tickfont=dict(size=11, family='Montserrat, sans-serif', color=BRAND_COLORS['graphite']),
             gridcolor='rgba(76, 70, 120, 0.07)',
             linecolor='rgba(45, 48, 64, 0.18)',
             zerolinecolor='rgba(45, 48, 64, 0.10)'
@@ -9803,7 +9824,7 @@ def _render_analysis_metric_cards_row(metrics_data, tab_label, single_day_analys
                 overflow: hidden;
             ">
                 <p style="
-                    font-family: 'Manrope', sans-serif;
+                    font-family: 'Montserrat', sans-serif;
                     font-size: 13px;
                     color: {color};
                     font-weight: 500;
@@ -9813,7 +9834,7 @@ def _render_analysis_metric_cards_row(metrics_data, tab_label, single_day_analys
                 ">{html.escape(variable_name)}</p>
                 <div style="display: flex; align-items: baseline; gap: 0.45rem; flex-wrap: wrap;">
                     <p style="
-                        font-family: 'Manrope', sans-serif;
+                        font-family: 'Montserrat', sans-serif;
                         font-size: 1.72rem;
                         font-weight: 700;
                         color: {BRAND_COLORS['ink']};
@@ -9822,7 +9843,7 @@ def _render_analysis_metric_cards_row(metrics_data, tab_label, single_day_analys
                         overflow-wrap: anywhere;
                     ">{display_value}</p>
                     <p style="
-                        font-family: 'Manrope', sans-serif;
+                        font-family: 'Montserrat', sans-serif;
                         font-size: 0.78rem;
                         color: {BRAND_COLORS['graphite']};
                         margin: 0;
@@ -9833,7 +9854,7 @@ def _render_analysis_metric_cards_row(metrics_data, tab_label, single_day_analys
                     ">{card_unit}</p>
                 </div>
                 <p style="
-                    font-family: 'Manrope', sans-serif;
+                    font-family: 'Montserrat', sans-serif;
                     font-size: 11px;
                     color: {BRAND_COLORS['graphite']};
                     margin: 10px 0 0 0;
@@ -9849,14 +9870,14 @@ def _render_analysis_metric_cards_row(metrics_data, tab_label, single_day_analys
                 ">
                     <div>
                         <p style="
-                            font-family: 'Manrope', sans-serif;
+                            font-family: 'Montserrat', sans-serif;
                             font-size: 10px;
                             color: {BRAND_COLORS['graphite']};
                             margin: 0 0 4px 0;
                             text-transform: uppercase;
                         ">Mínimo</p>
                         <p style="
-                            font-family: 'Manrope', sans-serif;
+                            font-family: 'Montserrat', sans-serif;
                             font-size: 14px;
                             font-weight: 700;
                             color: {BRAND_COLORS['ink']};
@@ -9865,14 +9886,14 @@ def _render_analysis_metric_cards_row(metrics_data, tab_label, single_day_analys
                     </div>
                     <div style="text-align: right;">
                         <p style="
-                            font-family: 'Manrope', sans-serif;
+                            font-family: 'Montserrat', sans-serif;
                             font-size: 10px;
                             color: {BRAND_COLORS['graphite']};
                             margin: 0 0 4px 0;
                             text-transform: uppercase;
                         ">Máximo</p>
                         <p style="
-                            font-family: 'Manrope', sans-serif;
+                            font-family: 'Montserrat', sans-serif;
                             font-size: 14px;
                             font-weight: 700;
                             color: {BRAND_COLORS['ink']};
@@ -9881,7 +9902,7 @@ def _render_analysis_metric_cards_row(metrics_data, tab_label, single_day_analys
                     </div>
                 </div>
                 <p style="
-                    font-family: 'Manrope', sans-serif;
+                    font-family: 'Montserrat', sans-serif;
                     font-size: 11px;
                     color: {color};
                     margin: 10px 0 0 0;
