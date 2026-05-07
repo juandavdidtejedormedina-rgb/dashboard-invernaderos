@@ -9547,46 +9547,29 @@ def _render_analysis_block_color_reference(grouped_df, variable_name=None):
         block_label = _format_block_display_name(block_name)
         color = _get_block_analysis_color(block_name, variable_name)
         chips_html.append(
-            f'''
-            <div style="
-                display:inline-flex;
-                align-items:center;
-                gap:0.45rem;
-                padding:0.38rem 0.74rem;
-                border-radius:999px;
-                background:rgba(255,255,255,0.86);
-                border:1px solid rgba(76, 70, 120, 0.10);
-                box-shadow:0 8px 18px rgba(42, 46, 53, 0.05);
-                margin:0 0.42rem 0.42rem 0;
-                font-family:'Manrope', sans-serif;
-                font-size:0.86rem;
-                color:{BRAND_COLORS['graphite']};
-                white-space:nowrap;
-            ">
-                <div style="
-                    width:0.72rem;
-                    height:0.72rem;
-                    border-radius:999px;
-                    background:{color};
-                    box-shadow:inset 0 0 0 1px rgba(255,255,255,0.78);
-                    flex:0 0 auto;
-                "></div>
-                <div>{html.escape(block_label)}</div>
-            </div>
-            '''
+            (
+                '<div style="display:inline-flex;align-items:center;gap:0.45rem;'
+                'padding:0.38rem 0.74rem;border-radius:999px;'
+                'background:rgba(255,255,255,0.86);border:1px solid rgba(76, 70, 120, 0.10);'
+                'box-shadow:0 8px 18px rgba(42, 46, 53, 0.05);'
+                'margin:0 0.42rem 0.42rem 0;font-family:\'Manrope\', sans-serif;'
+                f'font-size:0.86rem;color:{BRAND_COLORS["graphite"]};white-space:nowrap;">'
+                f'<div style="width:0.72rem;height:0.72rem;border-radius:999px;background:{color};'
+                'box-shadow:inset 0 0 0 1px rgba(255,255,255,0.78);flex:0 0 auto;"></div>'
+                f'<div>{html.escape(block_label)}</div>'
+                '</div>'
+            )
         )
 
-    st.markdown(
-        (
-            '<div style="margin:0.35rem 0 0.9rem 0;">'
-            '<p class="analysis-note" style="margin-bottom:0.5rem;"><strong>Referencia de colores por bloque</strong></p>'
-            '<div style="display:flex; flex-wrap:wrap; align-items:center; gap:0.18rem 0.22rem;">'
-            f'{"".join(chips_html)}'
-            '</div>'
-            '</div>'
-        ),
-        unsafe_allow_html=True
+    reference_html = (
+        '<div style="margin:0.35rem 0 0.9rem 0;">'
+        '<p class="analysis-note" style="margin-bottom:0.5rem;"><strong>Referencia de colores por bloque</strong></p>'
+        '<div style="display:flex;flex-wrap:wrap;align-items:center;gap:0.18rem 0.22rem;">'
+        f'{"".join(chips_html)}'
+        '</div>'
+        '</div>'
     )
+    st.markdown(reference_html, unsafe_allow_html=True)
 
 
 def _render_hourly_metric_chart(grouped_df, variable_name, metric_column):
