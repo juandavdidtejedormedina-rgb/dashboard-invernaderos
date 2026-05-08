@@ -9640,6 +9640,162 @@ def _build_greenhouse_block_ranking_chart(summary_df, selected_block_label):
     return fig
 
 
+def _build_greenhouse_gap_ranking_chart(summary_df, selected_block_label):
+    if summary_df.empty or "Bloque" not in summary_df.columns or "Brecha Máx-Real (m²)" not in summary_df.columns:
+        return None
+
+    ranking_df = summary_df.copy()
+    ranking_df["Brecha Máx-Real (m²)"] = pd.to_numeric(ranking_df["Brecha Máx-Real (m²)"], errors="coerce")
+    ranking_df = ranking_df.dropna(subset=["Brecha Máx-Real (m²)"]).sort_values("Brecha Máx-Real (m²)", ascending=True)
+    if ranking_df.empty:
+        return None
+
+    bar_colors = [
+        GREENHOUSE_COLORS["gap"] if str(block_name) == str(selected_block_label) else "#D8D2C4"
+        for block_name in ranking_df["Bloque"]
+    ]
+
+    fig = go.Figure(go.Bar(
+        x=ranking_df["Brecha Máx-Real (m²)"],
+        y=ranking_df["Bloque"],
+        orientation="h",
+        marker=dict(color=bar_colors, line=dict(color="rgba(56,58,53,0.10)", width=1)),
+        text=[f"{value:,.0f} m²" for value in ranking_df["Brecha Máx-Real (m²)"]],
+        textposition="outside",
+        hovertemplate="%{y}<br>Brecha: %{x:,.2f} m²<extra></extra>"
+    ))
+    fig.update_layout(
+        template="plotly_white",
+        title="Ranking de brecha operativa por bloque",
+        xaxis_title="Brecha máx-real (m²)",
+        yaxis_title="",
+        height=420,
+        margin=dict(l=20, r=20, t=70, b=24),
+    )
+    return fig
+
+
+def _build_greenhouse_performance_heatmap(summary_df, selected_block_label):
+    required_columns = [
+        "Bloque",
+        "% Real / Teórica",
+        "% Real / Máx. Perm.",
+        "Brecha Máx-Real (m²)",
+    ]
+    if summary_df.empty or any(column_name not in summary_df.columns for column_name in required_columns):
+        return None
+
+    heatmap_df = summary_df[required_columns].copy()
+    heatmap_df["% Real / Teórica"] = pd.to_numeric(heatmap_df["% Real / Teórica"], errors="coerce")
+    heatmap_df["% Real / Máx. Perm."] = pd.to_numeric(heatmap_df["% Real / Máx. Perm."], errors="coerce")
+    heatmap_df["Brecha Máx-Real (m²)"] = pd.to_numeric(heatmap_df["Brecha Máx-Real (m²)"], errors="coerce")
+    heatmap_df["Brecha normalizada"] = 1 - (
+        heatmap_df["Brecha Máx-Real (m²)"] / heatmap_df["Brecha Máx-Real (m²)"].max()
+    )
+    heatmap_df = heatmap_df.dropna(subset=["% Real / Teórica", "% Real / Máx. Perm.", "Brecha normalizada"])
+    if heatmap_df.empty:
+        return None
+
+    metric_labels = ["Real / teórica", "Real / máx.", "Brecha controlada"]
+    z_values = heatmap_df[["% Real / Teórica", "% Real / Máx. Perm.", "Brecha normalizada"]].to_numpy()
+    text_values = []
+    for _, row in heatmap_df.iterrows():
+        text_values.append([
+            f"{row['% Real / Teórica']:.1%}",
+            f"{row['% Real / Máx. Perm.']:.1%}",
+            f"{row['Brecha Máx-Real (m²)']:,.0f} m²",
+        ])
+
+    fig = go.Figure(go.Heatmap(
+        z=z_values,
+        x=metric_labels,
+        y=heatmap_df["Bloque"],
+        text=text_values,
+        texttemplate="%{text}",
+        colorscale=[
+            [0.0, "#D77A94"],
+            [0.5, "#E7C87A"],
+            [1.0, "#3DBB76"],
+        ],
+        zmin=0,
+        zmax=1,
+        colorbar=dict(title="Desempeño"),
+        hovertemplate="%{y}<br>%{x}: %{text}<extra></extra>",
+    ))
+    fig.update_layout(
+        template="plotly_white",
+        title="Heatmap de desempeño técnico",
+        height=410,
+        margin=dict(l=20, r=20, t=70, b=24),
+        xaxis_title="",
+        yaxis_title="",
+        shapes=[
+            dict(
+                type="rect",
+                xref="paper",
+                yref="y",
+                x0=0,
+                x1=1,
+                y0=selected_block_label,
+                y1=selected_block_label,
+                line=dict(color=BRAND_COLORS["hero"], width=2),
+                fillcolor="rgba(0,0,0,0)",
+            )
+        ] if selected_block_label in heatmap_df["Bloque"].astype(str).tolist() else []
+    )
+    return fig
+
+
+def _build_greenhouse_capacity_slope_chart(summary_df, selected_block_label):
+    required_columns = [
+        "Bloque",
+        "Total Teórica (m²)",
+        "Total Máx. Perm. (m²)",
+        "Total Real (m²)",
+    ]
+    if summary_df.empty or any(column_name not in summary_df.columns for column_name in required_columns):
+        return None
+
+    working_df = summary_df[required_columns].copy()
+    for column_name in required_columns[1:]:
+        working_df[column_name] = pd.to_numeric(working_df[column_name], errors="coerce")
+    working_df = working_df.dropna(subset=required_columns[1:])
+    if working_df.empty:
+        return None
+
+    stage_labels = ["Teórica", "Máx. permitida", "Real"]
+    stage_columns = ["Total Teórica (m²)", "Total Máx. Perm. (m²)", "Total Real (m²)"]
+
+    fig = go.Figure()
+    for _, row in working_df.iterrows():
+        is_selected = str(row["Bloque"]) == str(selected_block_label)
+        line_color = BRAND_COLORS["hero"] if is_selected else "rgba(84,83,134,0.28)"
+        line_width = 4 if is_selected else 2
+        marker_size = 11 if is_selected else 8
+        fig.add_trace(go.Scatter(
+            x=stage_labels,
+            y=[row[column_name] for column_name in stage_columns],
+            mode="lines+markers+text" if is_selected else "lines+markers",
+            name=str(row["Bloque"]),
+            line=dict(color=line_color, width=line_width),
+            marker=dict(size=marker_size, color=line_color),
+            text=[f"{row[column_name]:,.0f}" for column_name in stage_columns] if is_selected else None,
+            textposition="top center",
+            hovertemplate=f"{row['Bloque']}<br>%{{x}}: %{{y:,.2f}} m²<extra></extra>",
+        ))
+
+    fig.update_layout(
+        template="plotly_white",
+        title="Trayectoria de capacidad: teórica → máxima → real",
+        yaxis_title="Área de ventilación (m²)",
+        xaxis_title="Etapa de capacidad",
+        height=460,
+        margin=dict(l=20, r=20, t=70, b=24),
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+    )
+    return fig
+
+
 def _build_greenhouse_insights(selected_general_df, selected_areas_df, selected_summary_df):
     insights = []
     if selected_general_df.empty or selected_areas_df.empty or selected_summary_df.empty:
@@ -9973,6 +10129,36 @@ def _render_greenhouse_analysis_dashboard():
             "Resumen comparativo",
             "Aquí puedes revisar rápidamente cómo se comporta cada bloque frente al resto usando los indicadores globales del archivo."
         )
+
+        diagnostic_left, diagnostic_right = st.columns(2)
+        with diagnostic_left:
+            heatmap_chart = _build_greenhouse_performance_heatmap(summary_df, selected_block_label)
+            _render_greenhouse_chart_panel(
+                heatmap_chart,
+                "Heatmap de desempeño técnico",
+                "heatmap_desempeno_tecnico",
+                selected_block_label,
+                large_height=720
+            )
+        with diagnostic_right:
+            gap_chart = _build_greenhouse_gap_ranking_chart(summary_df, selected_block_label)
+            _render_greenhouse_chart_panel(
+                gap_chart,
+                "Ranking de brecha operativa",
+                "ranking_brecha_operativa",
+                selected_block_label,
+                large_height=720
+            )
+
+        slope_chart = _build_greenhouse_capacity_slope_chart(summary_df, selected_block_label)
+        _render_greenhouse_chart_panel(
+            slope_chart,
+            "Trayectoria de capacidad",
+            "trayectoria_capacidad",
+            selected_block_label,
+            large_height=760
+        )
+
         ranking_chart = _build_greenhouse_block_ranking_chart(summary_df, selected_block_label)
         _render_greenhouse_chart_panel(
             ranking_chart,
