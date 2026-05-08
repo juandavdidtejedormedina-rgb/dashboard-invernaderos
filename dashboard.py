@@ -1846,6 +1846,10 @@ URL_VARIABLES_FALLBACKS = (
     "https://raw.githubusercontent.com/juandavdidtejedormedina-rgb/dashboard-invernaderos/8ad936f88e1d3bb9363c8223ec6deeb8222f238c/Datos_Variables.xlsx",
 )
 URL_CORTINAS = "https://raw.githubusercontent.com/juandavdidtejedormedina-rgb/dashboard-invernaderos/main/Registro_Cortinas_Final.xlsx"
+URL_ANALYSIS_FALLBACKS = (
+    "https://raw.githubusercontent.com/juandavdidtejedormedina-rgb/dashboard-invernaderos/main/Analisis%20invernaderos.xlsx",
+    "https://raw.githubusercontent.com/juandavdidtejedormedina-rgb/dashboard-invernaderos/ef0c3dbe72a317574b9c656386a74a34582aabdf/Analisis%20invernaderos.xlsx",
+)
 LOCAL_VARIABLES_PATHS = (
     APP_DIR / "Datos_Variables.xlsx",
     APP_DIR / "Datos_variables.xlsx",
@@ -8829,6 +8833,160 @@ def _format_single_block_detail_table(df):
     return pd.DataFrame(detail_rows)
 
 
+def _safe_float(value):
+    if value is None or pd.isna(value):
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _build_greenhouse_component_chart(selected_areas_df, selected_block_label):
+    if selected_areas_df.empty:
+        return None
+
+    row = selected_areas_df.iloc[0]
+    components = [
+        (
+            "Lateral",
+            row.get("Área lateral teórica (m²)"),
+            row.get("Área lateral máxima permitida (m²)"),
+            row.get("Área lateral real (m²)"),
+        ),
+        (
+            "Frontal",
+            row.get("Área frontal teórica (m²)"),
+            row.get("Área frontal máxima permitida (m²)"),
+            row.get("Área frontal real (m²)"),
+        ),
+        (
+            "Culatas",
+            row.get("Área culatas teórica (m²)"),
+            row.get("Área culatas máxima permitida (m²)"),
+            row.get("Área culatas real (m²)"),
+        ),
+    ]
+
+    chart_df = pd.DataFrame(
+        [
+            {
+                "Componente": component_name,
+                "Teórica": _safe_float(theoretical_value) or 0.0,
+                "Máx. permitida": _safe_float(max_value) or 0.0,
+                "Real": _safe_float(real_value) or 0.0,
+            }
+            for component_name, theoretical_value, max_value, real_value in components
+        ]
+    )
+
+    fig = go.Figure()
+    series_config = [
+        ("Teórica", "#6FA8FF"),
+        ("Máx. permitida", "#F2A04B"),
+        ("Real", "#53C66F"),
+    ]
+    for series_name, color in series_config:
+        fig.add_trace(go.Bar(
+            x=chart_df["Componente"],
+            y=chart_df[series_name],
+            name=series_name,
+            marker_color=color,
+            text=[f"{value:,.0f}" for value in chart_df[series_name]],
+            textposition="outside",
+            hovertemplate="%{x}<br>" + series_name + ": %{y:,.2f} m²<extra></extra>"
+        ))
+
+    fig.update_layout(
+        template="plotly_white",
+        barmode="group",
+        title=f"Ventilación por componente · {selected_block_label}",
+        yaxis_title="Área de ventilación (m²)",
+        xaxis_title="",
+        legend_title_text="Escenario",
+        height=430,
+        margin=dict(l=20, r=20, t=68, b=20),
+    )
+    return fig
+
+
+def _build_greenhouse_block_ranking_chart(summary_df, selected_block_label):
+    if summary_df.empty or "Bloque" not in summary_df.columns or "Total Real (m²)" not in summary_df.columns:
+        return None
+
+    ranking_df = summary_df.copy()
+    ranking_df["Total Real (m²)"] = pd.to_numeric(ranking_df["Total Real (m²)"], errors="coerce")
+    ranking_df = ranking_df.dropna(subset=["Total Real (m²)"]).sort_values("Total Real (m²)", ascending=False)
+    if ranking_df.empty:
+        return None
+
+    bar_colors = [
+        "#545386" if str(block_name) == str(selected_block_label) else "#C9D7E7"
+        for block_name in ranking_df["Bloque"]
+    ]
+
+    fig = go.Figure(go.Bar(
+        x=ranking_df["Total Real (m²)"],
+        y=ranking_df["Bloque"],
+        orientation="h",
+        marker_color=bar_colors,
+        text=[f"{value:,.0f} m²" for value in ranking_df["Total Real (m²)"]],
+        textposition="outside",
+        hovertemplate="%{y}<br>Total real: %{x:,.2f} m²<extra></extra>"
+    ))
+    fig.update_layout(
+        template="plotly_white",
+        title="Comparación de ventilación real entre bloques",
+        xaxis_title="Total real (m²)",
+        yaxis_title="",
+        height=430,
+        margin=dict(l=20, r=20, t=68, b=20),
+        yaxis=dict(autorange="reversed"),
+    )
+    return fig
+
+
+def _build_greenhouse_insights(selected_general_df, selected_areas_df, selected_summary_df):
+    insights = []
+    if selected_general_df.empty or selected_areas_df.empty or selected_summary_df.empty:
+        return insights
+
+    general_row = selected_general_df.iloc[0]
+    area_row = selected_areas_df.iloc[0]
+    summary_row = selected_summary_df.iloc[0]
+
+    culatas_count = _safe_float(general_row.get("N° Culatas"))
+    if culatas_count == 0:
+        insights.append("Este bloque no tiene culatas activas en el cálculo, así que su ventilación depende de laterales y frontales.")
+    elif culatas_count is not None:
+        insights.append(f"El bloque incorpora {int(culatas_count)} culatas consideradas en la capacidad de ventilación.")
+
+    real_vs_theoretical = _safe_float(summary_row.get("% Real / Teórica"))
+    if real_vs_theoretical is not None:
+        insights.append(f"La ventilación real está en {real_vs_theoretical:.1%} del potencial teórico del bloque.")
+
+    largest_gap = None
+    largest_gap_label = None
+    for component_name, max_column, real_column in [
+        ("lateral", "Área lateral máxima permitida (m²)", "Área lateral real (m²)"),
+        ("frontal", "Área frontal máxima permitida (m²)", "Área frontal real (m²)"),
+        ("culatas", "Área culatas máxima permitida (m²)", "Área culatas real (m²)"),
+    ]:
+        max_value = _safe_float(area_row.get(max_column))
+        real_value = _safe_float(area_row.get(real_column))
+        if max_value is None or real_value is None:
+            continue
+        gap_value = max_value - real_value
+        if largest_gap is None or gap_value > largest_gap:
+            largest_gap = gap_value
+            largest_gap_label = component_name
+
+    if largest_gap_label is not None:
+        insights.append(f"La mayor oportunidad operativa frente al máximo permitido está en la ventilación {largest_gap_label}, con una brecha de {largest_gap:,.1f} m².")
+
+    return insights
+
+
 @st.cache_data(show_spinner="Cargando analisis estructural de invernaderos...")
 def cargar_analisis_invernaderos(ruta_bytes, cache_version=DATA_CACHE_VERSION):
     _ = cache_version
@@ -8873,7 +9031,9 @@ def cargar_analisis_invernaderos(ruta_bytes, cache_version=DATA_CACHE_VERSION):
 
 
 def _render_greenhouse_analysis_dashboard():
-    analysis_bytes = _read_first_local_file_bytes(GREENHOUSE_ANALYSIS_LOCAL_EXCEL_PATHS)
+    analysis_bytes = descargar_desde_github(URL_ANALYSIS_FALLBACKS)
+    if analysis_bytes is None:
+        analysis_bytes = _read_first_local_file_bytes(GREENHOUSE_ANALYSIS_LOCAL_EXCEL_PATHS)
     if analysis_bytes is None:
         st.warning("No se encontro el archivo de analisis de invernaderos en las rutas configuradas.")
         st.stop()
@@ -8930,15 +9090,20 @@ def _render_greenhouse_analysis_dashboard():
     )
 
     st.markdown("## La Ponderosa - Ficha tecnica de bloques")
-    st.caption("Vista informativa para entender la geometria, la capacidad de ventilacion y el contexto tecnico de cada bloque antes de construir nuevas graficas.")
+    st.caption("Vista interactiva para entender la geometria y la capacidad de ventilacion de cada bloque antes de pasar a correlaciones o nuevas graficas.")
 
     tab_block, tab_summary, tab_dictionary = st.tabs([
-        "Bloque seleccionado",
+        "Datos por bloque",
         "Resumen comparativo",
         "Diccionario",
     ])
 
     with tab_block:
+        _render_chart_explanation(
+            "Datos por bloque",
+            "Esta vista resume la geometría del invernadero, la capacidad de ventilación por componente y la posición relativa del bloque seleccionado frente a los demás."
+        )
+
         if not selected_summary_df.empty:
             summary_row = selected_summary_df.iloc[0]
             metric_cols = st.columns(4)
@@ -8957,15 +9122,43 @@ def _render_greenhouse_analysis_dashboard():
                 f"{float(summary_row.get('% Real / Máx. Perm.')):.1%}" if pd.notna(summary_row.get('% Real / Máx. Perm.')) else "—"
             )
 
+        if not selected_general_df.empty:
+            general_row = selected_general_df.iloc[0]
+            geometry_cols = st.columns(4)
+            geometry_cols[0].metric("Cuadros", _format_summary_number(general_row.get("N° Cuadros"), 0))
+            geometry_cols[1].metric("Naves", _format_summary_number(general_row.get("N° Naves"), 0))
+            geometry_cols[2].metric("Culatas", _format_summary_number(general_row.get("N° Culatas"), 0))
+            geometry_cols[3].metric("Tamaño nave (m)", _format_summary_number(general_row.get("Tamaño de la nave (m)"), 1))
+
+        insight_rows = _build_greenhouse_insights(selected_general_df, selected_areas_df, selected_summary_df)
+        if insight_rows:
+            st.markdown("### Lectura rápida")
+            for insight in insight_rows:
+                st.markdown(f"- {insight}")
+
+        chart_left, chart_right = st.columns(2)
+        with chart_left:
+            component_chart = _build_greenhouse_component_chart(selected_areas_df, selected_block_label)
+            if component_chart is not None:
+                _plotly_chart(component_chart)
+        with chart_right:
+            ranking_chart = _build_greenhouse_block_ranking_chart(summary_df, selected_block_label)
+            if ranking_chart is not None:
+                _plotly_chart(ranking_chart)
+
         detail_left, detail_right = st.columns(2)
         with detail_left:
-            st.markdown("### Datos generales y aperturas lineales")
-            _dataframe(_format_single_block_detail_table(selected_general_df), hide_index=True)
+            with st.expander("Ver datos generales y aperturas lineales", expanded=True):
+                _dataframe(_format_single_block_detail_table(selected_general_df), hide_index=True)
         with detail_right:
-            st.markdown("### Areas de ventilacion calculadas")
-            _dataframe(_format_single_block_detail_table(selected_areas_df), hide_index=True)
+            with st.expander("Ver areas de ventilacion calculadas", expanded=True):
+                _dataframe(_format_single_block_detail_table(selected_areas_df), hide_index=True)
 
     with tab_summary:
+        _render_chart_explanation(
+            "Resumen comparativo",
+            "Aquí puedes revisar rápidamente cómo se comporta cada bloque frente al resto usando los indicadores globales del archivo."
+        )
         st.markdown("### Tabla comparativa por bloque")
         _dataframe(_format_analysis_block_table(summary_df), hide_index=True)
 
