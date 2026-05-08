@@ -9355,6 +9355,73 @@ def _render_greenhouse_dictionary_cards(dictionary_df):
         )
 
 
+def _greenhouse_chart_config(file_stem):
+    return {
+        "displayModeBar": True,
+        "displaylogo": False,
+        "responsive": True,
+        "toImageButtonOptions": {
+            "format": "png",
+            "filename": file_stem,
+            "height": 900,
+            "width": 1400,
+            "scale": 2,
+        },
+    }
+
+
+@st.dialog("Gráfica ampliada", width="large")
+def _render_greenhouse_chart_dialog(fig, title, file_stem, large_height=760):
+    st.markdown(f"### {title}")
+    large_fig = go.Figure(fig)
+    large_fig.update_layout(height=large_height, margin=dict(l=28, r=28, t=82, b=36))
+    chart_config = _greenhouse_chart_config(file_stem)
+    _plotly_chart(large_fig, config=chart_config)
+
+    html_bytes = large_fig.to_html(
+        include_plotlyjs="cdn",
+        full_html=True,
+        config=chart_config
+    ).encode("utf-8")
+    st.download_button(
+        "Descargar gráfica interactiva",
+        data=html_bytes,
+        file_name=f"{file_stem}.html",
+        mime="text/html",
+        key=f"dialog_download_greenhouse_chart_{file_stem}",
+        use_container_width=True
+    )
+
+
+def _render_greenhouse_chart_panel(fig, title, key, selected_block_label, large_height=680):
+    if fig is None:
+        return
+
+    file_stem = _build_report_slug("ficha-tecnica", selected_block_label, key)
+    chart_config = _greenhouse_chart_config(file_stem)
+    _plotly_chart(fig, config=chart_config)
+
+    action_left, action_right = st.columns(2)
+    with action_left:
+        if st.button("Abrir gráfica", key=f"open_greenhouse_chart_{file_stem}", use_container_width=True):
+            _render_greenhouse_chart_dialog(fig, title, file_stem, large_height)
+    with action_right:
+        html_bytes = fig.to_html(
+            include_plotlyjs="cdn",
+            full_html=True,
+            config=chart_config
+        ).encode("utf-8")
+        st.download_button(
+            "Descargar HTML",
+            data=html_bytes,
+            file_name=f"{file_stem}.html",
+            mime="text/html",
+            key=f"download_greenhouse_chart_{file_stem}",
+            use_container_width=True,
+            help=f"Descarga {title} como gráfica interactiva independiente."
+        )
+
+
 def _build_greenhouse_component_chart(selected_areas_df, selected_block_label):
     if selected_areas_df.empty:
         return None
@@ -9891,22 +9958,42 @@ def _render_greenhouse_analysis_dashboard():
         donut_left, donut_right = st.columns(2)
         with donut_left:
             efficiency_donut = _build_greenhouse_efficiency_donut(selected_summary_df, selected_block_label)
-            if efficiency_donut is not None:
-                _plotly_chart(efficiency_donut, config={"displayModeBar": False})
+            _render_greenhouse_chart_panel(
+                efficiency_donut,
+                "Eficiencia operativa",
+                "eficiencia_operativa",
+                selected_block_label,
+                large_height=720
+            )
         with donut_right:
             composition_donut = _build_greenhouse_composition_donut(selected_areas_df, selected_block_label)
-            if composition_donut is not None:
-                _plotly_chart(composition_donut, config={"displayModeBar": False})
+            _render_greenhouse_chart_panel(
+                composition_donut,
+                "Composición de la ventilación real",
+                "composicion_ventilacion_real",
+                selected_block_label,
+                large_height=720
+            )
 
         chart_left, chart_right = st.columns(2)
         with chart_left:
             component_chart = _build_greenhouse_component_chart(selected_areas_df, selected_block_label)
-            if component_chart is not None:
-                _plotly_chart(component_chart, config={"displayModeBar": False})
+            _render_greenhouse_chart_panel(
+                component_chart,
+                "Ventilación por componente",
+                "ventilacion_por_componente",
+                selected_block_label,
+                large_height=760
+            )
         with chart_right:
             progress_chart = _build_greenhouse_component_progress_chart(selected_areas_df, selected_block_label)
-            if progress_chart is not None:
-                _plotly_chart(progress_chart, config={"displayModeBar": False})
+            _render_greenhouse_chart_panel(
+                progress_chart,
+                "Uso del máximo permitido por componente",
+                "uso_maximo_por_componente",
+                selected_block_label,
+                large_height=760
+            )
 
         _render_greenhouse_reading_cards("Guía rápida de lectura", guide_df, title_col="Concepto", body_col="Descripcion")
 
@@ -9930,8 +10017,13 @@ def _render_greenhouse_analysis_dashboard():
             "Aquí puedes revisar rápidamente cómo se comporta cada bloque frente al resto usando los indicadores globales del archivo."
         )
         ranking_chart = _build_greenhouse_block_ranking_chart(summary_df, selected_block_label)
-        if ranking_chart is not None:
-            _plotly_chart(ranking_chart, config={"displayModeBar": False})
+        _render_greenhouse_chart_panel(
+            ranking_chart,
+            "Comparación de ventilación real entre bloques",
+            "ranking_ventilacion_real",
+            selected_block_label,
+            large_height=720
+        )
 
         st.markdown("### Tabla comparativa por bloque")
         _dataframe(_format_analysis_block_table(summary_df), hide_index=True)
