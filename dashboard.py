@@ -9378,19 +9378,47 @@ def _render_greenhouse_chart_dialog(fig, title, file_stem, large_height=760):
     chart_config = _greenhouse_chart_config(file_stem)
     _plotly_chart(large_fig, config=chart_config)
 
-    html_bytes = large_fig.to_html(
-        include_plotlyjs="cdn",
-        full_html=True,
-        config=chart_config
-    ).encode("utf-8")
-    st.download_button(
-        "Descargar gráfica interactiva",
-        data=html_bytes,
-        file_name=f"{file_stem}.html",
-        mime="text/html",
+    _render_greenhouse_png_download(
+        large_fig,
+        file_stem=f"{file_stem}_ampliada",
         key=f"dialog_download_greenhouse_chart_{file_stem}",
-        use_container_width=True
+        width=1600,
+        height=1000
     )
+
+
+def _build_greenhouse_png_bytes(fig, width=1400, height=900, scale=2):
+    try:
+        return fig.to_image(
+            format="png",
+            width=width,
+            height=height,
+            scale=scale
+        )
+    except Exception:
+        return None
+
+
+def _render_greenhouse_png_download(fig, file_stem, key, width=1400, height=900):
+    png_bytes = _build_greenhouse_png_bytes(fig, width=width, height=height, scale=2)
+    if png_bytes:
+        st.download_button(
+            "Descargar PNG",
+            data=png_bytes,
+            file_name=f"{file_stem}.png",
+            mime="image/png",
+            key=key,
+            use_container_width=True,
+            help="Descarga esta gráfica como imagen PNG."
+        )
+    else:
+        st.button(
+            "Descargar PNG",
+            key=f"{key}_disabled",
+            disabled=True,
+            use_container_width=True,
+            help="Para habilitar este botón instala kaleido en el entorno. También puedes usar el icono de cámara de Plotly sobre la gráfica."
+        )
 
 
 def _render_greenhouse_chart_panel(fig, title, key, selected_block_label, large_height=680):
@@ -9406,19 +9434,12 @@ def _render_greenhouse_chart_panel(fig, title, key, selected_block_label, large_
         if st.button("Abrir gráfica", key=f"open_greenhouse_chart_{file_stem}", use_container_width=True):
             _render_greenhouse_chart_dialog(fig, title, file_stem, large_height)
     with action_right:
-        html_bytes = fig.to_html(
-            include_plotlyjs="cdn",
-            full_html=True,
-            config=chart_config
-        ).encode("utf-8")
-        st.download_button(
-            "Descargar HTML",
-            data=html_bytes,
-            file_name=f"{file_stem}.html",
-            mime="text/html",
+        _render_greenhouse_png_download(
+            fig,
+            file_stem=file_stem,
             key=f"download_greenhouse_chart_{file_stem}",
-            use_container_width=True,
-            help=f"Descarga {title} como gráfica interactiva independiente."
+            width=1400,
+            height=900
         )
 
 
