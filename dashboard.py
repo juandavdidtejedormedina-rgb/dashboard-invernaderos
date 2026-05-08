@@ -9370,57 +9370,6 @@ def _greenhouse_chart_config(file_stem):
     }
 
 
-@st.dialog("Gráfica ampliada", width="large")
-def _render_greenhouse_chart_dialog(fig, title, file_stem, large_height=760):
-    st.markdown(f"### {title}")
-    large_fig = go.Figure(fig)
-    large_fig.update_layout(height=large_height, margin=dict(l=28, r=28, t=82, b=36))
-    chart_config = _greenhouse_chart_config(file_stem)
-    _plotly_chart(large_fig, config=chart_config)
-
-    _render_greenhouse_png_download(
-        large_fig,
-        file_stem=f"{file_stem}_ampliada",
-        key=f"dialog_download_greenhouse_chart_{file_stem}",
-        width=1600,
-        height=1000
-    )
-
-
-def _build_greenhouse_png_bytes(fig, width=1400, height=900, scale=2):
-    try:
-        return fig.to_image(
-            format="png",
-            width=width,
-            height=height,
-            scale=scale
-        )
-    except Exception:
-        return None
-
-
-def _render_greenhouse_png_download(fig, file_stem, key, width=1400, height=900):
-    png_bytes = _build_greenhouse_png_bytes(fig, width=width, height=height, scale=2)
-    if png_bytes:
-        st.download_button(
-            "Descargar PNG",
-            data=png_bytes,
-            file_name=f"{file_stem}.png",
-            mime="image/png",
-            key=key,
-            use_container_width=True,
-            help="Descarga esta gráfica como imagen PNG."
-        )
-    else:
-        st.button(
-            "Descargar PNG",
-            key=f"{key}_disabled",
-            disabled=True,
-            use_container_width=True,
-            help="Para habilitar este botón instala kaleido en el entorno. También puedes usar el icono de cámara de Plotly sobre la gráfica."
-        )
-
-
 def _render_greenhouse_chart_panel(fig, title, key, selected_block_label, large_height=680):
     if fig is None:
         return
@@ -9428,19 +9377,6 @@ def _render_greenhouse_chart_panel(fig, title, key, selected_block_label, large_
     file_stem = _build_report_slug("ficha-tecnica", selected_block_label, key)
     chart_config = _greenhouse_chart_config(file_stem)
     _plotly_chart(fig, config=chart_config)
-
-    action_left, action_right = st.columns(2)
-    with action_left:
-        if st.button("Abrir gráfica", key=f"open_greenhouse_chart_{file_stem}", use_container_width=True):
-            _render_greenhouse_chart_dialog(fig, title, file_stem, large_height)
-    with action_right:
-        _render_greenhouse_png_download(
-            fig,
-            file_stem=file_stem,
-            key=f"download_greenhouse_chart_{file_stem}",
-            width=1400,
-            height=900
-        )
 
 
 def _build_greenhouse_component_chart(selected_areas_df, selected_block_label):
