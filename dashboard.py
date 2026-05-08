@@ -8738,9 +8738,12 @@ def cargar_dashboard_completo(cache_version=DATA_CACHE_VERSION):
 
 
 def _find_excel_row_by_first_value(raw_df, expected_value, start_idx=0):
+    expected_text = str(expected_value).strip()
+    expected_key = _build_normalized_text_key(expected_text)
     for row_idx in range(start_idx, len(raw_df)):
         first_value = raw_df.iloc[row_idx, 0] if raw_df.shape[1] else None
-        if str(first_value).strip() == expected_value:
+        first_text = str(first_value).strip()
+        if first_text == expected_text or _build_normalized_text_key(first_text) == expected_key:
             return row_idx
     return None
 
@@ -8784,20 +8787,92 @@ def _build_greenhouse_interpretation_table(raw_df, start_row_idx):
         return pd.DataFrame(columns=["Indicador", "Interpretacion"])
 
     records = []
+    has_started = False
     for row_idx in range(start_row_idx + 1, len(raw_df)):
         row_values = raw_df.iloc[row_idx].tolist()
         if pd.isna(pd.Series(row_values)).all():
+            if has_started:
+                break
             continue
         indicator = str(row_values[0]).strip() if row_values else ""
         interpretation = str(row_values[1]).strip() if len(row_values) > 1 and pd.notna(row_values[1]) else ""
         if not indicator:
             continue
+        has_started = True
         records.append({
             "Indicador": indicator,
             "Interpretacion": interpretation
         })
 
     return pd.DataFrame(records)
+
+
+def _build_greenhouse_guide_table(raw_df, start_row_idx):
+    if start_row_idx is None:
+        return pd.DataFrame(columns=["Concepto", "Descripcion"])
+
+    records = []
+    for row_idx in range(start_row_idx + 1, len(raw_df)):
+        row_values = raw_df.iloc[row_idx].tolist()
+        if pd.isna(pd.Series(row_values)).all():
+            break
+        concept = str(row_values[0]).strip() if row_values else ""
+        description = str(row_values[1]).strip() if len(row_values) > 1 and pd.notna(row_values[1]) else ""
+        if not concept:
+            continue
+        records.append({
+            "Concepto": concept,
+            "Descripcion": description
+        })
+    return pd.DataFrame(records)
+
+
+def _extract_sparse_excel_table(raw_df, header_row_idx):
+    if header_row_idx is None:
+        return pd.DataFrame()
+
+    header_row = raw_df.iloc[header_row_idx].tolist()
+    header_positions = [
+        (col_idx, str(value).strip())
+        for col_idx, value in enumerate(header_row)
+        if pd.notna(value) and str(value).strip()
+    ]
+    if not header_positions:
+        return pd.DataFrame()
+
+    records = []
+    for row_idx in range(header_row_idx + 1, len(raw_df)):
+        row_values = raw_df.iloc[row_idx].tolist()
+        if pd.isna(pd.Series(row_values)).all():
+            break
+        first_value = row_values[header_positions[0][0]]
+        if pd.isna(first_value) or str(first_value).strip() == "":
+            break
+        records.append({
+            header_name: row_values[col_idx]
+            for col_idx, header_name in header_positions
+        })
+
+    return pd.DataFrame(records)
+
+
+def _find_sparse_header_row(raw_df, start_row_idx, required_text):
+    if start_row_idx is None:
+        return None
+
+    required_key = _build_normalized_text_key(required_text)
+    for row_idx in range(start_row_idx + 1, len(raw_df)):
+        row_values = raw_df.iloc[row_idx].tolist()
+        if pd.isna(pd.Series(row_values)).all():
+            continue
+        row_key = " ".join(
+            _build_normalized_text_key(value)
+            for value in row_values
+            if pd.notna(value)
+        )
+        if str(row_values[0]).strip() == "Bloque" and required_key in row_key:
+            return row_idx
+    return None
 
 
 def _format_analysis_block_table(df):
@@ -8870,6 +8945,13 @@ def _format_greenhouse_percent(value):
     return f"{numeric_value:.1%}" if numeric_value is not None else "Sin datos"
 
 
+def _clean_greenhouse_text(value, fallback=""):
+    if value is None or pd.isna(value):
+        return fallback
+    text = str(value).strip()
+    return text if text else fallback
+
+
 def _render_greenhouse_styles():
     st.markdown(
         """
@@ -8907,13 +8989,15 @@ def _render_greenhouse_styles():
             letter-spacing: 0.12em;
             text-transform: uppercase;
         }
-        .greenhouse-title {
+        .greenhouse-hero .greenhouse-title {
             margin: 0;
-            color: #ffffff;
+            color: #ffffff !important;
+            -webkit-text-fill-color: #ffffff !important;
             font-size: 1.72rem;
             line-height: 1.1;
             font-weight: 900;
             letter-spacing: 0;
+            text-shadow: 0 2px 12px rgba(0,0,0,0.28);
         }
         .greenhouse-subtitle {
             max-width: 48rem;
@@ -9022,6 +9106,96 @@ def _render_greenhouse_styles():
         .greenhouse-insight-card strong {
             color: var(--elite-hero);
         }
+        .greenhouse-reading-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 0.85rem;
+            margin: 0.45rem 0 1rem 0;
+        }
+        .greenhouse-reading-card {
+            position: relative;
+            min-height: 118px;
+            padding: 1rem 1rem 0.95rem 1.05rem;
+            border-radius: 8px;
+            border: 1px solid rgba(84,83,134,0.12);
+            background: linear-gradient(180deg, rgba(255,255,255,0.96), rgba(247,244,238,0.86));
+            box-shadow: 0 12px 28px rgba(56,58,53,0.08);
+            overflow: hidden;
+        }
+        .greenhouse-reading-card::before {
+            content: '';
+            position: absolute;
+            inset: 0 auto 0 0;
+            width: 5px;
+            background: linear-gradient(180deg, var(--elite-hero), rgba(61,187,118,0.78));
+        }
+        .greenhouse-reading-card-title {
+            display: block;
+            color: var(--elite-hero);
+            font-size: 0.82rem;
+            font-weight: 900;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+        }
+        .greenhouse-reading-card-body {
+            display: block;
+            margin-top: 0.48rem;
+            color: var(--elite-ink);
+            font-size: 0.92rem;
+            line-height: 1.48;
+        }
+        .greenhouse-dictionary-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 0.82rem;
+            margin: 0.65rem 0 1rem 0;
+        }
+        .greenhouse-dictionary-card {
+            padding: 0.95rem 1rem;
+            border-radius: 8px;
+            border: 1px solid rgba(84,83,134,0.12);
+            background: rgba(255,255,255,0.94);
+            box-shadow: 0 10px 22px rgba(56,58,53,0.07);
+        }
+        .greenhouse-dictionary-card-top {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 0.75rem;
+            margin-bottom: 0.52rem;
+        }
+        .greenhouse-dictionary-term {
+            color: var(--elite-graphite);
+            font-size: 0.96rem;
+            font-weight: 900;
+            line-height: 1.22;
+        }
+        .greenhouse-dictionary-unit {
+            flex: 0 0 auto;
+            padding: 0.2rem 0.46rem;
+            border-radius: 8px;
+            background: rgba(84,83,134,0.10);
+            color: var(--elite-hero);
+            font-size: 0.74rem;
+            font-weight: 900;
+            white-space: nowrap;
+        }
+        .greenhouse-dictionary-text {
+            margin: 0.42rem 0 0 0;
+            color: var(--elite-ink);
+            font-size: 0.86rem;
+            line-height: 1.45;
+        }
+        .greenhouse-dictionary-source {
+            display: inline-flex;
+            margin-top: 0.62rem;
+            padding: 0.22rem 0.52rem;
+            border-radius: 8px;
+            background: rgba(61,187,118,0.10);
+            color: #2f7652;
+            font-size: 0.74rem;
+            font-weight: 800;
+        }
         @media (max-width: 900px) {
             .greenhouse-hero {
                 grid-template-columns: 1fr;
@@ -9030,13 +9204,17 @@ def _render_greenhouse_styles():
                 max-width: 220px;
             }
             .greenhouse-metric-grid,
-            .greenhouse-insight-grid {
+            .greenhouse-insight-grid,
+            .greenhouse-reading-grid,
+            .greenhouse-dictionary-grid {
                 grid-template-columns: repeat(2, minmax(0, 1fr));
             }
         }
         @media (max-width: 640px) {
             .greenhouse-metric-grid,
-            .greenhouse-insight-grid {
+            .greenhouse-insight-grid,
+            .greenhouse-reading-grid,
+            .greenhouse-dictionary-grid {
                 grid-template-columns: 1fr;
             }
         }
@@ -9108,6 +9286,73 @@ def _render_greenhouse_insight_cards(insights):
         """,
         unsafe_allow_html=True
     )
+
+
+def _render_greenhouse_reading_cards(title, reading_df, title_col="Indicador", body_col="Interpretacion"):
+    if reading_df.empty:
+        return
+
+    rows = []
+    for _, reading_row in reading_df.iterrows():
+        row_title = _clean_greenhouse_text(reading_row.get(title_col, ""))
+        row_body = _clean_greenhouse_text(reading_row.get(body_col, ""))
+        if not row_title and not row_body:
+            continue
+        rows.append(
+            (
+                '<div class="greenhouse-reading-card">'
+                f'<span class="greenhouse-reading-card-title">{html.escape(row_title)}</span>'
+                f'<span class="greenhouse-reading-card-body">{html.escape(row_body)}</span>'
+                '</div>'
+            )
+        )
+
+    if not rows:
+        return
+
+    st.markdown(
+        f"""
+        <div class="greenhouse-section-title">{html.escape(title)}</div>
+        <div class="greenhouse-reading-grid">{''.join(rows)}</div>
+        """,
+        unsafe_allow_html=True
+    )
+
+
+def _render_greenhouse_dictionary_cards(dictionary_df):
+    if dictionary_df.empty:
+        st.info("No hay diccionario de variables disponible en el archivo.")
+        return
+
+    rows = []
+    for _, dictionary_row in dictionary_df.iterrows():
+        variable_name = _clean_greenhouse_text(dictionary_row.get("Variable / columna", ""))
+        meaning = _clean_greenhouse_text(dictionary_row.get("Qué significa", ""))
+        unit = _clean_greenhouse_text(dictionary_row.get("Unidad", ""))
+        interpretation = _clean_greenhouse_text(dictionary_row.get("Cómo se interpreta", ""))
+        source = _clean_greenhouse_text(dictionary_row.get("Dónde aparece", ""))
+        if not variable_name:
+            continue
+        unit_html = html.escape(unit or "Referencia")
+        rows.append(
+            (
+                '<div class="greenhouse-dictionary-card">'
+                '<div class="greenhouse-dictionary-card-top">'
+                f'<span class="greenhouse-dictionary-term">{html.escape(variable_name)}</span>'
+                f'<span class="greenhouse-dictionary-unit">{unit_html}</span>'
+                '</div>'
+                f'<p class="greenhouse-dictionary-text">{html.escape(meaning)}</p>'
+                f'<p class="greenhouse-dictionary-text"><strong>Lectura:</strong> {html.escape(interpretation)}</p>'
+                f'<span class="greenhouse-dictionary-source">{html.escape(source)}</span>'
+                '</div>'
+            )
+        )
+
+    if rows:
+        st.markdown(
+            f'<div class="greenhouse-dictionary-grid">{"".join(rows)}</div>',
+            unsafe_allow_html=True
+        )
 
 
 def _build_greenhouse_component_chart(selected_areas_df, selected_block_label):
@@ -9421,6 +9666,9 @@ def cargar_analisis_invernaderos(ruta_bytes, cache_version=DATA_CACHE_VERSION):
             "areas": pd.DataFrame(),
             "summary": pd.DataFrame(),
             "interpretations": pd.DataFrame(),
+            "guide": pd.DataFrame(),
+            "chart_totals": pd.DataFrame(),
+            "chart_ratios": pd.DataFrame(),
             "dictionary": pd.DataFrame(),
         }
 
@@ -9433,8 +9681,12 @@ def cargar_analisis_invernaderos(ruta_bytes, cache_version=DATA_CACHE_VERSION):
 
         general_header_idx = _find_excel_row_by_first_value(raw_general, "Bloque")
         area_header_idx = _find_excel_row_by_first_value(raw_general, "Bloque", start_idx=(general_header_idx or 0) + 1)
+        guide_start_idx = _find_excel_row_by_first_value(raw_general, "GUÍA RÁPIDA DE LECTURA")
         summary_header_idx = _find_excel_row_by_first_value(raw_summary, "Bloque")
         interpretation_start_idx = _find_excel_row_by_first_value(raw_summary, "INTERPRETACIÓN TÉCNICA")
+        chart_start_idx = _find_excel_row_by_first_value(raw_summary, "GRÁFICAS COMPARATIVAS – VENTILACIÓN POR BLOQUE")
+        chart_total_header_idx = _find_sparse_header_row(raw_summary, chart_start_idx, "Teórica")
+        chart_ratio_header_idx = _find_sparse_header_row(raw_summary, chart_start_idx, "% Real / Teórica")
         dictionary_header_idx = _find_excel_row_by_first_value(raw_dictionary, "Variable / columna")
 
         return {
@@ -9442,6 +9694,9 @@ def cargar_analisis_invernaderos(ruta_bytes, cache_version=DATA_CACHE_VERSION):
             "areas": _extract_excel_table(raw_general, area_header_idx),
             "summary": _extract_excel_table(raw_summary, summary_header_idx),
             "interpretations": _build_greenhouse_interpretation_table(raw_summary, interpretation_start_idx),
+            "guide": _build_greenhouse_guide_table(raw_general, guide_start_idx),
+            "chart_totals": _extract_sparse_excel_table(raw_summary, chart_total_header_idx),
+            "chart_ratios": _extract_sparse_excel_table(raw_summary, chart_ratio_header_idx),
             "dictionary": _extract_excel_table(raw_dictionary, dictionary_header_idx),
         }
     except Exception as error:
@@ -9451,6 +9706,9 @@ def cargar_analisis_invernaderos(ruta_bytes, cache_version=DATA_CACHE_VERSION):
             "areas": pd.DataFrame(),
             "summary": pd.DataFrame(),
             "interpretations": pd.DataFrame(),
+            "guide": pd.DataFrame(),
+            "chart_totals": pd.DataFrame(),
+            "chart_ratios": pd.DataFrame(),
             "dictionary": pd.DataFrame(),
         }
 
@@ -9468,6 +9726,9 @@ def _render_greenhouse_analysis_dashboard():
     areas_df = analysis_data["areas"]
     summary_df = analysis_data["summary"]
     interpretations_df = analysis_data["interpretations"]
+    guide_df = analysis_data["guide"]
+    chart_totals_df = analysis_data["chart_totals"]
+    chart_ratios_df = analysis_data["chart_ratios"]
     dictionary_df = analysis_data["dictionary"]
 
     available_blocks = []
@@ -9647,6 +9908,14 @@ def _render_greenhouse_analysis_dashboard():
             if progress_chart is not None:
                 _plotly_chart(progress_chart, config={"displayModeBar": False})
 
+        _render_greenhouse_reading_cards("Guía rápida de lectura", guide_df, title_col="Concepto", body_col="Descripcion")
+
+        st.markdown("### Datos completos del Excel")
+        with st.expander("Datos generales de todos los bloques", expanded=True):
+            _dataframe(general_df, hide_index=True, height=230)
+        with st.expander("Apertura calculada en m² de todos los bloques", expanded=True):
+            _dataframe(_format_analysis_block_table(areas_df), hide_index=True, height=250)
+
         detail_left, detail_right = st.columns(2)
         with detail_left:
             with st.expander("Ver datos generales y aperturas lineales", expanded=False):
@@ -9667,16 +9936,21 @@ def _render_greenhouse_analysis_dashboard():
         st.markdown("### Tabla comparativa por bloque")
         _dataframe(_format_analysis_block_table(summary_df), hide_index=True)
 
-        if not interpretations_df.empty:
-            st.markdown("### Lectura tecnica del archivo")
-            for _, interpretation_row in interpretations_df.iterrows():
-                indicator = interpretation_row.get("Indicador", "")
-                interpretation = interpretation_row.get("Interpretacion", "")
-                st.markdown(f"**{indicator}**  \n{interpretation}")
+        _render_greenhouse_reading_cards("Lectura técnica del archivo", interpretations_df)
+
+        with st.expander("Datos base de gráficas comparativas del archivo", expanded=False):
+            if not chart_totals_df.empty:
+                st.markdown("#### Ventilación por bloque")
+                _dataframe(chart_totals_df, hide_index=True)
+            if not chart_ratios_df.empty:
+                st.markdown("#### Indicadores porcentuales")
+                _dataframe(_format_analysis_block_table(chart_ratios_df), hide_index=True)
 
     with tab_dictionary:
         st.markdown("### Diccionario de variables")
-        _dataframe(dictionary_df, hide_index=True)
+        _render_greenhouse_dictionary_cards(dictionary_df)
+        with st.expander("Ver diccionario en tabla completa", expanded=False):
+            _dataframe(dictionary_df, hide_index=True, height=360)
 
 
 def _render_correlacion(
