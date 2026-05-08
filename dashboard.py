@@ -9384,6 +9384,418 @@ def _render_greenhouse_chart_panel(fig, title, key, selected_block_label, large_
     _plotly_chart(fig, config=chart_config)
 
 
+def _build_greenhouse_report_excel_bytes(analysis_data, diagnostic_df=None):
+    output = io.BytesIO()
+    sheet_definitions = [
+        ("Datos generales", analysis_data.get("general", pd.DataFrame())),
+        ("Apertura calculada", analysis_data.get("areas", pd.DataFrame())),
+        ("Indicadores resumen", analysis_data.get("summary", pd.DataFrame())),
+        ("Lectura técnica", analysis_data.get("interpretations", pd.DataFrame())),
+        ("Guía rápida", analysis_data.get("guide", pd.DataFrame())),
+        ("Gráficas totales", analysis_data.get("chart_totals", pd.DataFrame())),
+        ("Gráficas porcentuales", analysis_data.get("chart_ratios", pd.DataFrame())),
+        ("Diccionario", analysis_data.get("dictionary", pd.DataFrame())),
+    ]
+    if isinstance(diagnostic_df, pd.DataFrame) and not diagnostic_df.empty:
+        sheet_definitions.append(("Cruce ambiental", diagnostic_df))
+
+    with pd.ExcelWriter(output, engine="openpyxl") as writer:
+        sheets_written = []
+        for sheet_title, frame in sheet_definitions:
+            if not isinstance(frame, pd.DataFrame) or frame.empty:
+                continue
+            sheet_name = _sanitize_excel_sheet_name(sheet_title, sheets_written)
+            frame.to_excel(writer, index=False, sheet_name=sheet_name)
+            sheets_written.append(sheet_name)
+
+        if not sheets_written:
+            fallback_name = _sanitize_excel_sheet_name("Sin datos", sheets_written)
+            pd.DataFrame({"Mensaje": ["No hay datos disponibles para exportar."]}).to_excel(
+                writer,
+                index=False,
+                sheet_name=fallback_name
+            )
+
+        workbook = writer.book
+        try:
+            from openpyxl.styles import Alignment, Font, PatternFill
+
+            header_fill = PatternFill("solid", fgColor="545386")
+            header_font = Font(color="FFFFFF", bold=True)
+            header_alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+        except Exception:
+            header_fill = header_font = header_alignment = None
+
+        for worksheet in workbook.worksheets:
+            worksheet.freeze_panes = "A2"
+            worksheet.auto_filter.ref = worksheet.dimensions
+            if header_fill and header_font and header_alignment:
+                for cell in worksheet[1]:
+                    cell.fill = header_fill
+                    cell.font = header_font
+                    cell.alignment = header_alignment
+
+            for column_cells in worksheet.columns:
+                column_letter = column_cells[0].column_letter
+                max_length = 0
+                for cell in column_cells:
+                    value = cell.value
+                    if value is None:
+                        continue
+                    max_length = max(max_length, len(str(value)))
+                worksheet.column_dimensions[column_letter].width = min(max(max_length + 2, 12), 42)
+
+    output.seek(0)
+    return output.getvalue()
+
+
+def _render_greenhouse_report_download(analysis_data, selected_block_label, diagnostic_df=None, key_suffix="base"):
+    try:
+        report_bytes = _build_greenhouse_report_excel_bytes(analysis_data, diagnostic_df=diagnostic_df)
+    except Exception as error:
+        st.info(f"No fue posible preparar el reporte descargable. Detalle: {error}")
+        return
+
+    file_name = f"{_build_report_slug('ficha-tecnica-invernaderos', selected_block_label, key_suffix)}.xlsx"
+    st.download_button(
+        "Descargar reporte técnico",
+        data=report_bytes,
+        file_name=file_name,
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        key=f"download_greenhouse_report_{key_suffix}",
+        help="Descarga un Excel con las tablas estructurales, lectura técnica, diccionario y cruce ambiental si está disponible."
+    )
+
+
+def _get_greenhouse_diagnostic_dates(df_variables_all, variable_blocks, window_days=7):
+    if (
+        df_variables_all.empty or
+        "Bloque" not in df_variables_all.columns or
+        "Fecha_Filtro" not in df_variables_all.columns or
+        not variable_blocks
+    ):
+        return None, None
+
+    date_series = pd.to_datetime(
+        df_variables_all.loc[df_variables_all["Bloque"].isin(variable_blocks), "Fecha_Filtro"],
+        errors="coerce"
+    ).dropna()
+    if date_series.empty:
+        return None, None
+
+    end_date = date_series.max().date()
+    start_date = end_date - timedelta(days=max(1, int(window_days)) - 1)
+    return start_date, end_date
+
+
+def _classify_greenhouse_diagnostic(row):
+    usage = _safe_float(row.get("Uso máximo permitido (%)"))
+    temperature = _safe_float(row.get("Temperatura"))
+    gap = _safe_float(row.get("Brecha operativa (m²)"))
+
+    if usage is None:
+        return "Sin lectura suficiente para priorizar."
+    if usage < 85 and temperature is not None and temperature >= 27:
+        return "Prioridad alta: menor uso de capacidad con temperatura elevada."
+    if usage < 85:
+        return "Revisar apertura real y restricciones de cortinas."
+    if gap is not None and gap >= 200:
+        return "Buena eficiencia relativa, pero con brecha absoluta importante."
+    if usage >= 90:
+        return "Operación alineada con la capacidad máxima permitida."
+    return "Condición intermedia: mantener seguimiento operativo."
+
+
+def _build_greenhouse_environment_diagnostic(summary_df, df_variables_all, window_days=7):
+    empty_meta = {
+        "start_date": None,
+        "end_date": None,
+        "records": 0,
+        "mapped_blocks": 0,
+    }
+    if summary_df.empty or df_variables_all.empty:
+        return pd.DataFrame(), empty_meta
+    if "Bloque" not in summary_df.columns or "Bloque" not in df_variables_all.columns:
+        return pd.DataFrame(), empty_meta
+
+    _, variable_map, _ = _get_block_options(df_variables_all, pd.DataFrame(), selected_finca="La Ponderosa")
+    block_lookup = {}
+    for block_name in summary_df["Bloque"].dropna().astype(str).tolist():
+        block_identifier = _extract_block_identifier(block_name)
+        variable_block = variable_map.get(block_identifier)
+        if variable_block:
+            block_lookup[block_name] = variable_block
+
+    if not block_lookup:
+        return pd.DataFrame(), empty_meta
+
+    variable_blocks = list(block_lookup.values())
+    start_date, end_date = _get_greenhouse_diagnostic_dates(df_variables_all, variable_blocks, window_days=window_days)
+    if start_date is None or end_date is None:
+        return pd.DataFrame(), {**empty_meta, "mapped_blocks": len(block_lookup)}
+
+    filtered_df = _filter_variables_multi_block_range(
+        df_variables_all,
+        start_date,
+        end_date,
+        bloques=variable_blocks
+    )
+    sensor_columns = [
+        column_name
+        for column_name in SENSOR_VARIABLES
+        if column_name in filtered_df.columns and filtered_df[column_name].notna().any()
+    ]
+    if filtered_df.empty or not sensor_columns:
+        return pd.DataFrame(), {
+            **empty_meta,
+            "start_date": start_date,
+            "end_date": end_date,
+            "mapped_blocks": len(block_lookup),
+        }
+
+    aggregate_df = filtered_df.groupby("Bloque", as_index=False)[sensor_columns].mean()
+    record_counts = filtered_df.groupby("Bloque").size().reset_index(name="Registros")
+    aggregate_df = aggregate_df.merge(record_counts, on="Bloque", how="left")
+    reverse_lookup = {variable_block: block_name for block_name, variable_block in block_lookup.items()}
+    aggregate_df["Bloque"] = aggregate_df["Bloque"].map(reverse_lookup)
+    aggregate_df = aggregate_df.dropna(subset=["Bloque"]).reset_index(drop=True)
+    if aggregate_df.empty:
+        return pd.DataFrame(), {
+            **empty_meta,
+            "start_date": start_date,
+            "end_date": end_date,
+            "mapped_blocks": len(block_lookup),
+            "records": int(len(filtered_df)),
+        }
+
+    summary_columns = [
+        "Bloque",
+        "% Real / Teórica",
+        "% Real / Máx. Perm.",
+        "Brecha Máx-Real (m²)",
+        "% Pérdida Operativa",
+    ]
+    available_summary_columns = [column_name for column_name in summary_columns if column_name in summary_df.columns]
+    merged_df = aggregate_df.merge(summary_df[available_summary_columns], on="Bloque", how="left")
+    rename_map = {
+        "% Real / Teórica": "Uso potencial teórico (%)",
+        "% Real / Máx. Perm.": "Uso máximo permitido (%)",
+        "Brecha Máx-Real (m²)": "Brecha operativa (m²)",
+        "% Pérdida Operativa": "Pérdida operativa (%)",
+    }
+    merged_df = merged_df.rename(columns=rename_map)
+    for column_name in [
+        "Uso potencial teórico (%)",
+        "Uso máximo permitido (%)",
+        "Pérdida operativa (%)",
+    ]:
+        if column_name in merged_df.columns:
+            merged_df[column_name] = pd.to_numeric(merged_df[column_name], errors="coerce") * 100
+    if "Brecha operativa (m²)" in merged_df.columns:
+        merged_df["Brecha operativa (m²)"] = pd.to_numeric(merged_df["Brecha operativa (m²)"], errors="coerce")
+
+    for column_name in sensor_columns:
+        merged_df[column_name] = pd.to_numeric(merged_df[column_name], errors="coerce").round(2)
+    merged_df["Lectura operativa"] = merged_df.apply(_classify_greenhouse_diagnostic, axis=1)
+
+    ordered_columns = [
+        "Bloque",
+        "Registros",
+        *sensor_columns,
+        "Uso potencial teórico (%)",
+        "Uso máximo permitido (%)",
+        "Brecha operativa (m²)",
+        "Pérdida operativa (%)",
+        "Lectura operativa",
+    ]
+    ordered_columns = [column_name for column_name in ordered_columns if column_name in merged_df.columns]
+    merged_df = merged_df[ordered_columns].sort_values("Bloque").reset_index(drop=True)
+
+    return merged_df, {
+        "start_date": start_date,
+        "end_date": end_date,
+        "records": int(len(filtered_df)),
+        "mapped_blocks": len(block_lookup),
+    }
+
+
+def _build_greenhouse_environment_scatter(diagnostic_df, metric_column, selected_block_label):
+    if diagnostic_df.empty or metric_column not in diagnostic_df.columns:
+        return None
+    required_columns = ["Bloque", "Uso máximo permitido (%)", "Brecha operativa (m²)"]
+    if any(column_name not in diagnostic_df.columns for column_name in required_columns):
+        return None
+
+    working_df = diagnostic_df.copy()
+    working_df["Uso máximo permitido (%)"] = pd.to_numeric(working_df["Uso máximo permitido (%)"], errors="coerce")
+    working_df[metric_column] = pd.to_numeric(working_df[metric_column], errors="coerce")
+    working_df["Brecha operativa (m²)"] = pd.to_numeric(working_df["Brecha operativa (m²)"], errors="coerce")
+    working_df = working_df.dropna(subset=["Uso máximo permitido (%)", metric_column, "Brecha operativa (m²)"])
+    if working_df.empty:
+        return None
+
+    gap_min = float(working_df["Brecha operativa (m²)"].min())
+    gap_max = float(working_df["Brecha operativa (m²)"].max())
+    gap_range = gap_max - gap_min if gap_max != gap_min else 1.0
+    marker_sizes = [
+        18 + ((float(value) - gap_min) / gap_range) * 30
+        for value in working_df["Brecha operativa (m²)"]
+    ]
+    marker_symbols = [
+        "diamond" if str(block_name) == str(selected_block_label) else "circle"
+        for block_name in working_df["Bloque"]
+    ]
+
+    fig = go.Figure(go.Scatter(
+        x=working_df["Uso máximo permitido (%)"],
+        y=working_df[metric_column],
+        text=working_df["Bloque"],
+        customdata=working_df[["Brecha operativa (m²)", "Registros", "Lectura operativa"]],
+        mode="markers+text",
+        textposition="top center",
+        marker=dict(
+            size=marker_sizes,
+            symbol=marker_symbols,
+            color=working_df["Brecha operativa (m²)"],
+            colorscale=[
+                [0.0, GREENHOUSE_COLORS["real"]],
+                [0.55, GREENHOUSE_COLORS["gap"]],
+                [1.0, BRAND_COLORS["rose"]],
+            ],
+            colorbar=dict(title="Brecha m²"),
+            line=dict(color="rgba(255,255,255,0.95)", width=2),
+            opacity=0.92,
+        ),
+        hovertemplate=(
+            "<b>%{text}</b><br>"
+            "Uso máximo permitido: %{x:.1f}%<br>"
+            f"{VARIABLE_SELECTOR_LABELS.get(metric_column, metric_column)}: "
+            f"%{{y:.2f}} {VARIABLE_UNITS.get(metric_column, '')}<br>"
+            "Brecha operativa: %{customdata[0]:,.1f} m²<br>"
+            "Registros del periodo: %{customdata[1]:,.0f}<br>"
+            "%{customdata[2]}<extra></extra>"
+        ),
+    ))
+    fig.update_layout(
+        template="plotly_white",
+        title=f"Cruce ambiental vs capacidad instalada · {VARIABLE_SELECTOR_LABELS.get(metric_column, metric_column)}",
+        xaxis_title="Uso del máximo permitido (%)",
+        yaxis_title=VARIABLE_SELECTOR_LABELS.get(metric_column, metric_column),
+        height=520,
+        margin=dict(l=20, r=20, t=80, b=36),
+    )
+    fig.update_xaxes(range=[max(0, float(working_df["Uso máximo permitido (%)"].min()) - 5), 105])
+    return fig
+
+
+def _render_greenhouse_environment_tab(summary_df, analysis_data, selected_block_label):
+    _render_chart_explanation(
+        "Cruce ambiental",
+        "Esta lectura conecta la ficha estructural de ventilación con los sensores del periodo más reciente. Sirve para priorizar bloques donde una brecha de apertura podría coincidir con temperatura, humedad, PAR o gramos de agua."
+    )
+
+    with _loading_context(True, "Cargando contexto ambiental reciente..."):
+        df_variables_all, _ = cargar_dashboard_completo()
+
+    diagnostic_df, diagnostic_meta = _build_greenhouse_environment_diagnostic(summary_df, df_variables_all)
+    if diagnostic_df.empty:
+        st.info("No se encontró información ambiental suficiente para cruzar con la ficha técnica.")
+        return
+
+    period_text = "Periodo no disponible"
+    if diagnostic_meta.get("start_date") and diagnostic_meta.get("end_date"):
+        period_text = (
+            f"{diagnostic_meta['start_date'].strftime('%d/%m/%Y')} - "
+            f"{diagnostic_meta['end_date'].strftime('%d/%m/%Y')}"
+        )
+    st.caption(
+        f"Periodo analizado: {period_text}. "
+        f"Registros usados: {diagnostic_meta.get('records', 0):,}. "
+        f"Bloques conectados: {diagnostic_meta.get('mapped_blocks', 0)}."
+    )
+
+    available_metrics = [
+        variable_name
+        for variable_name in SENSOR_VARIABLES
+        if variable_name in diagnostic_df.columns and diagnostic_df[variable_name].notna().any()
+    ]
+    if not available_metrics:
+        st.info("Hay bloques conectados, pero no se detectaron variables ambientales numéricas para graficar.")
+        return
+
+    metric_choice = st.selectbox(
+        "Variable ambiental para cruzar con capacidad:",
+        options=available_metrics,
+        format_func=lambda value: VARIABLE_SELECTOR_LABELS.get(value, value),
+        key="greenhouse_environment_metric"
+    )
+
+    selected_env_df = diagnostic_df[diagnostic_df["Bloque"].astype(str) == str(selected_block_label)].reset_index(drop=True)
+    if not selected_env_df.empty:
+        selected_env_row = selected_env_df.iloc[0]
+        _render_greenhouse_metric_grid(
+            "Lectura ambiental del bloque seleccionado",
+            [
+                {
+                    "label": VARIABLE_SELECTOR_LABELS.get(metric_choice, metric_choice),
+                    "value": _format_greenhouse_value(
+                        selected_env_row.get(metric_choice),
+                        2,
+                        f" {VARIABLE_UNITS.get(metric_choice, '')}".rstrip()
+                    ),
+                    "note": "Promedio del periodo reciente",
+                    "accent": VARIABLE_COLORS.get(metric_choice, BRAND_COLORS["hero"]),
+                },
+                {
+                    "label": "Uso máximo",
+                    "value": _format_greenhouse_value(selected_env_row.get("Uso máximo permitido (%)"), 1, "%"),
+                    "note": "Ventilación real frente al máximo permitido",
+                    "accent": GREENHOUSE_COLORS["real"],
+                },
+                {
+                    "label": "Brecha operativa",
+                    "value": _format_greenhouse_value(selected_env_row.get("Brecha operativa (m²)"), 1, " m²"),
+                    "note": "Diferencia entre máximo permitido y real",
+                    "accent": GREENHOUSE_COLORS["gap"],
+                },
+                {
+                    "label": "Registros",
+                    "value": _format_greenhouse_value(selected_env_row.get("Registros"), 0),
+                    "note": "Datos ambientales usados",
+                    "accent": BRAND_COLORS["graphite"],
+                },
+            ]
+        )
+        st.info(str(selected_env_row.get("Lectura operativa", "Lectura no disponible.")))
+
+    environment_chart = _build_greenhouse_environment_scatter(
+        diagnostic_df,
+        metric_choice,
+        selected_block_label
+    )
+    _render_greenhouse_chart_panel(
+        environment_chart,
+        "Cruce ambiental vs capacidad instalada",
+        "cruce_ambiental_capacidad",
+        selected_block_label,
+        large_height=760
+    )
+
+    download_col, spacer_col = st.columns([0.28, 0.72])
+    with download_col:
+        _render_greenhouse_report_download(
+            analysis_data,
+            selected_block_label,
+            diagnostic_df=diagnostic_df,
+            key_suffix="cruce_ambiental"
+        )
+    with spacer_col:
+        st.caption("El Excel descargable incluye la ficha técnica completa y la hoja adicional de cruce ambiental.")
+
+    with st.expander("Ver tabla completa del cruce ambiental", expanded=False):
+        _dataframe(diagnostic_df, hide_index=True, height=300)
+
+
 def _build_greenhouse_component_chart(selected_areas_df, selected_block_label):
     if selected_areas_df.empty:
         return None
@@ -9835,7 +10247,7 @@ def _build_greenhouse_insights(selected_general_df, selected_areas_df, selected_
     return insights
 
 
-@st.cache_data(show_spinner="Cargando analisis estructural de invernaderos...")
+@st.cache_data(show_spinner="Cargando análisis estructural de invernaderos...")
 def cargar_analisis_invernaderos(ruta_bytes, cache_version=DATA_CACHE_VERSION):
     _ = cache_version
     if not ruta_bytes:
@@ -9878,7 +10290,7 @@ def cargar_analisis_invernaderos(ruta_bytes, cache_version=DATA_CACHE_VERSION):
             "dictionary": _extract_excel_table(raw_dictionary, dictionary_header_idx),
         }
     except Exception as error:
-        st.error(f"No fue posible cargar el analisis de invernaderos. Detalle: {error}")
+        st.error(f"No fue posible cargar el análisis de invernaderos. Detalle: {error}")
         return {
             "general": pd.DataFrame(),
             "areas": pd.DataFrame(),
@@ -9896,7 +10308,7 @@ def _render_greenhouse_analysis_dashboard():
     if analysis_bytes is None:
         analysis_bytes = _read_first_local_file_bytes(GREENHOUSE_ANALYSIS_LOCAL_EXCEL_PATHS)
     if analysis_bytes is None:
-        st.warning("No se encontro el archivo de analisis de invernaderos en las rutas configuradas.")
+        st.warning("No se encontró el archivo de análisis de invernaderos en las rutas configuradas.")
         st.stop()
 
     analysis_data = cargar_analisis_invernaderos(analysis_bytes)
@@ -9916,7 +10328,7 @@ def _render_greenhouse_analysis_dashboard():
     available_blocks = list(dict.fromkeys(available_blocks))
 
     if not available_blocks:
-        st.warning("El archivo de analisis no contiene bloques listos para mostrar.")
+        st.warning("El archivo de análisis no contiene bloques listos para mostrar.")
         st.stop()
 
     shared_block_code = st.session_state.get("bloque_compartido")
@@ -9927,13 +10339,13 @@ def _render_greenhouse_analysis_dashboard():
     if st.session_state.get("greenhouse_analysis_block") not in available_blocks:
         st.session_state["greenhouse_analysis_block"] = default_block_label
 
-    with st.sidebar.expander("Bloque tecnico", expanded=True):
+    with st.sidebar.expander("Bloque técnico", expanded=True):
         _sidebar_field_label("location", "Bloque analizado")
         selected_block_label = st.selectbox(
-            "Seleccionar bloque tecnico:",
+            "Seleccionar bloque técnico:",
             options=available_blocks,
             key="greenhouse_analysis_block",
-            help="Muestra la ficha estructural y de ventilacion calculada para el bloque seleccionado."
+            help="Muestra la ficha estructural y de ventilación calculada para el bloque seleccionado."
         )
 
     selected_block_code = _extract_block_code(selected_block_label)
@@ -9956,9 +10368,16 @@ def _render_greenhouse_analysis_dashboard():
     _render_greenhouse_styles()
     _render_greenhouse_hero(selected_block_label, selected_summary_df)
 
-    tab_block, tab_summary, tab_dictionary = st.tabs([
+    download_col, download_note_col = st.columns([0.28, 0.72])
+    with download_col:
+        _render_greenhouse_report_download(analysis_data, selected_block_label, key_suffix="ficha_tecnica")
+    with download_note_col:
+        st.caption("Reporte listo para auditoría: datos generales, áreas calculadas, indicadores, lectura técnica, guía rápida y diccionario.")
+
+    tab_block, tab_summary, tab_environment, tab_dictionary = st.tabs([
         "Datos por bloque",
         "Resumen comparativo",
+        "Cruce ambiental",
         "Diccionario",
     ])
 
@@ -10119,7 +10538,7 @@ def _render_greenhouse_analysis_dashboard():
             with st.expander("Ver datos generales y aperturas lineales", expanded=False):
                 _dataframe(_format_single_block_detail_table(selected_general_df), hide_index=True)
         with detail_right:
-            with st.expander("Ver areas de ventilacion calculadas", expanded=False):
+            with st.expander("Ver áreas de ventilación calculadas", expanded=False):
                 _dataframe(_format_single_block_detail_table(selected_areas_df), hide_index=True)
 
     with tab_summary:
@@ -10178,6 +10597,9 @@ def _render_greenhouse_analysis_dashboard():
             if not chart_ratios_df.empty:
                 st.markdown("#### Indicadores porcentuales")
                 _dataframe(_format_analysis_block_table(chart_ratios_df), hide_index=True)
+
+    with tab_environment:
+        _render_greenhouse_environment_tab(summary_df, analysis_data, selected_block_label)
 
     with tab_dictionary:
         st.markdown("### Diccionario de variables")
