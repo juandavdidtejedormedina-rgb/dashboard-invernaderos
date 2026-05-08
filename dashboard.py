@@ -8901,9 +8901,14 @@ def _format_single_block_detail_table(df):
     for column_name, value in row.items():
         if pd.isna(value):
             continue
+        numeric_value = _safe_float(value) if not isinstance(value, str) else None
+        if numeric_value is not None:
+            value_text = f"{numeric_value:,.2f}".rstrip("0").rstrip(".")
+        else:
+            value_text = str(value)
         detail_rows.append({
             "Campo": column_name,
-            "Valor": value
+            "Valor": value_text
         })
     return pd.DataFrame(detail_rows)
 
@@ -9635,7 +9640,7 @@ def _build_greenhouse_block_ranking_chart(summary_df, selected_block_label):
         yaxis_title="",
         height=420,
         margin=dict(l=20, r=20, t=70, b=24),
-        yaxis=dict(autorange="reversed"),
+        yaxis=dict(autorange="reversed", categoryorder="array", categoryarray=ranking_df["Bloque"].tolist()),
     )
     return fig
 
@@ -9646,7 +9651,7 @@ def _build_greenhouse_gap_ranking_chart(summary_df, selected_block_label):
 
     ranking_df = summary_df.copy()
     ranking_df["Brecha Máx-Real (m²)"] = pd.to_numeric(ranking_df["Brecha Máx-Real (m²)"], errors="coerce")
-    ranking_df = ranking_df.dropna(subset=["Brecha Máx-Real (m²)"]).sort_values("Brecha Máx-Real (m²)", ascending=True)
+    ranking_df = ranking_df.dropna(subset=["Brecha Máx-Real (m²)"]).sort_values("Brecha Máx-Real (m²)", ascending=False)
     if ranking_df.empty:
         return None
 
@@ -9671,6 +9676,7 @@ def _build_greenhouse_gap_ranking_chart(summary_df, selected_block_label):
         yaxis_title="",
         height=420,
         margin=dict(l=20, r=20, t=70, b=24),
+        yaxis=dict(autorange="reversed", categoryorder="array", categoryarray=ranking_df["Bloque"].tolist()),
     )
     return fig
 
@@ -9719,7 +9725,11 @@ def _build_greenhouse_performance_heatmap(summary_df, selected_block_label):
         ],
         zmin=0,
         zmax=1,
-        colorbar=dict(title="Desempeño"),
+        colorbar=dict(
+            title="Desempeño",
+            tickvals=[0, 0.5, 1],
+            ticktext=["Bajo", "Medio", "Alto"],
+        ),
         hovertemplate="%{y}<br>%{x}: %{text}<extra></extra>",
     ))
     fig.update_layout(
@@ -9729,19 +9739,7 @@ def _build_greenhouse_performance_heatmap(summary_df, selected_block_label):
         margin=dict(l=20, r=20, t=70, b=24),
         xaxis_title="",
         yaxis_title="",
-        shapes=[
-            dict(
-                type="rect",
-                xref="paper",
-                yref="y",
-                x0=0,
-                x1=1,
-                y0=selected_block_label,
-                y1=selected_block_label,
-                line=dict(color=BRAND_COLORS["hero"], width=2),
-                fillcolor="rgba(0,0,0,0)",
-            )
-        ] if selected_block_label in heatmap_df["Bloque"].astype(str).tolist() else []
+        yaxis=dict(autorange="reversed"),
     )
     return fig
 
