@@ -8833,6 +8833,18 @@ def _format_single_block_detail_table(df):
     return pd.DataFrame(detail_rows)
 
 
+GREENHOUSE_COLORS = {
+    "real": "#3DBB76",
+    "gap": "#E7C87A",
+    "theoretical": "#6FA8FF",
+    "allowed": "#F2A04B",
+    "frontal": "#545386",
+    "lateral": "#6FBFD6",
+    "culatas": "#D77A94",
+    "muted": "#D8D2C4",
+}
+
+
 def _safe_float(value):
     if value is None or pd.isna(value):
         return None
@@ -8840,6 +8852,262 @@ def _safe_float(value):
         return float(value)
     except (TypeError, ValueError):
         return None
+
+
+def _format_greenhouse_value(value, decimals=1, suffix=""):
+    numeric_value = _safe_float(value)
+    if numeric_value is None:
+        return "Sin datos"
+    if decimals == 0:
+        formatted_value = f"{numeric_value:,.0f}"
+    else:
+        formatted_value = f"{numeric_value:,.{decimals}f}"
+    return f"{formatted_value}{suffix}"
+
+
+def _format_greenhouse_percent(value):
+    numeric_value = _safe_float(value)
+    return f"{numeric_value:.1%}" if numeric_value is not None else "Sin datos"
+
+
+def _render_greenhouse_styles():
+    st.markdown(
+        """
+        <style>
+        .greenhouse-hero {
+            position: relative;
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            gap: 1rem;
+            align-items: center;
+            margin: 0.1rem 0 1.15rem 0;
+            padding: 1.18rem 1.25rem;
+            border-radius: 8px;
+            border: 1px solid rgba(84, 83, 134, 0.18);
+            background:
+                linear-gradient(120deg, rgba(84,83,134,0.98) 0%, rgba(62,68,98,0.96) 58%, rgba(61,187,118,0.88) 100%);
+            box-shadow: 0 18px 42px rgba(38, 43, 59, 0.16);
+            overflow: hidden;
+        }
+        .greenhouse-hero::after {
+            content: '';
+            position: absolute;
+            inset: auto -42px -68px auto;
+            width: 210px;
+            height: 210px;
+            border-radius: 50%;
+            border: 34px solid rgba(255,255,255,0.10);
+            pointer-events: none;
+        }
+        .greenhouse-kicker {
+            margin: 0 0 0.35rem 0;
+            color: rgba(255,255,255,0.72);
+            font-size: 0.78rem;
+            font-weight: 800;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+        }
+        .greenhouse-title {
+            margin: 0;
+            color: #ffffff;
+            font-size: 1.72rem;
+            line-height: 1.1;
+            font-weight: 900;
+            letter-spacing: 0;
+        }
+        .greenhouse-subtitle {
+            max-width: 48rem;
+            margin: 0.58rem 0 0 0;
+            color: rgba(255,255,255,0.82);
+            font-size: 0.96rem;
+            line-height: 1.55;
+        }
+        .greenhouse-hero-badge {
+            position: relative;
+            z-index: 1;
+            min-width: 138px;
+            padding: 0.86rem 0.95rem;
+            border-radius: 8px;
+            border: 1px solid rgba(255,255,255,0.22);
+            background: rgba(255,255,255,0.13);
+            text-align: center;
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.18);
+        }
+        .greenhouse-hero-badge-label {
+            display: block;
+            color: rgba(255,255,255,0.72);
+            font-size: 0.72rem;
+            font-weight: 800;
+            letter-spacing: 0.10em;
+            text-transform: uppercase;
+        }
+        .greenhouse-hero-badge-value {
+            display: block;
+            margin-top: 0.24rem;
+            color: #ffffff;
+            font-size: 1.38rem;
+            font-weight: 900;
+            line-height: 1;
+        }
+        .greenhouse-section-title {
+            margin: 1.05rem 0 0.55rem 0;
+            color: var(--elite-graphite);
+            font-size: 1.02rem;
+            font-weight: 900;
+            letter-spacing: 0;
+        }
+        .greenhouse-metric-grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 0.72rem;
+            margin: 0.4rem 0 0.85rem 0;
+        }
+        .greenhouse-metric-card {
+            position: relative;
+            min-height: 112px;
+            padding: 0.92rem 0.92rem 0.82rem 0.92rem;
+            border-radius: 8px;
+            border: 1px solid rgba(84, 83, 134, 0.12);
+            background: linear-gradient(180deg, #ffffff 0%, rgba(255,255,255,0.88) 100%);
+            box-shadow: 0 12px 28px rgba(56,58,53,0.08);
+            overflow: hidden;
+        }
+        .greenhouse-metric-card::before {
+            content: '';
+            position: absolute;
+            inset: 0 0 auto 0;
+            height: 5px;
+            background: var(--greenhouse-accent);
+        }
+        .greenhouse-metric-card-label {
+            display: block;
+            color: rgba(56,58,53,0.66);
+            font-size: 0.74rem;
+            font-weight: 800;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+        }
+        .greenhouse-metric-card-value {
+            display: block;
+            margin-top: 0.48rem;
+            color: var(--elite-graphite);
+            font-size: 1.42rem;
+            font-weight: 900;
+            line-height: 1.05;
+            overflow-wrap: anywhere;
+        }
+        .greenhouse-metric-card-note {
+            display: block;
+            margin-top: 0.42rem;
+            color: rgba(56,58,53,0.62);
+            font-size: 0.78rem;
+            line-height: 1.35;
+        }
+        .greenhouse-insight-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 0.7rem;
+            margin: 0.4rem 0 1rem 0;
+        }
+        .greenhouse-insight-card {
+            padding: 0.9rem 0.95rem;
+            border-radius: 8px;
+            border: 1px solid rgba(84,83,134,0.12);
+            background: linear-gradient(180deg, rgba(255,255,255,0.94), rgba(247,244,238,0.82));
+            box-shadow: 0 10px 24px rgba(56,58,53,0.07);
+            color: var(--elite-ink);
+            font-size: 0.9rem;
+            line-height: 1.48;
+        }
+        .greenhouse-insight-card strong {
+            color: var(--elite-hero);
+        }
+        @media (max-width: 900px) {
+            .greenhouse-hero {
+                grid-template-columns: 1fr;
+            }
+            .greenhouse-hero-badge {
+                max-width: 220px;
+            }
+            .greenhouse-metric-grid,
+            .greenhouse-insight-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+        }
+        @media (max-width: 640px) {
+            .greenhouse-metric-grid,
+            .greenhouse-insight-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
+
+
+def _render_greenhouse_hero(selected_block_label, selected_summary_df):
+    efficiency_text = "Sin datos"
+    if not selected_summary_df.empty:
+        efficiency_text = _format_greenhouse_percent(selected_summary_df.iloc[0].get("% Real / Máx. Perm."))
+
+    st.markdown(
+        f"""
+        <div class="greenhouse-hero">
+            <div>
+                <p class="greenhouse-kicker">Contexto técnico de ventilación</p>
+                <h2 class="greenhouse-title">{html.escape(selected_block_label)}</h2>
+                <p class="greenhouse-subtitle">
+                    Lectura ejecutiva de geometría, capacidad instalada, apertura real y brechas operativas para conectar el comportamiento ambiental con la estructura del invernadero.
+                </p>
+            </div>
+            <div class="greenhouse-hero-badge">
+                <span class="greenhouse-hero-badge-label">Uso del máximo</span>
+                <span class="greenhouse-hero-badge-value">{html.escape(efficiency_text)}</span>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+
+def _render_greenhouse_metric_grid(title, metrics):
+    card_html = []
+    for metric in metrics:
+        card_html.append(
+            (
+                f'<div class="greenhouse-metric-card" style="--greenhouse-accent: {metric["accent"]};">'
+                f'<span class="greenhouse-metric-card-label">{html.escape(metric["label"])}</span>'
+                f'<span class="greenhouse-metric-card-value">{html.escape(metric["value"])}</span>'
+                f'<span class="greenhouse-metric-card-note">{html.escape(metric["note"])}</span>'
+                '</div>'
+            )
+        )
+
+    st.markdown(
+        f"""
+        <div class="greenhouse-section-title">{html.escape(title)}</div>
+        <div class="greenhouse-metric-grid">{''.join(card_html)}</div>
+        """,
+        unsafe_allow_html=True
+    )
+
+
+def _render_greenhouse_insight_cards(insights):
+    if not insights:
+        return
+
+    rows = [
+        f'<div class="greenhouse-insight-card"><strong>{idx}.</strong> {html.escape(insight)}</div>'
+        for idx, insight in enumerate(insights, start=1)
+    ]
+    st.markdown(
+        f"""
+        <div class="greenhouse-section-title">Lectura rápida</div>
+        <div class="greenhouse-insight-grid">{''.join(rows)}</div>
+        """,
+        unsafe_allow_html=True
+    )
 
 
 def _build_greenhouse_component_chart(selected_areas_df, selected_block_label):
@@ -8882,16 +9150,16 @@ def _build_greenhouse_component_chart(selected_areas_df, selected_block_label):
 
     fig = go.Figure()
     series_config = [
-        ("Teórica", "#6FA8FF"),
-        ("Máx. permitida", "#F2A04B"),
-        ("Real", "#53C66F"),
+        ("Teórica", GREENHOUSE_COLORS["theoretical"]),
+        ("Máx. permitida", GREENHOUSE_COLORS["allowed"]),
+        ("Real", GREENHOUSE_COLORS["real"]),
     ]
     for series_name, color in series_config:
         fig.add_trace(go.Bar(
             x=chart_df["Componente"],
             y=chart_df[series_name],
             name=series_name,
-            marker_color=color,
+            marker=dict(color=color, line=dict(color="rgba(56,58,53,0.12)", width=1)),
             text=[f"{value:,.0f}" for value in chart_df[series_name]],
             textposition="outside",
             hovertemplate="%{x}<br>" + series_name + ": %{y:,.2f} m²<extra></extra>"
@@ -8904,8 +9172,11 @@ def _build_greenhouse_component_chart(selected_areas_df, selected_block_label):
         yaxis_title="Área de ventilación (m²)",
         xaxis_title="",
         legend_title_text="Escenario",
-        height=430,
-        margin=dict(l=20, r=20, t=68, b=20),
+        height=440,
+        margin=dict(l=20, r=20, t=70, b=24),
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+        bargap=0.22,
+        bargroupgap=0.08,
     )
     return fig
 
@@ -8925,16 +9196,21 @@ def _build_greenhouse_efficiency_donut(selected_summary_df, selected_block_label
         labels=["Ventilación real", "Brecha operativa"],
         values=[total_real, gap_value],
         hole=0.68,
-        marker=dict(colors=["#53C66F", "#E7C87A"]),
+        marker=dict(
+            colors=[GREENHOUSE_COLORS["real"], GREENHOUSE_COLORS["gap"]],
+            line=dict(color="rgba(255,255,255,0.96)", width=3),
+        ),
         sort=False,
-        textinfo="label+percent",
+        texttemplate="<b>%{label}</b><br>%{percent}",
+        textposition="inside",
+        insidetextfont=dict(color="#ffffff", size=12),
         hovertemplate="%{label}<br>%{value:,.2f} m²<extra></extra>"
     ))
     fig.update_layout(
         template="plotly_white",
         title=f"Eficiencia operativa · {selected_block_label}",
-        height=380,
-        margin=dict(l=20, r=20, t=68, b=20),
+        height=390,
+        margin=dict(l=20, r=20, t=70, b=38),
         annotations=[dict(
             text=f"{(total_real / total_max):.0%}<br><span style='font-size:12px;'>del máximo</span>",
             x=0.5,
@@ -8942,7 +9218,9 @@ def _build_greenhouse_efficiency_donut(selected_summary_df, selected_block_label
             showarrow=False,
             font=dict(size=18, color="#383A35")
         )],
-        legend=dict(orientation="h", yanchor="bottom", y=-0.12, xanchor="center", x=0.5)
+        uniformtext_minsize=11,
+        uniformtext_mode="hide",
+        legend=dict(orientation="h", yanchor="bottom", y=-0.16, xanchor="center", x=0.5)
     )
     return fig
 
@@ -8953,9 +9231,9 @@ def _build_greenhouse_composition_donut(selected_areas_df, selected_block_label)
 
     row = selected_areas_df.iloc[0]
     composition_rows = [
-        ("Lateral", _safe_float(row.get("Área lateral real (m²)")) or 0.0, "#6FA8FF"),
-        ("Frontal", _safe_float(row.get("Área frontal real (m²)")) or 0.0, "#545386"),
-        ("Culatas", _safe_float(row.get("Área culatas real (m²)")) or 0.0, "#F2A04B"),
+        ("Lateral", _safe_float(row.get("Área lateral real (m²)")) or 0.0, GREENHOUSE_COLORS["lateral"]),
+        ("Frontal", _safe_float(row.get("Área frontal real (m²)")) or 0.0, GREENHOUSE_COLORS["frontal"]),
+        ("Culatas", _safe_float(row.get("Área culatas real (m²)")) or 0.0, GREENHOUSE_COLORS["culatas"]),
     ]
     composition_rows = [item for item in composition_rows if item[1] > 0]
     if not composition_rows:
@@ -8966,16 +9244,21 @@ def _build_greenhouse_composition_donut(selected_areas_df, selected_block_label)
         labels=[label for label, _, _ in composition_rows],
         values=[value for _, value, _ in composition_rows],
         hole=0.62,
-        marker=dict(colors=[color for _, _, color in composition_rows]),
+        marker=dict(
+            colors=[color for _, _, color in composition_rows],
+            line=dict(color="rgba(255,255,255,0.96)", width=3),
+        ),
         sort=False,
-        textinfo="label+percent",
+        texttemplate="<b>%{label}</b><br>%{percent}",
+        textposition="inside",
+        insidetextfont=dict(color="#ffffff", size=12),
         hovertemplate="%{label}<br>%{value:,.2f} m²<extra></extra>"
     ))
     fig.update_layout(
         template="plotly_white",
         title=f"Composición de la ventilación real · {selected_block_label}",
-        height=380,
-        margin=dict(l=20, r=20, t=68, b=20),
+        height=390,
+        margin=dict(l=20, r=20, t=70, b=38),
         annotations=[dict(
             text=f"{total_real:,.0f} m²<br><span style='font-size:12px;'>ventilación real</span>",
             x=0.5,
@@ -8983,7 +9266,71 @@ def _build_greenhouse_composition_donut(selected_areas_df, selected_block_label)
             showarrow=False,
             font=dict(size=18, color="#383A35")
         )],
-        legend=dict(orientation="h", yanchor="bottom", y=-0.12, xanchor="center", x=0.5)
+        uniformtext_minsize=11,
+        uniformtext_mode="hide",
+        legend=dict(orientation="h", yanchor="bottom", y=-0.16, xanchor="center", x=0.5)
+    )
+    return fig
+
+
+def _build_greenhouse_component_progress_chart(selected_areas_df, selected_block_label):
+    if selected_areas_df.empty:
+        return None
+
+    row = selected_areas_df.iloc[0]
+    components = [
+        ("Lateral", row.get("Área lateral máxima permitida (m²)"), row.get("Área lateral real (m²)")),
+        ("Frontal", row.get("Área frontal máxima permitida (m²)"), row.get("Área frontal real (m²)")),
+        ("Culatas", row.get("Área culatas máxima permitida (m²)"), row.get("Área culatas real (m²)")),
+    ]
+    progress_rows = []
+    for component_name, max_value, real_value in components:
+        max_numeric = _safe_float(max_value)
+        real_numeric = _safe_float(real_value)
+        if max_numeric is None or max_numeric <= 0 or real_numeric is None:
+            continue
+        real_capped = min(real_numeric, max_numeric)
+        gap_value = max(max_numeric - real_numeric, 0.0)
+        progress_rows.append({
+            "Componente": component_name,
+            "Real": real_capped,
+            "Brecha": gap_value,
+            "Cumplimiento": real_numeric / max_numeric,
+        })
+
+    if not progress_rows:
+        return None
+
+    progress_df = pd.DataFrame(progress_rows)
+    fig = go.Figure()
+    fig.add_trace(go.Bar(
+        y=progress_df["Componente"],
+        x=progress_df["Real"],
+        orientation="h",
+        name="Real",
+        marker=dict(color=GREENHOUSE_COLORS["real"], line=dict(color="rgba(56,58,53,0.10)", width=1)),
+        text=[f"{value:.0%}" for value in progress_df["Cumplimiento"]],
+        textposition="inside",
+        insidetextanchor="middle",
+        hovertemplate="%{y}<br>Real: %{x:,.2f} m²<extra></extra>",
+    ))
+    fig.add_trace(go.Bar(
+        y=progress_df["Componente"],
+        x=progress_df["Brecha"],
+        orientation="h",
+        name="Brecha",
+        marker=dict(color=GREENHOUSE_COLORS["gap"], line=dict(color="rgba(56,58,53,0.10)", width=1)),
+        hovertemplate="%{y}<br>Brecha: %{x:,.2f} m²<extra></extra>",
+    ))
+    fig.update_layout(
+        template="plotly_white",
+        title=f"Uso del máximo permitido por componente · {selected_block_label}",
+        barmode="stack",
+        height=440,
+        margin=dict(l=20, r=20, t=70, b=24),
+        xaxis_title="Área máxima permitida (m²)",
+        yaxis_title="",
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
     )
     return fig
 
@@ -8999,7 +9346,7 @@ def _build_greenhouse_block_ranking_chart(summary_df, selected_block_label):
         return None
 
     bar_colors = [
-        "#545386" if str(block_name) == str(selected_block_label) else "#C9D7E7"
+        BRAND_COLORS["hero"] if str(block_name) == str(selected_block_label) else "#C9D7E7"
         for block_name in ranking_df["Bloque"]
     ]
 
@@ -9017,8 +9364,8 @@ def _build_greenhouse_block_ranking_chart(summary_df, selected_block_label):
         title="Comparación de ventilación real entre bloques",
         xaxis_title="Total real (m²)",
         yaxis_title="",
-        height=430,
-        margin=dict(l=20, r=20, t=68, b=20),
+        height=420,
+        margin=dict(l=20, r=20, t=70, b=24),
         yaxis=dict(autorange="reversed"),
     )
     return fig
@@ -9167,8 +9514,8 @@ def _render_greenhouse_analysis_dashboard():
         if "Bloque" in summary_df.columns else pd.DataFrame()
     )
 
-    st.markdown("## La Ponderosa - Ficha tecnica de bloques")
-    st.caption("Vista interactiva para entender la geometria y la capacidad de ventilacion de cada bloque antes de pasar a correlaciones o nuevas graficas.")
+    _render_greenhouse_styles()
+    _render_greenhouse_hero(selected_block_label, selected_summary_df)
 
     tab_block, tab_summary, tab_dictionary = st.tabs([
         "Datos por bloque",
@@ -9184,62 +9531,128 @@ def _render_greenhouse_analysis_dashboard():
 
         if not selected_summary_df.empty:
             summary_row = selected_summary_df.iloc[0]
-            metric_cols = st.columns(4)
-            metric_cols[0].metric("Total teórica (m²)", _format_summary_number(summary_row.get("Total Teórica (m²)"), 2))
-            metric_cols[1].metric("Total máx. permitida (m²)", _format_summary_number(summary_row.get("Total Máx. Perm. (m²)"), 2))
-            metric_cols[2].metric("Total real (m²)", _format_summary_number(summary_row.get("Total Real (m²)"), 2))
-            metric_cols[3].metric("Brecha máx-real (m²)", _format_summary_number(summary_row.get("Brecha Máx-Real (m²)"), 2))
-
-            ratio_cols = st.columns(2)
-            ratio_cols[0].metric(
-                "% real / teórica",
-                f"{float(summary_row.get('% Real / Teórica')):.1%}" if pd.notna(summary_row.get('% Real / Teórica')) else "—"
+            real_max_ratio = _safe_float(summary_row.get("% Real / Máx. Perm."))
+            loss_ratio = max(0.0, 1 - real_max_ratio) if real_max_ratio is not None else None
+            _render_greenhouse_metric_grid(
+                "Capacidad de ventilación",
+                [
+                    {
+                        "label": "Total teórica",
+                        "value": _format_greenhouse_value(summary_row.get("Total Teórica (m²)"), 2, " m²"),
+                        "note": "Potencial geométrico calculado",
+                        "accent": GREENHOUSE_COLORS["theoretical"],
+                    },
+                    {
+                        "label": "Máx. permitida",
+                        "value": _format_greenhouse_value(summary_row.get("Total Máx. Perm. (m²)"), 2, " m²"),
+                        "note": "Límite operativo instalado",
+                        "accent": GREENHOUSE_COLORS["allowed"],
+                    },
+                    {
+                        "label": "Total real",
+                        "value": _format_greenhouse_value(summary_row.get("Total Real (m²)"), 2, " m²"),
+                        "note": "Ventilación efectiva disponible",
+                        "accent": GREENHOUSE_COLORS["real"],
+                    },
+                    {
+                        "label": "Brecha máx-real",
+                        "value": _format_greenhouse_value(summary_row.get("Brecha Máx-Real (m²)"), 2, " m²"),
+                        "note": "Oportunidad frente al máximo",
+                        "accent": GREENHOUSE_COLORS["gap"],
+                    },
+                ]
             )
-            ratio_cols[1].metric(
-                "% real / máx. perm.",
-                f"{float(summary_row.get('% Real / Máx. Perm.')):.1%}" if pd.notna(summary_row.get('% Real / Máx. Perm.')) else "—"
+            _render_greenhouse_metric_grid(
+                "Indicadores de cumplimiento",
+                [
+                    {
+                        "label": "Real / teórica",
+                        "value": _format_greenhouse_percent(summary_row.get("% Real / Teórica")),
+                        "note": "Uso del potencial geométrico",
+                        "accent": BRAND_COLORS["sky"],
+                    },
+                    {
+                        "label": "Real / máx. permitida",
+                        "value": _format_greenhouse_percent(summary_row.get("% Real / Máx. Perm.")),
+                        "note": "Uso de la capacidad instalada",
+                        "accent": BRAND_COLORS["hero"],
+                    },
+                    {
+                        "label": "Pérdida operativa",
+                        "value": _format_greenhouse_percent(loss_ratio),
+                        "note": "Brecha relativa al máximo",
+                        "accent": BRAND_COLORS["rose"],
+                    },
+                    {
+                        "label": "Bloque evaluado",
+                        "value": selected_block_label,
+                        "note": "Fuente: Datos por Bloque",
+                        "accent": BRAND_COLORS["graphite"],
+                    },
+                ]
             )
 
         if not selected_general_df.empty:
             general_row = selected_general_df.iloc[0]
-            geometry_cols = st.columns(4)
-            geometry_cols[0].metric("Cuadros", _format_summary_number(general_row.get("N° Cuadros"), 0))
-            geometry_cols[1].metric("Naves", _format_summary_number(general_row.get("N° Naves"), 0))
-            geometry_cols[2].metric("Culatas", _format_summary_number(general_row.get("N° Culatas"), 0))
-            geometry_cols[3].metric("Tamaño nave (m)", _format_summary_number(general_row.get("Tamaño de la nave (m)"), 1))
+            _render_greenhouse_metric_grid(
+                "Geometría del invernadero",
+                [
+                    {
+                        "label": "Cuadros",
+                        "value": _format_greenhouse_value(general_row.get("N° Cuadros"), 0),
+                        "note": "Módulos estructurales",
+                        "accent": GREENHOUSE_COLORS["lateral"],
+                    },
+                    {
+                        "label": "Naves",
+                        "value": _format_greenhouse_value(general_row.get("N° Naves"), 0),
+                        "note": "Configuración del bloque",
+                        "accent": GREENHOUSE_COLORS["frontal"],
+                    },
+                    {
+                        "label": "Culatas",
+                        "value": _format_greenhouse_value(general_row.get("N° Culatas"), 0),
+                        "note": "Aperturas consideradas",
+                        "accent": GREENHOUSE_COLORS["culatas"],
+                    },
+                    {
+                        "label": "Tamaño nave",
+                        "value": _format_greenhouse_value(general_row.get("Tamaño de la nave (m)"), 1, " m"),
+                        "note": "Medida base de cálculo",
+                        "accent": BRAND_COLORS["beige"],
+                    },
+                ]
+            )
 
         insight_rows = _build_greenhouse_insights(selected_general_df, selected_areas_df, selected_summary_df)
-        if insight_rows:
-            st.markdown("### Lectura rápida")
-            for insight in insight_rows:
-                st.markdown(f"- {insight}")
+        _render_greenhouse_insight_cards(insight_rows)
 
         donut_left, donut_right = st.columns(2)
         with donut_left:
             efficiency_donut = _build_greenhouse_efficiency_donut(selected_summary_df, selected_block_label)
             if efficiency_donut is not None:
-                _plotly_chart(efficiency_donut)
+                _plotly_chart(efficiency_donut, config={"displayModeBar": False})
         with donut_right:
             composition_donut = _build_greenhouse_composition_donut(selected_areas_df, selected_block_label)
             if composition_donut is not None:
-                _plotly_chart(composition_donut)
+                _plotly_chart(composition_donut, config={"displayModeBar": False})
 
         chart_left, chart_right = st.columns(2)
         with chart_left:
             component_chart = _build_greenhouse_component_chart(selected_areas_df, selected_block_label)
             if component_chart is not None:
-                _plotly_chart(component_chart)
+                _plotly_chart(component_chart, config={"displayModeBar": False})
         with chart_right:
-            ranking_chart = _build_greenhouse_block_ranking_chart(summary_df, selected_block_label)
-            if ranking_chart is not None:
-                _plotly_chart(ranking_chart)
+            progress_chart = _build_greenhouse_component_progress_chart(selected_areas_df, selected_block_label)
+            if progress_chart is not None:
+                _plotly_chart(progress_chart, config={"displayModeBar": False})
 
         detail_left, detail_right = st.columns(2)
         with detail_left:
-            with st.expander("Ver datos generales y aperturas lineales", expanded=True):
+            with st.expander("Ver datos generales y aperturas lineales", expanded=False):
                 _dataframe(_format_single_block_detail_table(selected_general_df), hide_index=True)
         with detail_right:
-            with st.expander("Ver areas de ventilacion calculadas", expanded=True):
+            with st.expander("Ver areas de ventilacion calculadas", expanded=False):
                 _dataframe(_format_single_block_detail_table(selected_areas_df), hide_index=True)
 
     with tab_summary:
@@ -9247,6 +9660,10 @@ def _render_greenhouse_analysis_dashboard():
             "Resumen comparativo",
             "Aquí puedes revisar rápidamente cómo se comporta cada bloque frente al resto usando los indicadores globales del archivo."
         )
+        ranking_chart = _build_greenhouse_block_ranking_chart(summary_df, selected_block_label)
+        if ranking_chart is not None:
+            _plotly_chart(ranking_chart, config={"displayModeBar": False})
+
         st.markdown("### Tabla comparativa por bloque")
         _dataframe(_format_analysis_block_table(summary_df), hide_index=True)
 
