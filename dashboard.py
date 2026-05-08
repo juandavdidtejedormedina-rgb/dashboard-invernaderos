@@ -8910,6 +8910,84 @@ def _build_greenhouse_component_chart(selected_areas_df, selected_block_label):
     return fig
 
 
+def _build_greenhouse_efficiency_donut(selected_summary_df, selected_block_label):
+    if selected_summary_df.empty:
+        return None
+
+    row = selected_summary_df.iloc[0]
+    total_real = _safe_float(row.get("Total Real (m²)"))
+    total_max = _safe_float(row.get("Total Máx. Perm. (m²)"))
+    if total_real is None or total_max is None or total_max <= 0:
+        return None
+
+    gap_value = max(total_max - total_real, 0.0)
+    fig = go.Figure(go.Pie(
+        labels=["Ventilación real", "Brecha operativa"],
+        values=[total_real, gap_value],
+        hole=0.68,
+        marker=dict(colors=["#53C66F", "#E7C87A"]),
+        sort=False,
+        textinfo="label+percent",
+        hovertemplate="%{label}<br>%{value:,.2f} m²<extra></extra>"
+    ))
+    fig.update_layout(
+        template="plotly_white",
+        title=f"Eficiencia operativa · {selected_block_label}",
+        height=380,
+        margin=dict(l=20, r=20, t=68, b=20),
+        annotations=[dict(
+            text=f"{(total_real / total_max):.0%}<br><span style='font-size:12px;'>del máximo</span>",
+            x=0.5,
+            y=0.5,
+            showarrow=False,
+            font=dict(size=18, color="#383A35")
+        )],
+        legend=dict(orientation="h", yanchor="bottom", y=-0.12, xanchor="center", x=0.5)
+    )
+    return fig
+
+
+def _build_greenhouse_composition_donut(selected_areas_df, selected_block_label):
+    if selected_areas_df.empty:
+        return None
+
+    row = selected_areas_df.iloc[0]
+    composition_rows = [
+        ("Lateral", _safe_float(row.get("Área lateral real (m²)")) or 0.0, "#6FA8FF"),
+        ("Frontal", _safe_float(row.get("Área frontal real (m²)")) or 0.0, "#545386"),
+        ("Culatas", _safe_float(row.get("Área culatas real (m²)")) or 0.0, "#F2A04B"),
+    ]
+    composition_rows = [item for item in composition_rows if item[1] > 0]
+    if not composition_rows:
+        return None
+
+    total_real = sum(value for _, value, _ in composition_rows)
+    fig = go.Figure(go.Pie(
+        labels=[label for label, _, _ in composition_rows],
+        values=[value for _, value, _ in composition_rows],
+        hole=0.62,
+        marker=dict(colors=[color for _, _, color in composition_rows]),
+        sort=False,
+        textinfo="label+percent",
+        hovertemplate="%{label}<br>%{value:,.2f} m²<extra></extra>"
+    ))
+    fig.update_layout(
+        template="plotly_white",
+        title=f"Composición de la ventilación real · {selected_block_label}",
+        height=380,
+        margin=dict(l=20, r=20, t=68, b=20),
+        annotations=[dict(
+            text=f"{total_real:,.0f} m²<br><span style='font-size:12px;'>ventilación real</span>",
+            x=0.5,
+            y=0.5,
+            showarrow=False,
+            font=dict(size=18, color="#383A35")
+        )],
+        legend=dict(orientation="h", yanchor="bottom", y=-0.12, xanchor="center", x=0.5)
+    )
+    return fig
+
+
 def _build_greenhouse_block_ranking_chart(summary_df, selected_block_label):
     if summary_df.empty or "Bloque" not in summary_df.columns or "Total Real (m²)" not in summary_df.columns:
         return None
@@ -9135,6 +9213,16 @@ def _render_greenhouse_analysis_dashboard():
             st.markdown("### Lectura rápida")
             for insight in insight_rows:
                 st.markdown(f"- {insight}")
+
+        donut_left, donut_right = st.columns(2)
+        with donut_left:
+            efficiency_donut = _build_greenhouse_efficiency_donut(selected_summary_df, selected_block_label)
+            if efficiency_donut is not None:
+                _plotly_chart(efficiency_donut)
+        with donut_right:
+            composition_donut = _build_greenhouse_composition_donut(selected_areas_df, selected_block_label)
+            if composition_donut is not None:
+                _plotly_chart(composition_donut)
 
         chart_left, chart_right = st.columns(2)
         with chart_left:
