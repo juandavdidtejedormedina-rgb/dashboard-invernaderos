@@ -9,6 +9,7 @@ import re
 import html
 import base64
 import unicodedata
+import shutil
 from contextlib import nullcontext
 from pathlib import Path
 from datetime import date, datetime, timedelta
@@ -236,6 +237,10 @@ SOURCE_RESOLUTION_OPTIONS = (
 PONDEROSA_ECOWITT_LOCAL_EXCEL_PATHS = [
     APP_DIR / 'ECOWITT Ponderosa.xlsx'
 ]
+GREENHOUSE_ANALYSIS_LOCAL_EXCEL_PATHS = [
+    APP_DIR / 'Analisis invernaderos.xlsx',
+    Path.home() / 'OneDrive - Elite Flower' / 'Escritorio' / 'Analisis invernaderos.xlsx',
+]
 PONDEROSA_ECOWITT_REMOTE_EXCEL_URLS = [
     (
         "https://raw.githubusercontent.com/"
@@ -251,9 +256,11 @@ PONDEROSA_ECOWITT_DETAILS_DEFAULT = False
 PAR_TO_LUX_FACTOR = 54.0
 PONDEROSA_LIGHT_SENSOR_NAMES = ("WIGA", "MCI", "APOGEE")
 PONDEROSA_LIGHT_VIEW_NAME = "APOGEE MCI WIGA"
+PONDEROSA_BLOCK_INFO_VIEW_NAME = "Ficha tecnica"
 PONDEROSA_VIEW_GROUPS = {
     "Comparativas": ["WIGA con cortinas", "WIGA relacion ECOWITT", PONDEROSA_LIGHT_VIEW_NAME],
     "Análisis": ["Varianza", "Promedio"],
+    "Contexto tecnico": [PONDEROSA_BLOCK_INFO_VIEW_NAME],
     "Fuentes individuales": ["WIGA", "ECOWITT", "APOGEE", "Cortinas"],
 }
 MARLY_VIEW_GROUPS = {
@@ -264,6 +271,7 @@ MARLY_VIEW_GROUPS = {
 VIEW_DISPLAY_LABELS = {
     "WIGA relacion ECOWITT": "WIGA relación ECOWITT",
     PONDEROSA_LIGHT_VIEW_NAME: "APOGEE / MCI / WIGA",
+    PONDEROSA_BLOCK_INFO_VIEW_NAME: "Ficha técnica",
     "Comparativa": "WIGA relación ECOWITT",
     "Solo WIGA": "WIGA",
     "Solo ECOWITT": "ECOWITT",
@@ -1875,8 +1883,15 @@ def _read_local_file_bytes(path):
     try:
         return path.read_bytes()
     except OSError as error:
-        st.warning(f"No fue posible leer el respaldo local {path.name}: {error}")
-        return None
+        temp_copy_path = APP_DIR / f"_tmp_{path.name}"
+        try:
+            shutil.copy2(path, temp_copy_path)
+            file_bytes = temp_copy_path.read_bytes()
+            temp_copy_path.unlink(missing_ok=True)
+            return file_bytes
+        except OSError:
+            st.warning(f"No fue posible leer el respaldo local {path.name}: {error}")
+            return None
 
 
 def _read_first_local_file_bytes(paths):
@@ -8718,6 +8733,254 @@ def cargar_dashboard_completo(cache_version=DATA_CACHE_VERSION):
     return df_variables, df_cortinas
 
 
+def _find_excel_row_by_first_value(raw_df, expected_value, start_idx=0):
+    for row_idx in range(start_idx, len(raw_df)):
+        first_value = raw_df.iloc[row_idx, 0] if raw_df.shape[1] else None
+        if str(first_value).strip() == expected_value:
+            return row_idx
+    return None
+
+
+def _extract_excel_table(raw_df, header_row_idx):
+    if header_row_idx is None:
+        return pd.DataFrame()
+
+    headers = []
+    for col_idx, value in enumerate(raw_df.iloc[header_row_idx].tolist()):
+        text = str(value).strip() if pd.notna(value) else ""
+        headers.append(text if text else f"column_{col_idx}")
+
+    records = []
+    for row_idx in range(header_row_idx + 1, len(raw_df)):
+        row_values = raw_df.iloc[row_idx].tolist()
+        if pd.isna(pd.Series(row_values)).all():
+            break
+        first_value = row_values[0] if row_values else None
+        if str(first_value).strip() == "":
+            break
+        records.append(row_values)
+
+    if not records:
+        return pd.DataFrame(columns=headers)
+
+    table = pd.DataFrame(records, columns=headers)
+    keep_columns = [
+        column_name
+        for column_name in table.columns
+        if not (
+            str(column_name).startswith("column_")
+            and table[column_name].isna().all()
+        )
+    ]
+    return table[keep_columns].reset_index(drop=True)
+
+
+def _build_greenhouse_interpretation_table(raw_df, start_row_idx):
+    if start_row_idx is None:
+        return pd.DataFrame(columns=["Indicador", "Interpretacion"])
+
+    records = []
+    for row_idx in range(start_row_idx + 1, len(raw_df)):
+        row_values = raw_df.iloc[row_idx].tolist()
+        if pd.isna(pd.Series(row_values)).all():
+            continue
+        indicator = str(row_values[0]).strip() if row_values else ""
+        interpretation = str(row_values[1]).strip() if len(row_values) > 1 and pd.notna(row_values[1]) else ""
+        if not indicator:
+            continue
+        records.append({
+            "Indicador": indicator,
+            "Interpretacion": interpretation
+        })
+
+    return pd.DataFrame(records)
+
+
+def _format_analysis_block_table(df):
+    if df.empty:
+        return df
+
+    formatted = df.copy()
+    percent_columns = [
+        column_name
+        for column_name in formatted.columns
+        if "%" in str(column_name)
+    ]
+    for column_name in percent_columns:
+        formatted[column_name] = formatted[column_name].apply(
+            lambda value: f"{float(value):.1%}" if pd.notna(value) else "—"
+        )
+    return formatted
+
+
+def _format_single_block_detail_table(df):
+    if df.empty:
+        return pd.DataFrame(columns=["Campo", "Valor"])
+
+    row = df.iloc[0]
+    detail_rows = []
+    for column_name, value in row.items():
+        if pd.isna(value):
+            continue
+        detail_rows.append({
+            "Campo": column_name,
+            "Valor": value
+        })
+    return pd.DataFrame(detail_rows)
+
+
+@st.cache_data(show_spinner="Cargando analisis estructural de invernaderos...")
+def cargar_analisis_invernaderos(ruta_bytes, cache_version=DATA_CACHE_VERSION):
+    _ = cache_version
+    if not ruta_bytes:
+        return {
+            "general": pd.DataFrame(),
+            "areas": pd.DataFrame(),
+            "summary": pd.DataFrame(),
+            "interpretations": pd.DataFrame(),
+            "dictionary": pd.DataFrame(),
+        }
+
+    try:
+        workbook = pd.ExcelFile(io.BytesIO(ruta_bytes), engine="openpyxl")
+
+        raw_general = workbook.parse("Datos por Bloque", header=None)
+        raw_summary = workbook.parse("Indicadores Resumen", header=None)
+        raw_dictionary = workbook.parse("Diccionario de Variables", header=None)
+
+        general_header_idx = _find_excel_row_by_first_value(raw_general, "Bloque")
+        area_header_idx = _find_excel_row_by_first_value(raw_general, "Bloque", start_idx=(general_header_idx or 0) + 1)
+        summary_header_idx = _find_excel_row_by_first_value(raw_summary, "Bloque")
+        interpretation_start_idx = _find_excel_row_by_first_value(raw_summary, "INTERPRETACIÓN TÉCNICA")
+        dictionary_header_idx = _find_excel_row_by_first_value(raw_dictionary, "Variable / columna")
+
+        return {
+            "general": _extract_excel_table(raw_general, general_header_idx),
+            "areas": _extract_excel_table(raw_general, area_header_idx),
+            "summary": _extract_excel_table(raw_summary, summary_header_idx),
+            "interpretations": _build_greenhouse_interpretation_table(raw_summary, interpretation_start_idx),
+            "dictionary": _extract_excel_table(raw_dictionary, dictionary_header_idx),
+        }
+    except Exception as error:
+        st.error(f"No fue posible cargar el analisis de invernaderos. Detalle: {error}")
+        return {
+            "general": pd.DataFrame(),
+            "areas": pd.DataFrame(),
+            "summary": pd.DataFrame(),
+            "interpretations": pd.DataFrame(),
+            "dictionary": pd.DataFrame(),
+        }
+
+
+def _render_greenhouse_analysis_dashboard():
+    analysis_bytes = _read_first_local_file_bytes(GREENHOUSE_ANALYSIS_LOCAL_EXCEL_PATHS)
+    if analysis_bytes is None:
+        st.warning("No se encontro el archivo de analisis de invernaderos en las rutas configuradas.")
+        st.stop()
+
+    analysis_data = cargar_analisis_invernaderos(analysis_bytes)
+    general_df = analysis_data["general"]
+    areas_df = analysis_data["areas"]
+    summary_df = analysis_data["summary"]
+    interpretations_df = analysis_data["interpretations"]
+    dictionary_df = analysis_data["dictionary"]
+
+    available_blocks = []
+    for source_df in (summary_df, general_df, areas_df):
+        if "Bloque" in source_df.columns:
+            available_blocks.extend(source_df["Bloque"].dropna().astype(str).tolist())
+    available_blocks = list(dict.fromkeys(available_blocks))
+
+    if not available_blocks:
+        st.warning("El archivo de analisis no contiene bloques listos para mostrar.")
+        st.stop()
+
+    shared_block_code = st.session_state.get("bloque_compartido")
+    default_block_label = next(
+        (block_name for block_name in available_blocks if _extract_block_code(block_name) == shared_block_code),
+        available_blocks[0]
+    )
+    if st.session_state.get("greenhouse_analysis_block") not in available_blocks:
+        st.session_state["greenhouse_analysis_block"] = default_block_label
+
+    with st.sidebar.expander("Bloque tecnico", expanded=True):
+        _sidebar_field_label("location", "Bloque analizado")
+        selected_block_label = st.selectbox(
+            "Seleccionar bloque tecnico:",
+            options=available_blocks,
+            key="greenhouse_analysis_block",
+            help="Muestra la ficha estructural y de ventilacion calculada para el bloque seleccionado."
+        )
+
+    selected_block_code = _extract_block_code(selected_block_label)
+    if selected_block_code:
+        st.session_state["bloque_compartido"] = selected_block_code
+
+    selected_general_df = (
+        general_df[general_df["Bloque"].astype(str) == selected_block_label].reset_index(drop=True)
+        if "Bloque" in general_df.columns else pd.DataFrame()
+    )
+    selected_areas_df = (
+        areas_df[areas_df["Bloque"].astype(str) == selected_block_label].reset_index(drop=True)
+        if "Bloque" in areas_df.columns else pd.DataFrame()
+    )
+    selected_summary_df = (
+        summary_df[summary_df["Bloque"].astype(str) == selected_block_label].reset_index(drop=True)
+        if "Bloque" in summary_df.columns else pd.DataFrame()
+    )
+
+    st.markdown("## La Ponderosa - Ficha tecnica de bloques")
+    st.caption("Vista informativa para entender la geometria, la capacidad de ventilacion y el contexto tecnico de cada bloque antes de construir nuevas graficas.")
+
+    tab_block, tab_summary, tab_dictionary = st.tabs([
+        "Bloque seleccionado",
+        "Resumen comparativo",
+        "Diccionario",
+    ])
+
+    with tab_block:
+        if not selected_summary_df.empty:
+            summary_row = selected_summary_df.iloc[0]
+            metric_cols = st.columns(4)
+            metric_cols[0].metric("Total teórica (m²)", _format_summary_number(summary_row.get("Total Teórica (m²)"), 2))
+            metric_cols[1].metric("Total máx. permitida (m²)", _format_summary_number(summary_row.get("Total Máx. Perm. (m²)"), 2))
+            metric_cols[2].metric("Total real (m²)", _format_summary_number(summary_row.get("Total Real (m²)"), 2))
+            metric_cols[3].metric("Brecha máx-real (m²)", _format_summary_number(summary_row.get("Brecha Máx-Real (m²)"), 2))
+
+            ratio_cols = st.columns(2)
+            ratio_cols[0].metric(
+                "% real / teórica",
+                f"{float(summary_row.get('% Real / Teórica')):.1%}" if pd.notna(summary_row.get('% Real / Teórica')) else "—"
+            )
+            ratio_cols[1].metric(
+                "% real / máx. perm.",
+                f"{float(summary_row.get('% Real / Máx. Perm.')):.1%}" if pd.notna(summary_row.get('% Real / Máx. Perm.')) else "—"
+            )
+
+        detail_left, detail_right = st.columns(2)
+        with detail_left:
+            st.markdown("### Datos generales y aperturas lineales")
+            _dataframe(_format_single_block_detail_table(selected_general_df), hide_index=True)
+        with detail_right:
+            st.markdown("### Areas de ventilacion calculadas")
+            _dataframe(_format_single_block_detail_table(selected_areas_df), hide_index=True)
+
+    with tab_summary:
+        st.markdown("### Tabla comparativa por bloque")
+        _dataframe(_format_analysis_block_table(summary_df), hide_index=True)
+
+        if not interpretations_df.empty:
+            st.markdown("### Lectura tecnica del archivo")
+            for _, interpretation_row in interpretations_df.iterrows():
+                indicator = interpretation_row.get("Indicador", "")
+                interpretation = interpretation_row.get("Interpretacion", "")
+                st.markdown(f"**{indicator}**  \n{interpretation}")
+
+    with tab_dictionary:
+        st.markdown("### Diccionario de variables")
+        _dataframe(dictionary_df, hide_index=True)
+
+
 def _render_correlacion(
     df_variables,
     datos_cortinas_sel,
@@ -10387,6 +10650,10 @@ if selected_finca == 'Marly':
         "Cargando gráficas de Marly..."
     ):
         _render_marley_dashboard(dashboard_mode)
+    st.stop()
+
+if dashboard_mode == PONDEROSA_BLOCK_INFO_VIEW_NAME:
+    _render_greenhouse_analysis_dashboard()
     st.stop()
 
 _df_variables_all, _df_cortinas_all = cargar_dashboard_completo()
