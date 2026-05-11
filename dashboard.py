@@ -5288,10 +5288,10 @@ def _render_marley_dashboard(dashboard_mode):
             selected_range = (fecha_unica, fecha_unica)
             marley_navigation_state_key = "marley_fecha_unica"
         else:
-            if dashboard_mode == "Varianza":
+            if dashboard_mode in ("Varianza", "Desviacion estandar"):
                 modo_fechas = "Varios días"
                 st.session_state["marley_modo_fechas"] = modo_fechas
-                st.caption(f"{metric_name} se calcula automáticamente con varios días.")
+                st.caption(f"{dashboard_mode} se calcula automáticamente con varios días.")
             else:
                 modo_fechas = st.radio(
                     "Modo de fechas:",
@@ -5398,9 +5398,20 @@ def _render_marley_dashboard(dashboard_mode):
             source_resolution,
         )
 
-        tab_general, tab_detail, tab_records = st.tabs(["Vista general", "Detalle individual", "Registros"])
+        tab_general, tab_stats, tab_detail, tab_records = st.tabs(["Gráfica", "Resumen estadístico", "Detalle individual", "Registros"])
         with tab_general:
             _plotly_chart(combined_chart)
+
+        with tab_stats:
+            stats_table = _build_variable_distribution_table(graphed_frame, list(MARLEY_VARIABLES.keys()))
+            _render_variable_distribution_cards(
+                stats_table,
+                MARLEY_VARIABLES,
+                title=f"Resumen estadístico {source_name} - Marly"
+            )
+            if not stats_table.empty:
+                with st.expander("Ver resumen estadístico en tabla", expanded=False):
+                    _dataframe(stats_table.round(2), hide_index=True)
 
         with tab_detail:
             _render_marley_individual_variable_charts(
@@ -7270,6 +7281,65 @@ def _render_ponderosa_wiga_values_dashboard(df_variables_all, df_cortinas_all, s
         st.warning("No hay datos suficientes para graficar las variables WIGA.")
         st.stop()
 
+    tab_chart, tab_stats, tab_detail, tab_records = st.tabs(["Gráfica", "Resumen estadístico", "Detalle individual", "Registros"])
+    with tab_chart:
+        _render_correlacion(
+            correlation_df,
+            pd.DataFrame(),
+            selected_range,
+            variables_seleccionadas=wiga_variables,
+            block_label=block_label,
+            chart_title='Variables WIGA - La Ponderosa',
+            explanation_title='Variables WIGA',
+            explanation_text=f'Esta gráfica reúne las cuatro variables WIGA del bloque seleccionado sobre la misma línea de tiempo. Cada color conserva su propia escala a la derecha para comparar comportamiento sin separar la lectura. {PPFD_HELP_TEXT}'
+        )
+
+    with tab_stats:
+        stats_table = _build_variable_distribution_table(correlation_df, wiga_variables)
+        _render_variable_distribution_cards(
+            stats_table,
+            PONDEROSA_WIGA_VARIABLES,
+            title=f"Resumen estadístico WIGA - {block_label}"
+        )
+        if not stats_table.empty:
+            with st.expander("Ver resumen estadístico en tabla", expanded=False):
+                _dataframe(stats_table.round(2), hide_index=True)
+
+    with tab_detail:
+        if st.checkbox(
+            "Cargar detalle individual WIGA",
+            key="mostrar_ponderosa_wiga_only_detalle",
+            help=FILTER_HELP_TEXTS['graficas_detalladas']
+        ):
+            _render_ponderosa_source_individual_charts(
+                filtered_df,
+                selected_range,
+                wiga_variables,
+                ("WIGA",),
+                "Variables individuales WIGA Ponderosa",
+                "Cada gráfica muestra una variable WIGA de Datos_Variables con su propia escala.",
+                wiga_resolution
+            )
+
+    with tab_records:
+        _render_graphed_series_table(
+            correlation_df,
+            wiga_variables,
+            PONDEROSA_WIGA_VARIABLES,
+            "Tabla de datos graficados - WIGA",
+            wiga_resolution,
+            source_label=f"WIGA {block_label}",
+            expanded=True,
+        )
+        if st.checkbox(
+            "Cargar registros WIGA Ponderosa",
+            key="mostrar_ponderosa_wiga_only_registros",
+            help=FILTER_HELP_TEXTS['registros']
+        ):
+            _dataframe(filtered_df.drop(columns=['Fecha_Filtro'], errors='ignore'), hide_index=True)
+
+    st.stop()
+
     _render_correlacion(
         correlation_df,
         pd.DataFrame(),
@@ -7468,6 +7538,44 @@ def _render_ponderosa_cortinas_dashboard(df_cortinas_all, selected_finca):
 
     st.markdown(f"## La Ponderosa - Solo bloques | {block_label}")
     st.caption("Vista dedicada al comportamiento de frentes y puertas registrado en Registro_Cortinas.")
+    tab_chart, tab_summary, tab_records = st.tabs(["Gráfica", "Resumen operativo", "Registros"])
+    with tab_chart:
+        if not selected_motors:
+            st.warning("Selecciona al menos una cortina para graficar.")
+        else:
+            chart = _build_cortinas_only_chart(filtered_df, selected_range, selected_motors, block_label=block_label)
+            if chart is None:
+                st.warning("No hay información de apertura para las cortinas seleccionadas.")
+            else:
+                _plotly_chart(chart)
+                _render_chart_explanation(
+                    "Comportamiento de cortinas",
+                    "Las cortinas cerradas se muestran en 0% como en el registro original. El eje de tiempo se resume por horas para leer mejor el día completo; pasa el cursor por cada punto para ver inicio de apertura, duración y cierre cuando esa información exista en el registro.",
+                    accent=BRAND_COLORS['hero']
+                )
+
+    with tab_summary:
+        _render_info_panels(
+            block_label,
+            block_modification,
+            culatas_observation,
+            daily_annotations,
+            rango_multiple,
+            annotations_by_day=annotations_by_day,
+            culatas_by_day=culatas_by_day
+        )
+        _render_cortina_operation_summary(filtered_df, selected_motors)
+
+    with tab_records:
+        if st.checkbox(
+            "Cargar registros completos de cortinas",
+            key="mostrar_ponderosa_cortinas_registros",
+            help=FILTER_HELP_TEXTS['registros']
+        ):
+            _dataframe(filtered_df, hide_index=True)
+
+    st.stop()
+
     if not selected_motors:
         st.warning("Selecciona al menos una cortina para graficar.")
     else:
@@ -7644,6 +7752,57 @@ def _render_ponderosa_ecowitt_values_dashboard():
     if correlation_df.empty:
         st.warning("No hay datos suficientes para graficar las variables de ECOWITT Ponderosa.")
         st.stop()
+
+    tab_chart, tab_stats, tab_detail, tab_records = st.tabs(["Gráfica", "Resumen estadístico", "Detalle individual", "Registros"])
+    with tab_chart:
+        _render_correlacion(
+            correlation_df,
+            pd.DataFrame(),
+            selected_range,
+            variables_seleccionadas=ecowitt_variables,
+            block_label=f"ECOWITT Bloque {PONDEROSA_ECOWITT_BLOCK_CODE}",
+            chart_title='Variables ECOWITT - La Ponderosa',
+            explanation_title='Variables ECOWITT',
+            explanation_text=f'Esta gráfica reúne temperatura, humedad y PPFD (PAR, µmol m-2 s-1) de ECOWITT/MCI sobre la misma línea de tiempo. La luminosidad LUX pertenece a APOGEE y se consulta en su propia vista. {PPFD_HELP_TEXT}'
+        )
+
+    with tab_stats:
+        stats_table = _build_variable_distribution_table(correlation_df, ecowitt_variables)
+        _render_variable_distribution_cards(
+            stats_table,
+            PONDEROSA_ECOWITT_VARIABLES,
+            title=f"Resumen estadístico ECOWITT - Bloque {PONDEROSA_ECOWITT_BLOCK_CODE}"
+        )
+        if not stats_table.empty:
+            with st.expander("Ver resumen estadístico en tabla", expanded=False):
+                _dataframe(stats_table.round(2), hide_index=True)
+
+    with tab_detail:
+        if st.checkbox(
+            "Cargar detalle individual ECOWITT",
+            key="mostrar_ponderosa_ecowitt_only_detalle",
+            help=FILTER_HELP_TEXTS['graficas_detalladas']
+        ):
+            _render_ponderosa_ecowitt_individual_charts(filtered_df, selected_range, ecowitt_resolution)
+
+    with tab_records:
+        _render_graphed_series_table(
+            correlation_df,
+            ecowitt_variables,
+            PONDEROSA_ECOWITT_VARIABLES,
+            "Tabla de datos graficados - ECOWITT",
+            ecowitt_resolution,
+            source_label=f"ECOWITT Bloque {PONDEROSA_ECOWITT_BLOCK_CODE}",
+            expanded=True,
+        )
+        if st.checkbox(
+            "Cargar registros ECOWITT Ponderosa",
+            key="mostrar_ponderosa_ecowitt_only_registros",
+            help=FILTER_HELP_TEXTS['registros']
+        ):
+            _dataframe(filtered_df.drop(columns=['Fecha_Filtro'], errors='ignore'), hide_index=True)
+
+    st.stop()
 
     _render_correlacion(
         correlation_df,
@@ -7822,6 +7981,57 @@ def _render_ponderosa_apogee_values_dashboard():
     if correlation_df.empty:
         st.warning("No hay datos suficientes para graficar la luminosidad de APOGEE.")
         st.stop()
+
+    tab_chart, tab_stats, tab_detail, tab_records = st.tabs(["Gráfica", "Resumen estadístico", "Detalle individual", "Registros"])
+    with tab_chart:
+        _render_correlacion(
+            correlation_df,
+            pd.DataFrame(),
+            selected_range,
+            variables_seleccionadas=apogee_variables,
+            block_label="APOGEE",
+            chart_title='Luminosidad APOGEE - La Ponderosa',
+            explanation_title='Luminosidad APOGEE',
+            explanation_text='Esta gráfica muestra únicamente la luminosidad LUX medida por APOGEE. Esta serie no pertenece a ECOWITT/MCI; solo comparte el archivo de origen.'
+        )
+
+    with tab_stats:
+        stats_table = _build_variable_distribution_table(correlation_df, apogee_variables)
+        _render_variable_distribution_cards(
+            stats_table,
+            PONDEROSA_APOGEE_VARIABLES,
+            title="Resumen estadístico APOGEE"
+        )
+        if not stats_table.empty:
+            with st.expander("Ver resumen estadístico en tabla", expanded=False):
+                _dataframe(stats_table.round(2), hide_index=True)
+
+    with tab_detail:
+        if st.checkbox(
+            "Cargar detalle individual APOGEE",
+            key="mostrar_ponderosa_apogee_detalle",
+            help=FILTER_HELP_TEXTS['graficas_detalladas']
+        ):
+            _render_ponderosa_apogee_individual_charts(filtered_df, selected_range, apogee_resolution)
+
+    with tab_records:
+        _render_graphed_series_table(
+            correlation_df,
+            apogee_variables,
+            PONDEROSA_APOGEE_VARIABLES,
+            "Tabla de datos graficados - APOGEE",
+            apogee_resolution,
+            source_label="APOGEE",
+            expanded=True,
+        )
+        if st.checkbox(
+            "Cargar registros APOGEE Ponderosa",
+            key="mostrar_ponderosa_apogee_registros",
+            help=FILTER_HELP_TEXTS['registros']
+        ):
+            _dataframe(filtered_df.drop(columns=['Fecha_Filtro'], errors='ignore'), hide_index=True)
+
+    st.stop()
 
     _render_correlacion(
         correlation_df,
@@ -8030,6 +8240,73 @@ def _render_ponderosa_apogee_mci_wiga_dashboard(df_variables_all, df_cortinas_al
         help="Promedio agrupa todos los sensores cada 30 minutos; punto por punto usa WIGA como ancla cruda y toma el registro más cercano de MCI/APOGEE; WIGA 30 min toma WIGA por media hora y busca los registros cercanos de MCI/APOGEE."
     )
     comparisons = {}
+    for variable in PONDEROSA_LIGHT_VARIABLES:
+        comparison = _build_ponderosa_light_comparison(filtered_df, variable, selected_range, comparison_resolution)
+        comparison = comparison.dropna(how='all', subset=list(PONDEROSA_LIGHT_SENSOR_NAMES)) if not comparison.empty else comparison
+        comparisons[variable] = comparison
+
+    tab_compare, tab_table, tab_detail, tab_records = st.tabs(["Gráfica", "Tabla y resumen", "Detalle individual", "Registros"])
+    with tab_compare:
+        for variable, comparison in comparisons.items():
+            chart = _make_ponderosa_light_comparison_chart(comparison, variable, selected_range, comparison_resolution)
+            if chart is None:
+                st.info(f"No hay suficientes datos para graficar {PONDEROSA_LIGHT_VARIABLES[variable]['title'].lower()}.")
+                continue
+            _plotly_chart(chart)
+            difference_chart = _make_ponderosa_light_difference_chart(
+                comparison,
+                variable,
+                selected_range,
+                comparison_resolution
+            )
+            if difference_chart is not None:
+                _render_chart_explanation(
+                    f'Diferencia de {PONDEROSA_LIGHT_VARIABLES[variable]["title"].replace("Comparativa de ", "")}',
+                    'Esta gráfica no muestra el valor absoluto, sino cuánto se separan MCI y APOGEE respecto a WIGA. La línea cero significa que el sensor está igual a WIGA; arriba mide más alto y abajo mide más bajo.',
+                    accent=PONDEROSA_LIGHT_VARIABLES[variable]['accent']
+                )
+                _plotly_chart(difference_chart)
+
+    with tab_table:
+        table_mode = (
+            "Promedio de cada sensor en bloques de 30 minutos"
+            if comparison_resolution == COMPARISON_RESOLUTION_OPTIONS[0] else
+            "WIGA crudo con MCI/APOGEE más cercanos"
+            if comparison_resolution == COMPARISON_RESOLUTION_OPTIONS[1] else
+            "WIGA 30 min con MCI/APOGEE más cercanos"
+        )
+        table = _build_ponderosa_light_comparison_table(filtered_df, selected_range, comparison_resolution)
+        if table.empty:
+            st.info("No hay datos suficientes para construir la tabla comparativa.")
+        else:
+            st.caption(f"Tabla calculada con: {table_mode}. Las diferencias se leen como sensor comparado menos WIGA o APOGEE menos MCI.")
+            _render_comparison_table_summary(table, title="Resumen ejecutivo APOGEE / MCI / WIGA")
+            _render_variable_split_tables(
+                table,
+                default_expanded=True,
+                download_label="Descargar reporte APOGEE / MCI / WIGA",
+                download_file_name=f"reporte_apogee_mci_wiga_{_build_normalized_text_key(comparison_resolution).replace(' ', '_')}.xlsx",
+                download_key="descargar_ponderosa_light_reporte"
+            )
+
+    with tab_detail:
+        if st.checkbox(
+            "Mostrar gráficas individuales APOGEE / MCI / WIGA",
+            key="mostrar_ponderosa_light_detalles",
+            help="Activa esta sección para ver cada variable por separado debajo de la comparativa principal."
+        ):
+            _render_ponderosa_light_individual_charts(comparisons, selected_range, comparison_resolution)
+
+    with tab_records:
+        if st.checkbox(
+            "Cargar registros base APOGEE / MCI / WIGA",
+            key="mostrar_ponderosa_light_registros",
+            help=FILTER_HELP_TEXTS['registros']
+        ):
+            _dataframe(filtered_df.drop(columns=['Fecha_Filtro'], errors='ignore'), hide_index=True)
+
+    st.stop()
+
     for variable in PONDEROSA_LIGHT_VARIABLES:
         comparison = _build_ponderosa_light_comparison(filtered_df, variable, selected_range, comparison_resolution)
         comparison = comparison.dropna(how='all', subset=list(PONDEROSA_LIGHT_SENSOR_NAMES)) if not comparison.empty else comparison
@@ -8418,6 +8695,111 @@ def _render_ponderosa_ecowitt_dashboard(df_variables_all, df_cortinas_all, selec
     point_mode = comparison_resolution == COMPARISON_RESOLUTION_OPTIONS[1]
     nearest_wiga_mode = comparison_resolution == COMPARISON_RESOLUTION_OPTIONS[2]
     compared_variables = list(PONDEROSA_COMPARISON_VARIABLES.keys())
+    tab_compare, tab_stats, tab_tables, tab_detail = st.tabs(["Gráfica", "Resumen estadístico", "Tabla", "Detalle y registros"])
+
+    with tab_compare:
+        for variable_name in compared_variables:
+            comparison = (
+                _build_point_comparison(filtered_df, variable_name, PONDEROSA_SENSOR_NAMES)
+                if point_mode else
+                _build_wiga_anchor_nearest_comparison(
+                    filtered_df,
+                    variable_name,
+                    PONDEROSA_SENSOR_NAMES,
+                    selected_range,
+                    _build_ponderosa_hourly_series
+                )
+                if nearest_wiga_mode else
+                _build_ponderosa_hourly_comparison(filtered_df, variable_name, selected_range)
+            )
+            if comparison.empty or comparison.dropna(how='all', subset=list(PONDEROSA_SENSOR_NAMES)).empty:
+                st.info(f"No hay datos suficientes para graficar {_format_variable_display_title(PONDEROSA_COMPARISON_VARIABLES[variable_name]['title'])}.")
+                continue
+            _plotly_chart(_make_ponderosa_comparison_chart(comparison, variable_name, selected_range, comparison_resolution))
+            difference_chart = _make_ponderosa_difference_chart(comparison, variable_name, selected_range, comparison_resolution)
+            if difference_chart is not None:
+                _plotly_chart(difference_chart)
+
+    with tab_stats:
+        selected_variable_stats = st.segmented_control(
+            "Variable para resumen:",
+            options=compared_variables,
+            format_func=lambda value: _format_variable_display_title(PONDEROSA_COMPARISON_VARIABLES[value]['title']),
+            key="ponderosa_ecowitt_stats_variable",
+            width="stretch"
+        )
+        comparison_stats = (
+            _build_point_comparison(filtered_df, selected_variable_stats, PONDEROSA_SENSOR_NAMES)
+            if point_mode else
+            _build_wiga_anchor_nearest_comparison(
+                filtered_df,
+                selected_variable_stats,
+                PONDEROSA_SENSOR_NAMES,
+                selected_range,
+                _build_ponderosa_hourly_series
+            )
+            if nearest_wiga_mode else
+            _build_ponderosa_hourly_comparison(filtered_df, selected_variable_stats, selected_range)
+        )
+        overlap = comparison_stats.dropna(subset=list(PONDEROSA_SENSOR_NAMES)).copy()
+        _render_ponderosa_comparison_metric_cards(overlap, selected_variable_stats)
+        scatter_chart = _make_ponderosa_scatter_chart(comparison_stats, selected_variable_stats)
+        if scatter_chart is not None:
+            _render_chart_explanation(
+                'Dispersión entre sensores',
+                'Cada punto cruza una lectura simultánea de WIGA y ECOWITT. Mientras más cerca esté de la línea diagonal, más parecidos fueron ambos sensores.',
+                accent=PONDEROSA_COMPARISON_VARIABLES[selected_variable_stats]['colors']['WIGA']
+            )
+            _plotly_chart(scatter_chart)
+
+    with tab_tables:
+        _render_difference_table_30min(
+            filtered_df,
+            compared_variables,
+            PONDEROSA_SENSOR_NAMES,
+            selected_range,
+            comparison_resolution,
+            _build_ponderosa_hourly_comparison,
+            _build_ponderosa_hourly_series,
+            PONDEROSA_COMPARISON_VARIABLES,
+            "mostrar_ponderosa_tabla_diferencias_30min"
+        )
+
+    with tab_detail:
+        if st.checkbox(
+            "Mostrar gráficas individuales WIGA / ECOWITT",
+            key="mostrar_ponderosa_ecowitt_detalles",
+            help="Activa esta sección para ver cada variable por separado debajo de la comparativa principal."
+        ):
+            _render_ponderosa_source_individual_charts(
+                filtered_df,
+                selected_range,
+                compared_variables,
+                PONDEROSA_SENSOR_NAMES,
+                "Variables individuales WIGA / ECOWITT Ponderosa",
+                "Estas gráficas separan cada variable compartida por sensor para revisar la forma de cada lectura sin la superposición de la comparativa.",
+                comparison_resolution
+            )
+
+        if st.checkbox(
+            "Cargar registros consolidados de Ponderosa",
+            key="mostrar_ponderosa_ecowitt_registros",
+            help=FILTER_HELP_TEXTS['registros']
+        ):
+            _dataframe(filtered_df.drop(columns=['Fecha_Filtro'], errors='ignore'), hide_index=True)
+            summary_rows = []
+            for source_name, source_df in source_frames.items():
+                current = source_df[source_df['Fecha_Filtro'].between(*selected_range)] if not source_df.empty else pd.DataFrame()
+                summary_rows.append({
+                    'Equipo': source_name,
+                    'Registros': len(current),
+                    'Inicio': current['FechaHora'].min().strftime('%Y-%m-%d %H:%M') if not current.empty else '-',
+                    'Fin': current['FechaHora'].max().strftime('%Y-%m-%d %H:%M') if not current.empty else '-',
+                })
+            _dataframe(pd.DataFrame(summary_rows), hide_index=True)
+
+    st.stop()
+
     for variable_name in compared_variables:
         comparison = (
             _build_point_comparison(filtered_df, variable_name, PONDEROSA_SENSOR_NAMES)
@@ -11917,6 +12299,121 @@ def _render_analysis_distribution_cards(
     st.markdown(cards_markup, unsafe_allow_html=True)
 
 
+def _build_variable_distribution_table(df_source, variables):
+    if not isinstance(df_source, pd.DataFrame) or df_source.empty:
+        return pd.DataFrame()
+
+    records = []
+    for variable_name in variables:
+        if variable_name not in df_source.columns:
+            continue
+
+        series = pd.to_numeric(df_source[variable_name], errors='coerce').dropna()
+        if series.empty:
+            records.append({
+                'Variable': variable_name,
+                'Registros': 0,
+                'Promedio': None,
+                'Mediana': None,
+                'Minimo': None,
+                'Maximo': None,
+                'Rango': None,
+                'Desviacion estandar': None,
+                'Varianza': None,
+                'Coef. variacion (%)': None,
+            })
+            continue
+
+        mean_value = series.mean()
+        std_value = series.std(ddof=1) if len(series) > 1 else 0.0
+        var_value = series.var(ddof=1) if len(series) > 1 else 0.0
+        min_value = series.min()
+        max_value = series.max()
+        cv_value = (std_value / mean_value * 100) if mean_value not in (0, None) and not pd.isna(mean_value) else None
+
+        records.append({
+            'Variable': variable_name,
+            'Registros': int(series.count()),
+            'Promedio': mean_value,
+            'Mediana': series.median(),
+            'Minimo': min_value,
+            'Maximo': max_value,
+            'Rango': max_value - min_value,
+            'Desviacion estandar': std_value,
+            'Varianza': var_value,
+            'Coef. variacion (%)': cv_value,
+        })
+
+    return pd.DataFrame(records)
+
+
+def _render_variable_distribution_cards(stats_df, variable_configs=None, title='Resumen estadístico'):
+    if stats_df.empty or 'Variable' not in stats_df.columns:
+        st.info("No hay datos suficientes para construir el resumen estadístico.")
+        return
+
+    variable_configs = variable_configs or {}
+    st.markdown(
+        f'<p class="analysis-note"><strong>{html.escape(title)}</strong></p>',
+        unsafe_allow_html=True
+    )
+
+    cards_html = []
+    for _, row in stats_df.iterrows():
+        variable_name = row.get('Variable', 'Variable')
+        config = variable_configs.get(variable_name, {})
+        display_name = _format_variable_display_title(config.get('title', variable_name))
+        unit_text = _format_analysis_unit_text(config.get('unit', VARIABLE_UNITS.get(variable_name, '')))
+        accent = config.get('accent', VARIABLE_COLORS.get(variable_name, BRAND_COLORS['hero']))
+
+        promedio = _format_metric_card_value(row.get('Promedio'), decimals=2)
+        mediana = _format_metric_card_value(row.get('Mediana'), decimals=2)
+        minimo = _format_metric_card_value(row.get('Minimo'), decimals=2)
+        maximo = _format_metric_card_value(row.get('Maximo'), decimals=2)
+        rango = _format_metric_card_value(row.get('Rango'), decimals=2)
+        desviacion = _format_metric_card_value(row.get('Desviacion estandar'), decimals=2)
+        varianza = _format_metric_card_value(row.get('Varianza'), decimals=2)
+        registros = _format_metric_card_value(row.get('Registros'), decimals=0)
+        cv_value = row.get('Coef. variacion (%)')
+        cv_text = _format_metric_card_value(cv_value, decimals=1) if pd.notna(cv_value) else "Sin dato"
+        cv_display = f"{cv_text}%" if cv_text != "Sin dato" else cv_text
+
+        cards_html.append(
+            '<div class="analysis-stat-card" style="--analysis-accent: {accent};">'
+            '<p class="analysis-stat-label">{display_name}</p>'
+            '<div class="analysis-stat-main">'
+            '<span class="analysis-stat-main-value">{promedio}</span>'
+            '<span class="analysis-stat-unit">{unit}</span>'
+            '</div>'
+            '<p class="analysis-stat-subtitle">Promedio del periodo. Mediana: <strong>{mediana}</strong>.</p>'
+            '<div class="analysis-stat-mini-grid">'
+            '<div class="analysis-stat-mini"><span>Mínimo</span><strong>{minimo}</strong></div>'
+            '<div class="analysis-stat-mini"><span>Máximo</span><strong>{maximo}</strong></div>'
+            '<div class="analysis-stat-mini"><span>Rango</span><strong>{rango}</strong></div>'
+            '<div class="analysis-stat-mini"><span>Desv. est.</span><strong>{desviacion}</strong></div>'
+            '<div class="analysis-stat-mini"><span>Varianza</span><strong>{varianza}</strong></div>'
+            '<div class="analysis-stat-mini"><span>Registros</span><strong>{registros}</strong></div>'
+            '<div class="analysis-stat-mini"><span>Coef. var.</span><strong>{cv}</strong></div>'
+            '</div>'
+            '</div>'.format(
+                accent=html.escape(str(accent)),
+                display_name=html.escape(display_name),
+                promedio=promedio,
+                unit=html.escape(unit_text),
+                mediana=mediana,
+                minimo=minimo,
+                maximo=maximo,
+                rango=rango,
+                desviacion=desviacion,
+                varianza=varianza,
+                registros=registros,
+                cv=cv_display,
+            )
+        )
+
+    st.markdown('<div class="analysis-stat-grid">' + ''.join(cards_html) + '</div>', unsafe_allow_html=True)
+
+
 def _render_analysis_metric_cards_row(metrics_data, tab_label, single_day_analysis, heading=None, variable_options=None):
     if not metrics_data:
         return
@@ -13335,6 +13832,89 @@ with tab_correlacion:
             st.warning("No se encontraron variables con datos para graficar en el rango seleccionado.")
         elif datos_cortinas_sel.empty:
             st.info("No hay información de motores para este periodo. Se mostrarán las variables ambientales disponibles.")
+
+        tab_chart, tab_summary, tab_detail, tab_records = st.tabs(["Gráfica", "Resumen", "Detalle", "Registros"])
+        with tab_chart:
+            if not df_variables_corr.empty and available_correlacion_vars:
+                if not selected_vars:
+                    st.warning('Selecciona al menos una variable para mostrar la correlación.')
+                else:
+                    with _loading_context(
+                        st.session_state.get("modo_fechas_compartidas") == "Varios días",
+                        "Cargando gráficas de correlación..."
+                    ):
+                        _render_correlacion(
+                            df_variables_corr,
+                            datos_cortinas_sel,
+                            fecha_variables,
+                            selected_vars,
+                            block_label=block_label,
+                            show_ideal_aperturas=st.session_state.get('mostrar_aperturas_ideales', False),
+                            df_variables_almacen=df_variables_almacen_corr,
+                            compare_with_almacen=st.session_state.get('comparar_con_almacen', False)
+                        )
+
+        with tab_summary:
+            if (
+                block_label or
+                block_modification or
+                culatas_observation or
+                daily_annotations or
+                culatas_by_day or
+                annotations_by_day
+            ):
+                _render_info_panels(
+                    block_label,
+                    block_modification,
+                    culatas_observation,
+                    daily_annotations,
+                    rango_multiple,
+                    annotations_by_day=annotations_by_day,
+                    culatas_by_day=culatas_by_day
+                )
+            _render_summary_cards_selector(
+                df_variables_corr,
+                fecha_variables,
+                df_reference=summary_reference_df,
+                reference_label='Estación externa',
+                base_label=block_label
+            )
+
+        with tab_detail:
+            if st.session_state.get("mostrar_graficas_detalladas", DETAIL_CHARTS_DEFAULT):
+                _render_temperature_focus_chart(
+                    df_variables_corr,
+                    fecha_variables,
+                    block_label=block_label,
+                    df_external=df_variables_almacen_corr,
+                    datos_cortinas_sel=datos_cortinas_sel
+                )
+            else:
+                st.info("Activa 'Gráficas detalladas' en la barra lateral para cargar esta lectura.")
+
+        with tab_records:
+            record_content_options = ["Ocultar registros", "Sensores", "Cortinas"]
+            if st.session_state.get("vista_registros_correlacion") not in record_content_options:
+                st.session_state["vista_registros_correlacion"] = record_content_options[0]
+            selected_record_content = st.segmented_control(
+                "Registros",
+                options=record_content_options,
+                key="vista_registros_correlacion",
+                help=FILTER_HELP_TEXTS['registros'],
+                width="stretch"
+            )
+            if selected_record_content == "Sensores":
+                if datos_sensores_corr.empty:
+                    st.info("No hay registros de sensores para los filtros seleccionados.")
+                else:
+                    _dataframe(datos_sensores_corr)
+            elif selected_record_content == "Cortinas":
+                if datos_cortinas_sel.empty:
+                    st.info("No hay registros de cortinas para los filtros seleccionados.")
+                else:
+                    _dataframe(datos_cortinas_sel)
+
+        st.stop()
 
         if not df_variables_corr.empty and available_correlacion_vars:
             if not selected_vars:
