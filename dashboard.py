@@ -11880,28 +11880,41 @@ def _render_analysis_distribution_cards(
         cv_text = _format_metric_card_value(cv_value, decimals=1) if pd.notna(cv_value) else "Sin dato"
 
         cards_html.append(
-            f"""
-            <div class="analysis-stat-card" style="--analysis-accent: {accent};">
-                <p class="analysis-stat-label">{html.escape(group_name)}</p>
-                <div class="analysis-stat-main">
-                    <span class="analysis-stat-main-value">{promedio}</span>
-                    <span class="analysis-stat-unit">{html.escape(unit_text)}</span>
-                </div>
-                <p class="analysis-stat-subtitle">Promedio de {html.escape(variable_name)}. Mediana: <strong>{mediana}</strong>.</p>
-                <div class="analysis-stat-mini-grid">
-                    <div class="analysis-stat-mini"><span>Minimo</span><strong>{minimo}</strong></div>
-                    <div class="analysis-stat-mini"><span>Maximo</span><strong>{maximo}</strong></div>
-                    <div class="analysis-stat-mini"><span>Rango</span><strong>{rango}</strong></div>
-                    <div class="analysis-stat-mini"><span>Desv. est.</span><strong>{desviacion}</strong></div>
-                    <div class="analysis-stat-mini"><span>Varianza</span><strong>{varianza}</strong></div>
-                    <div class="analysis-stat-mini"><span>Registros</span><strong>{registros}</strong></div>
-                    <div class="analysis-stat-mini"><span>Coef. var.</span><strong>{cv_text}%</strong></div>
-                </div>
-            </div>
-            """
+            '<div class="analysis-stat-card" style="--analysis-accent: {accent};">'
+            '<p class="analysis-stat-label">{group_name}</p>'
+            '<div class="analysis-stat-main">'
+            '<span class="analysis-stat-main-value">{promedio}</span>'
+            '<span class="analysis-stat-unit">{unit}</span>'
+            '</div>'
+            '<p class="analysis-stat-subtitle">Promedio de {variable}. Mediana: <strong>{mediana}</strong>.</p>'
+            '<div class="analysis-stat-mini-grid">'
+            '<div class="analysis-stat-mini"><span>Minimo</span><strong>{minimo}</strong></div>'
+            '<div class="analysis-stat-mini"><span>Maximo</span><strong>{maximo}</strong></div>'
+            '<div class="analysis-stat-mini"><span>Rango</span><strong>{rango}</strong></div>'
+            '<div class="analysis-stat-mini"><span>Desv. est.</span><strong>{desviacion}</strong></div>'
+            '<div class="analysis-stat-mini"><span>Varianza</span><strong>{varianza}</strong></div>'
+            '<div class="analysis-stat-mini"><span>Registros</span><strong>{registros}</strong></div>'
+            '<div class="analysis-stat-mini"><span>Coef. var.</span><strong>{cv}%</strong></div>'
+            '</div>'
+            '</div>'.format(
+                accent=html.escape(str(accent)),
+                group_name=html.escape(group_name),
+                promedio=promedio,
+                unit=html.escape(unit_text),
+                variable=html.escape(variable_name),
+                mediana=mediana,
+                minimo=minimo,
+                maximo=maximo,
+                rango=rango,
+                desviacion=desviacion,
+                varianza=varianza,
+                registros=registros,
+                cv=cv_text,
+            )
         )
 
-    st.markdown(f'<div class="analysis-stat-grid">{"".join(cards_html)}</div>', unsafe_allow_html=True)
+    cards_markup = '<div class="analysis-stat-grid">' + ''.join(cards_html) + '</div>'
+    st.markdown(cards_markup, unsafe_allow_html=True)
 
 
 def _render_analysis_metric_cards_row(metrics_data, tab_label, single_day_analysis, heading=None, variable_options=None):
