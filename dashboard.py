@@ -273,6 +273,7 @@ VIEW_DISPLAY_LABELS = {
     PONDEROSA_LIGHT_VIEW_NAME: "APOGEE / MCI / WIGA",
     PONDEROSA_BLOCK_INFO_VIEW_NAME: "Ficha técnica",
     "Comparativa": "WIGA relación ECOWITT",
+    "Desviacion estandar": "Desviación estándar",
     "Solo WIGA": "WIGA",
     "Solo ECOWITT": "ECOWITT",
 }
@@ -1685,6 +1686,91 @@ div[data-testid="stDataFrame"] {{
     line-height: 1;
     letter-spacing: 0;
 }}
+.analysis-stat-grid {{
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.85rem;
+    margin: 0.35rem 0 1rem 0;
+}}
+.analysis-stat-card {{
+    position: relative;
+    overflow: hidden;
+    padding: 1rem;
+    border-radius: 8px;
+    border: 1px solid var(--elite-line-soft);
+    background: linear-gradient(180deg, rgba(255,255,255,0.96), rgba(247,244,238,0.93));
+    box-shadow: 0 18px 36px rgba(45, 48, 64, 0.06);
+}}
+.analysis-stat-card::before {{
+    content: '';
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: 5px;
+    background: linear-gradient(90deg, var(--analysis-accent), rgba(255,255,255,0.25));
+}}
+.analysis-stat-label {{
+    margin: 0 0 0.6rem 0;
+    color: var(--analysis-accent);
+    font-family: var(--font-display);
+    font-size: 0.78rem;
+    font-weight: 800;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+}}
+.analysis-stat-main {{
+    display: flex;
+    align-items: baseline;
+    gap: 0.42rem;
+    flex-wrap: wrap;
+    margin-bottom: 0.55rem;
+}}
+.analysis-stat-main-value {{
+    color: var(--elite-ink);
+    font-family: var(--font-display);
+    font-size: 2rem;
+    font-weight: 800;
+    line-height: 1.05;
+    font-variant-numeric: tabular-nums;
+}}
+.analysis-stat-unit {{
+    color: #606674;
+    font-size: 0.78rem;
+    font-weight: 700;
+}}
+.analysis-stat-subtitle {{
+    margin: 0 0 0.72rem 0;
+    color: #69707d;
+    font-size: 0.84rem;
+    line-height: 1.45;
+}}
+.analysis-stat-mini-grid {{
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.55rem;
+    padding-top: 0.7rem;
+    border-top: 1px solid rgba(76, 70, 120, 0.10);
+}}
+.analysis-stat-mini {{
+    min-width: 0;
+}}
+.analysis-stat-mini span {{
+    display: block;
+    color: #747987;
+    font-size: 0.66rem;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    margin-bottom: 0.18rem;
+}}
+.analysis-stat-mini strong {{
+    display: block;
+    color: var(--elite-graphite);
+    font-family: var(--font-display);
+    font-size: 0.98rem;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+    overflow-wrap: anywhere;
+}}
 .analysis-note {{
     margin: 0.1rem 0 0.95rem 0;
     color: #6d727f;
@@ -1799,6 +1885,9 @@ div[data-testid="stDataFrame"] {{
 }}
 @media (max-width: 680px) {{
     .summary-grid {{
+        grid-template-columns: 1fr;
+    }}
+    .analysis-stat-grid {{
         grid-template-columns: 1fr;
     }}
     .summary-card-footer {{
@@ -5376,6 +5465,16 @@ def _render_marley_dashboard(dashboard_mode):
         if grouped_metric.empty:
             st.warning("No hay datos suficientes para construir esta vista de Marly en el periodo seleccionado.")
             st.stop()
+
+        _render_marley_metric_analysis_tabs(
+            filtered_df,
+            selected_range,
+            selected_variable,
+            dashboard_mode,
+            grouped_metric,
+            show_marley_details
+        )
+        st.stop()
 
         _render_chart_explanation(
             f'{dashboard_mode} por franja horaria',
@@ -11698,6 +11797,113 @@ def _format_metric_card_value(value, decimals=2, scientific_threshold=100000):
     return f"{numeric_value:.{decimals}f}"
 
 
+def _format_analysis_unit_text(unit):
+    return str(unit or '').replace('Âµmol mâ»Â² sâ»Â¹', 'Âµmol/mÂ²/s').replace('µmol m⁻² s⁻¹', 'µmol/m²/s').replace('µmol m-2 s-1', 'µmol/m²/s')
+
+
+def _build_analysis_distribution_table(df_source, variable_name, group_col='Bloque', group_label='Bloque'):
+    if not isinstance(df_source, pd.DataFrame) or df_source.empty:
+        return pd.DataFrame()
+    if group_col not in df_source.columns or variable_name not in df_source.columns:
+        return pd.DataFrame()
+
+    data = df_source[[group_col, variable_name]].copy()
+    data[group_col] = data[group_col].fillna('Sin grupo')
+    data[variable_name] = pd.to_numeric(data[variable_name], errors='coerce')
+    data = data.dropna(subset=[variable_name])
+    if data.empty:
+        return pd.DataFrame()
+
+    records = []
+    for group_name, group_df in data.groupby(group_col, dropna=False):
+        series = group_df[variable_name].dropna()
+        if series.empty:
+            continue
+
+        mean_value = series.mean()
+        std_value = series.std(ddof=1) if len(series) > 1 else 0.0
+        var_value = series.var(ddof=1) if len(series) > 1 else 0.0
+        min_value = series.min()
+        max_value = series.max()
+        cv_value = (std_value / mean_value * 100) if mean_value not in (0, None) and not pd.isna(mean_value) else None
+
+        records.append({
+            group_label: group_name,
+            'Registros': int(series.count()),
+            'Promedio': mean_value,
+            'Mediana': series.median(),
+            'Minimo': min_value,
+            'Maximo': max_value,
+            'Rango': max_value - min_value,
+            'Desviacion estandar': std_value,
+            'Varianza': var_value,
+            'Coef. variacion (%)': cv_value,
+        })
+
+    if not records:
+        return pd.DataFrame()
+
+    return pd.DataFrame(records)
+
+
+def _render_analysis_distribution_cards(
+    stats_df,
+    variable_name,
+    unit='',
+    title='Resumen estadístico',
+    group_column='Bloque',
+    accent_getter=None,
+):
+    if stats_df.empty or group_column not in stats_df.columns:
+        st.info("No hay datos suficientes para construir el resumen estadístico.")
+        return
+
+    unit_text = _format_analysis_unit_text(unit)
+    st.markdown(
+        f'<p class="analysis-note"><strong>{html.escape(title)}</strong></p>',
+        unsafe_allow_html=True
+    )
+
+    cards_html = []
+    for _, row in stats_df.iterrows():
+        group_name = str(row.get(group_column, 'Sin grupo'))
+        accent = accent_getter(group_name) if callable(accent_getter) else BRAND_COLORS['hero']
+        promedio = _format_metric_card_value(row.get('Promedio'), decimals=2)
+        mediana = _format_metric_card_value(row.get('Mediana'), decimals=2)
+        minimo = _format_metric_card_value(row.get('Minimo'), decimals=2)
+        maximo = _format_metric_card_value(row.get('Maximo'), decimals=2)
+        rango = _format_metric_card_value(row.get('Rango'), decimals=2)
+        desviacion = _format_metric_card_value(row.get('Desviacion estandar'), decimals=2)
+        varianza = _format_metric_card_value(row.get('Varianza'), decimals=2)
+        registros = _format_metric_card_value(row.get('Registros'), decimals=0)
+        cv_value = row.get('Coef. variacion (%)')
+        cv_text = _format_metric_card_value(cv_value, decimals=1) if pd.notna(cv_value) else "Sin dato"
+
+        cards_html.append(
+            f"""
+            <div class="analysis-stat-card" style="--analysis-accent: {accent};">
+                <p class="analysis-stat-label">{html.escape(group_name)}</p>
+                <div class="analysis-stat-main">
+                    <span class="analysis-stat-main-value">{promedio}</span>
+                    <span class="analysis-stat-unit">{html.escape(unit_text)}</span>
+                </div>
+                <p class="analysis-stat-subtitle">Promedio de {html.escape(variable_name)}. Mediana: <strong>{mediana}</strong>.</p>
+                <div class="analysis-stat-mini-grid">
+                    <div class="analysis-stat-mini"><span>Minimo</span><strong>{minimo}</strong></div>
+                    <div class="analysis-stat-mini"><span>Maximo</span><strong>{maximo}</strong></div>
+                    <div class="analysis-stat-mini"><span>Rango</span><strong>{rango}</strong></div>
+                    <div class="analysis-stat-mini"><span>Desv. est.</span><strong>{desviacion}</strong></div>
+                    <div class="analysis-stat-mini"><span>Varianza</span><strong>{varianza}</strong></div>
+                    <div class="analysis-stat-mini"><span>Registros</span><strong>{registros}</strong></div>
+                    <div class="analysis-stat-mini"><span>Coef. var.</span><strong>{cv_text}%</strong></div>
+                </div>
+            </div>
+            """
+        )
+
+    st.markdown(f'<div class="analysis-stat-grid">{"".join(cards_html)}</div>', unsafe_allow_html=True)
+
+
 def _render_analysis_metric_cards_row(metrics_data, tab_label, single_day_analysis, heading=None, variable_options=None):
     if not metrics_data:
         return
@@ -11845,6 +12051,73 @@ def _render_analysis_metric_cards_row(metrics_data, tab_label, single_day_analys
             </div>
             '''
             st.markdown(metric_card_html, unsafe_allow_html=True)
+
+
+def _render_hourly_metric_visual(grouped_df, variable_name, tab_label, single_day_analysis):
+    if tab_label == "Promedio":
+        _render_hourly_metric_chart(grouped_df, variable_name, 'Promedio')
+    elif tab_label == "Desviacion estandar" and single_day_analysis:
+        _render_chart_explanation(
+            f'Desviacion estandar por franja horaria - {VARIABLE_SELECTOR_LABELS.get(variable_name, variable_name)}',
+            'La desviacion estandar necesita al menos dos dias para comparar la misma franja horaria entre dias. Con un solo dia se muestra la aclaracion, pero no se grafica una dispersion representativa.',
+            accent=VARIABLE_COLORS.get(variable_name, BRAND_COLORS['hero'])
+        )
+        st.info(
+            f'Desviacion estandar de un solo dia para {VARIABLE_SELECTOR_LABELS.get(variable_name, variable_name)}: '
+            'se muestra en 0 porque con un unico dia no hay suficiente repeticion por franja horaria para calcular una dispersion representativa.'
+        )
+    elif tab_label == "Desviacion estandar":
+        _render_hourly_metric_chart(grouped_df, variable_name, 'DesviacionEstandar')
+    elif single_day_analysis:
+        _render_chart_explanation(
+            f'Varianza por franja horaria - {VARIABLE_SELECTOR_LABELS.get(variable_name, variable_name)}',
+            'La varianza necesita al menos dos dias para comparar la misma franja horaria entre dias. Con un solo dia se muestra la aclaracion, pero no se grafica una variacion representativa.',
+            accent=VARIABLE_COLORS.get(variable_name, BRAND_COLORS['hero'])
+        )
+        st.info(
+            f'Varianza de un solo dia para {VARIABLE_SELECTOR_LABELS.get(variable_name, variable_name)}: '
+            'se muestra en 0 porque con un unico dia no hay suficiente repeticion por franja horaria para calcular una dispersion representativa.'
+        )
+    else:
+        _render_hourly_metric_chart(grouped_df, variable_name, 'Varianza')
+
+
+def _render_hourly_metric_table(
+    tab_label,
+    pivot_promedio,
+    pivot_varianza,
+    pivot_desviacion,
+    variable_name,
+    period_text,
+    variable_state_key,
+):
+    if tab_label == "Promedio":
+        table = _prepare_hourly_pivot_display(pivot_promedio)
+        metric_slug = "promedio"
+        label = "promedio"
+    elif tab_label == "Desviacion estandar":
+        table = _prepare_hourly_pivot_display(pivot_desviacion)
+        metric_slug = "desviacion_estandar"
+        label = "desviacion estandar"
+    else:
+        table = _prepare_hourly_pivot_display(pivot_varianza)
+        metric_slug = "varianza"
+        label = "varianza"
+
+    if table.empty:
+        st.info("No hay datos suficientes para construir la tabla de esta metrica.")
+        return
+
+    st.caption("Tabla calculada con los mismos valores de la grafica visible, ordenada por franja horaria.")
+    report_slug = _build_report_slug("ponderosa", metric_slug, variable_name, period_text, variable_state_key)
+    _render_table_download_button(
+        table,
+        f"Descargar tabla de {label}",
+        f"ponderosa_{metric_slug}_{report_slug}.xlsx",
+        f"descargar_ponderosa_{metric_slug}_{report_slug}",
+        help_text="Descarga un Excel con la tabla calculada a partir de la grafica visible."
+    )
+    _dataframe(table)
 
 
 def _render_hourly_analysis_view(
@@ -12023,6 +12296,204 @@ def _render_hourly_analysis_view(
             accent=BRAND_COLORS['hero'],
             kicker='Cómo leer este análisis'
         )
+
+
+def _render_hourly_analysis_view_organized(
+    df_variables,
+    fecha_variables,
+    selected_blocks,
+    df_external_station=None,
+    forced_metric=None,
+    variable_options=None,
+    variable_state_key="analisis_variable_option"
+):
+    if df_variables.empty:
+        fecha_inicio, fecha_fin = fecha_variables
+        fecha_label = (
+            fecha_inicio.strftime('%Y-%m-%d')
+            if fecha_inicio == fecha_fin else
+            f"{fecha_inicio.strftime('%Y-%m-%d')} a {fecha_fin.strftime('%Y-%m-%d')}"
+        )
+        st.warning(f'No se encontraron datos de variables para el rango seleccionado: {fecha_label}.')
+        return
+
+    fecha_inicio, fecha_fin = fecha_variables
+    period_text = (
+        fecha_inicio.strftime("%Y-%m-%d")
+        if fecha_inicio == fecha_fin else
+        f'{fecha_inicio.strftime("%Y-%m-%d")} a {fecha_fin.strftime("%Y-%m-%d")}'
+    )
+    single_day_analysis = fecha_inicio == fecha_fin
+
+    metric_options = ["Promedio", "Desviacion estandar", "Varianza"]
+    if forced_metric in metric_options:
+        tab_label = forced_metric
+    else:
+        if st.session_state.get("analisis_metric_option") not in metric_options:
+            st.session_state["analisis_metric_option"] = metric_options[0]
+        tab_label = st.segmented_control(
+            "Métrica del análisis",
+            options=metric_options,
+            key="analisis_metric_option",
+            help="Calcula solo la métrica visible para mantener esta vista más rápida.",
+            width="stretch"
+        )
+
+    variable_options = variable_options or SENSOR_VARIABLES
+    if st.session_state.get(variable_state_key) not in variable_options:
+        st.session_state[variable_state_key] = variable_options[0]
+    variable_name = st.segmented_control(
+        "Variable del análisis",
+        options=variable_options,
+        format_func=lambda value: VARIABLE_SELECTOR_LABELS.get(value, VARIABLE_LABELS.get(value, value)),
+        key=variable_state_key,
+        help="Calcula solo la variable seleccionada para evitar cargar todas las gráficas a la vez.",
+        width="stretch"
+    )
+
+    grouped_df, pivot_promedio, pivot_varianza, pivot_desviacion = _build_hourly_block_analysis(df_variables, variable_name)
+    if grouped_df.empty:
+        st.info(f'No se encontraron datos para {variable_name} en el rango seleccionado.')
+        return
+
+    tab_grafica, tab_resumen, tab_tabla = st.tabs(["Gráfica", "Resumen estadístico", "Tabla"])
+    with tab_grafica:
+        _render_hourly_metric_visual(grouped_df, variable_name, tab_label, single_day_analysis)
+
+    with tab_resumen:
+        selected_stats = _build_analysis_distribution_table(
+            df_variables,
+            variable_name,
+            group_col='Bloque',
+            group_label='Bloque'
+        )
+        _render_analysis_distribution_cards(
+            selected_stats,
+            VARIABLE_SELECTOR_LABELS.get(variable_name, variable_name),
+            unit=VARIABLE_UNITS.get(variable_name, ''),
+            title=f"Resumen estadístico por bloque - {VARIABLE_SELECTOR_LABELS.get(variable_name, variable_name)}",
+            group_column='Bloque',
+            accent_getter=lambda group_name: _get_block_analysis_color(group_name, variable_name)
+        )
+        if not selected_stats.empty:
+            with st.expander("Ver resumen estadístico en tabla", expanded=False):
+                _dataframe(selected_stats.round(2), hide_index=True)
+
+        metrics_data = _collect_analysis_metrics(df_variables, tab_label, variable_options)
+        _render_analysis_metric_cards_row(
+            metrics_data,
+            tab_label,
+            single_day_analysis,
+            heading='Resumen de la métrica seleccionada por variable',
+            variable_options=variable_options
+        )
+
+        external_metrics_data = _collect_analysis_metrics(df_external_station, tab_label, variable_options)
+        _render_analysis_metric_cards_row(
+            external_metrics_data,
+            tab_label,
+            single_day_analysis,
+            heading='Estacion externa',
+            variable_options=variable_options
+        )
+
+    with tab_tabla:
+        _render_hourly_metric_table(
+            tab_label,
+            pivot_promedio,
+            pivot_varianza,
+            pivot_desviacion,
+            variable_name,
+            period_text,
+            variable_state_key
+        )
+
+
+def _build_marley_metric_stats_source(df, variable):
+    if df.empty:
+        return pd.DataFrame()
+
+    frames = []
+    for source_name in MARLEY_SENSOR_NAMES:
+        column_name = f"{variable} - {source_name}"
+        if column_name not in df.columns:
+            continue
+        source_values = pd.to_numeric(df[column_name], errors='coerce').dropna()
+        if source_values.empty:
+            continue
+        frames.append(pd.DataFrame({
+            'Sensor': source_name,
+            variable: source_values
+        }))
+
+    if not frames:
+        return pd.DataFrame()
+    return pd.concat(frames, ignore_index=True)
+
+
+def _render_marley_metric_analysis_tabs(filtered_df, selected_range, selected_variable, dashboard_mode, grouped_metric, show_marley_details):
+    config = MARLEY_VARIABLES[selected_variable]
+    tab_grafica, tab_resumen, tab_tabla = st.tabs(["Gráfica", "Resumen estadístico", "Tabla"])
+
+    with tab_grafica:
+        _render_chart_explanation(
+            f'{dashboard_mode} por franja horaria',
+            (
+                'Esta gráfica muestra qué tanto se alejan las lecturas de cada sensor respecto a su valor central dentro de una misma hora del día durante el rango seleccionado. Valores bajos indican mayor estabilidad; valores altos indican una dispersión más amplia.'
+                if dashboard_mode == "Desviacion estandar" else
+                'Esta gráfica muestra qué tanto cambió cada sensor dentro de una misma hora del día durante el rango seleccionado. Valores bajos indican lecturas más estables; valores altos indican mayor fluctuación.'
+                if dashboard_mode == "Varianza" else
+                'Esta gráfica resume el valor promedio de cada sensor por franja de 30 minutos para comparar el comportamiento típico dentro del periodo seleccionado.'
+            ),
+            accent=config['accent']
+        )
+        _plotly_chart(_make_marley_hourly_metric_chart(grouped_metric, selected_variable, dashboard_mode))
+        if show_marley_details:
+            detail_resolution = st.radio(
+                "Resolución de las gráficas individuales:",
+                options=SOURCE_RESOLUTION_OPTIONS,
+                horizontal=True,
+                key=f"marley_{dashboard_mode.lower()}_detail_resolution",
+                help=f"El análisis de {dashboard_mode.lower()} se mantiene por franja horaria; este control aplica solo a las gráficas individuales con promedio, punto por punto o valor más cercano cada 30 minutos."
+            )
+            _render_marley_individual_variable_charts(
+                filtered_df,
+                selected_range,
+                resolution_label=detail_resolution
+            )
+
+    with tab_resumen:
+        stats_source = _build_marley_metric_stats_source(filtered_df, selected_variable)
+        stats_df = _build_analysis_distribution_table(
+            stats_source,
+            selected_variable,
+            group_col='Sensor',
+            group_label='Sensor'
+        )
+        _render_analysis_distribution_cards(
+            stats_df,
+            _format_variable_display_title(config['title']),
+            unit=config['unit'],
+            title=f"Resumen estadístico por sensor - {_format_variable_display_title(config['title'])}",
+            group_column='Sensor',
+            accent_getter=lambda sensor_name: config['colors'].get(sensor_name, config['accent'])
+        )
+        if not stats_df.empty:
+            with st.expander("Ver resumen estadístico en tabla", expanded=False):
+                _dataframe(stats_df.round(2), hide_index=True)
+
+    with tab_tabla:
+        metric_table = _prepare_marley_hourly_metric_table(grouped_metric)
+        st.caption("Tabla calculada con los mismos valores de la gráfica, ordenada por franja horaria.")
+        report_slug = _build_report_slug("marly", dashboard_mode, selected_variable)
+        _render_table_download_button(
+            metric_table,
+            f"Descargar tabla de {dashboard_mode.lower()}",
+            f"marly_{dashboard_mode.lower()}_{report_slug}.xlsx",
+            f"descargar_marley_{dashboard_mode.lower()}_{report_slug}",
+            help_text="Descarga un Excel con la tabla calculada a partir de la gráfica visible."
+        )
+        _dataframe(metric_table, hide_index=True)
 
 
 def _build_ponderosa_ecowitt_metric_frame(ecowitt_df):
@@ -12260,7 +12731,7 @@ def _render_ponderosa_metric_dashboard(df_variables_all, df_cortinas_all, select
 
     st.markdown(f"## La Ponderosa - {metric_name}")
     st.caption(f"Análisis de {metric_name.lower()} para {source_option}. ECOWITT corresponde al Bloque {PONDEROSA_ECOWITT_BLOCK_CODE}.")
-    _render_hourly_analysis_view(
+    _render_hourly_analysis_view_organized(
         analysis_df,
         selected_range,
         selected_blocks,
@@ -12582,7 +13053,7 @@ if dashboard_mode == "Varianza Y Promedio":
             st.session_state.get("modo_fechas_analisis") == "Varios días",
             "Cargando análisis de varios días..."
         ):
-            _render_hourly_analysis_view(
+            _render_hourly_analysis_view_organized(
                 df_variables_analisis,
                 fecha_analisis,
                 analysis_block_names,
