@@ -172,12 +172,12 @@ VARIABLE_SELECTOR_LABELS = {
     'PUERTA 2': 'Puerta 2'
 }
 FILTER_HELP_TEXTS = {
-    'modo_dashboard': 'Elige la vista principal: WIGA con cortinas, relación WIGA / ECOWITT, APOGEE / MCI / WIGA, APOGEE, varianza, promedio o fuentes individuales.',
+    'modo_dashboard': 'Elige la vista principal: WIGA con cortinas, relación WIGA / ECOWITT, APOGEE / MCI / WIGA, APOGEE, varianza, desviacion estandar, promedio o fuentes individuales.',
     'finca': 'Selecciona la finca que quieres explorar en el dashboard. Los bloques y fechas disponibles se ajustan según esa finca.',
     'modo_fechas': 'Define si quieres analizar un solo día o un rango de varios días.',
     'fecha': 'Selecciona la fecha o el rango que se usará para filtrar los registros visibles en la vista actual.',
     'bloque': 'Selecciona el bloque principal que quieres analizar en la correlación.',
-    'bloques_comparados': 'Activa o desactiva los bloques que quieres incluir en la comparación de varianza y promedio.',
+    'bloques_comparados': 'Activa o desactiva los bloques que quieres incluir en la comparación de promedio, desviacion estandar y varianza.',
     'series_visibles': 'Activa las variables ambientales y operativas que deseas mostrar en la gráfica.',
     'comparar_almacen': 'Muestra la serie equivalente de la Estación externa para cada variable ambiental seleccionada.',
     'aperturas_ideales': 'Superpone la apertura ideal calculada sobre las series de frentes y puertas cuando exista la referencia del bloque.',
@@ -259,13 +259,13 @@ PONDEROSA_LIGHT_VIEW_NAME = "APOGEE MCI WIGA"
 PONDEROSA_BLOCK_INFO_VIEW_NAME = "Ficha tecnica"
 PONDEROSA_VIEW_GROUPS = {
     "Comparativas": ["WIGA con cortinas", "WIGA relacion ECOWITT", PONDEROSA_LIGHT_VIEW_NAME],
-    "Análisis": ["Varianza", "Promedio"],
+    "Análisis": ["Varianza", "Desviacion estandar", "Promedio"],
     "Contexto tecnico": [PONDEROSA_BLOCK_INFO_VIEW_NAME],
     "Fuentes individuales": ["WIGA", "ECOWITT", "APOGEE", "Cortinas"],
 }
 MARLY_VIEW_GROUPS = {
     "Comparativas": ["Comparativa"],
-    "Análisis": ["Varianza", "Promedio"],
+    "Análisis": ["Varianza", "Desviacion estandar", "Promedio"],
     "Fuentes individuales": ["Solo WIGA", "Solo ECOWITT"],
 }
 VIEW_DISPLAY_LABELS = {
@@ -4707,9 +4707,12 @@ def _build_marley_hourly_metric(df, variable, metric_column):
         source_df['FranjaMinutos'] = source_df['FranjaDateTime'].dt.hour * 60 + source_df['FranjaDateTime'].dt.minute
         source_df['Franja'] = source_df['FranjaDateTime'].dt.strftime('%H:%M')
 
-        aggregation = 'mean' if metric_column == 'Promedio' else (
-            lambda serie: serie.var(ddof=1) if len(serie) > 1 else 0.0
-        )
+        if metric_column == 'Promedio':
+            aggregation = 'mean'
+        elif metric_column == 'Desviacion estandar':
+            aggregation = lambda serie: serie.std(ddof=1) if len(serie) > 1 else 0.0
+        else:
+            aggregation = lambda serie: serie.var(ddof=1) if len(serie) > 1 else 0.0
         grouped = (
             source_df.groupby(['FranjaMinutos', 'Franja'], as_index=False)
             .agg(Valor=(column_name, aggregation), Registros=(column_name, 'count'))
@@ -4768,7 +4771,12 @@ def _make_marley_hourly_metric_chart(grouped_df, variable, metric_column):
             )
         )
 
-    yaxis_title = config['unit'] if metric_column == 'Promedio' else f"Varianza ({config['unit']})"
+    if metric_column == 'Promedio':
+        yaxis_title = config['unit']
+    elif metric_column == 'Desviacion estandar':
+        yaxis_title = f"Desviacion estandar ({config['unit']})"
+    else:
+        yaxis_title = f"Varianza ({config['unit']})"
     fig.update_layout(
         title=dict(text=f"{metric_column} por franja horaria - {_format_variable_display_title(config['title'])}", x=0, xanchor='left'),
         height=470,
@@ -5194,7 +5202,7 @@ def _render_marley_dashboard(dashboard_mode):
             if dashboard_mode == "Varianza":
                 modo_fechas = "Varios días"
                 st.session_state["marley_modo_fechas"] = modo_fechas
-                st.caption("La varianza se calcula automáticamente con varios días.")
+                st.caption(f"{metric_name} se calcula automáticamente con varios días.")
             else:
                 modo_fechas = st.radio(
                     "Modo de fechas:",
@@ -5352,7 +5360,7 @@ def _render_marley_dashboard(dashboard_mode):
         help=FILTER_HELP_TEXTS['graficas_detalladas']
     )
 
-    if dashboard_mode in ("Varianza", "Promedio"):
+    if dashboard_mode in ("Varianza", "Desviacion estandar", "Promedio"):
         selected_variable = st.segmented_control(
             "Variable Marly",
             options=list(MARLEY_VARIABLES.keys()),
@@ -5360,8 +5368,8 @@ def _render_marley_dashboard(dashboard_mode):
             default=list(MARLEY_VARIABLES.keys())[0],
             key="marley_variable",
         )
-        if dashboard_mode == "Varianza" and selected_range[0] == selected_range[1]:
-            st.warning("Para ver la varianza en Marly selecciona un rango de al menos 2 días.")
+        if dashboard_mode in ("Varianza", "Desviacion estandar") and selected_range[0] == selected_range[1]:
+            st.warning(f"Para ver {dashboard_mode.lower()} en Marly selecciona un rango de al menos 2 días.")
             st.stop()
 
         grouped_metric = _build_marley_hourly_metric(filtered_df, selected_variable, dashboard_mode)
@@ -5372,6 +5380,8 @@ def _render_marley_dashboard(dashboard_mode):
         _render_chart_explanation(
             f'{dashboard_mode} por franja horaria',
             (
+                'Esta gráfica muestra qué tanto se alejan las lecturas de cada sensor respecto a su valor central dentro de una misma hora del día durante el rango seleccionado. Valores bajos indican mayor estabilidad; valores altos indican una dispersión más amplia.'
+                if dashboard_mode == "Desviacion estandar" else
                 'Esta gráfica muestra qué tanto cambió cada sensor dentro de una misma hora del día durante el rango seleccionado. Valores bajos indican lecturas más estables; valores altos indican mayor fluctuación.'
                 if dashboard_mode == "Varianza" else
                 'Esta gráfica resume el valor promedio de cada sensor por franja de 30 minutos para comparar el comportamiento típico dentro del periodo seleccionado.'
@@ -11398,11 +11408,11 @@ def _format_block_display_name(block_name):
 def _build_hourly_block_analysis(df_variables, variable_name):
     required_cols = {'DateTime', 'Bloque', variable_name}
     if df_variables.empty or not required_cols.issubset(df_variables.columns):
-        return pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
+        return pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
 
     data = df_variables[['DateTime', 'Bloque', variable_name]].dropna(subset=['DateTime', 'Bloque', variable_name]).copy()
     if data.empty:
-        return pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
+        return pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
 
     # Normaliza pequeñas desviaciones del Excel como 01:31 o 01:32
     # para consolidar la lectura en franjas limpias de 30 minutos.
@@ -11414,12 +11424,14 @@ def _build_hourly_block_analysis(df_variables, variable_name):
         data.groupby(['FranjaMinutos', 'Franja', 'Bloque'], as_index=False)
         .agg(
             Promedio=(variable_name, 'mean'),
+            DesviacionEstandar=(variable_name, lambda serie: serie.std(ddof=1) if len(serie) > 1 else 0.0),
             Varianza=(variable_name, lambda serie: serie.var(ddof=1) if len(serie) > 1 else 0.0),
             Registros=(variable_name, 'count')
         )
         .sort_values(['FranjaMinutos', 'Bloque'])
         .reset_index(drop=True)
     )
+    grouped['DesviacionEstandar'] = grouped['DesviacionEstandar'].fillna(0.0)
     grouped['Varianza'] = grouped['Varianza'].fillna(0.0)
 
     ordered_blocks = _sort_block_names(grouped['Bloque'].dropna().unique().tolist())
@@ -11437,8 +11449,14 @@ def _build_hourly_block_analysis(df_variables, variable_name):
         .sort_values('FranjaMinutos')
         .reindex(columns=base_columns + ordered_blocks)
     )
+    pivot_desviacion = (
+        grouped.pivot(index=base_columns, columns='Bloque', values='DesviacionEstandar')
+        .reset_index()
+        .sort_values('FranjaMinutos')
+        .reindex(columns=base_columns + ordered_blocks)
+    )
 
-    return grouped, pivot_promedio, pivot_varianza
+    return grouped, pivot_promedio, pivot_varianza, pivot_desviacion
 
 
 def _prepare_hourly_pivot_display(pivot_df):
@@ -11521,7 +11539,12 @@ def _render_hourly_metric_chart(grouped_df, variable_name, metric_column):
         ]
     else:
         display_slots = ordered_slots['Franja'].tolist()
-    metric_title = 'Promedio por franja horaria' if metric_column == 'Promedio' else 'Varianza por franja horaria'
+    if metric_column == 'Promedio':
+        metric_title = 'Promedio por franja horaria'
+    elif metric_column == 'DesviacionEstandar':
+        metric_title = 'Desviacion estandar por franja horaria'
+    else:
+        metric_title = 'Varianza por franja horaria'
 
     metric_label = VARIABLE_LABELS.get(variable_name, variable_name)
     fig = go.Figure()
@@ -11595,7 +11618,11 @@ def _render_hourly_metric_chart(grouped_df, variable_name, metric_column):
             automargin=True
         ),
         yaxis=dict(
-            title=f'<b>{metric_column}</b>',
+            title=(
+                '<b>Promedio</b>' if metric_column == 'Promedio' else
+                '<b>Desviacion estandar</b>' if metric_column == 'DesviacionEstandar' else
+                '<b>Varianza</b>'
+            ),
             tickfont=dict(size=11, family='Montserrat, sans-serif', color=BRAND_COLORS['graphite']),
             gridcolor='rgba(76, 70, 120, 0.07)',
             linecolor='rgba(45, 48, 64, 0.18)',
@@ -11606,6 +11633,8 @@ def _render_hourly_metric_chart(grouped_df, variable_name, metric_column):
     metric_description = (
         'Cada punto resume el valor promedio de una variable en una franja horaria. Úsalo para comparar el comportamiento típico entre bloques y ubicar las horas de mayor o menor intensidad.'
         if metric_column == 'Promedio' else
+        'Cada punto muestra cuánto se alejan, en promedio, las mediciones de su valor central dentro de esa franja horaria. Valores bajos sugieren estabilidad; valores altos indican una dispersión más fuerte.'
+        if metric_column == 'DesviacionEstandar' else
         'Cada punto muestra qué tanto variaron las mediciones dentro de esa franja horaria durante el periodo. Valores cercanos a cero indican estabilidad; valores altos indican cambios más fuertes.'
     )
     _plotly_chart(
@@ -11640,8 +11669,15 @@ def _collect_analysis_metrics(df_source, tab_label, variable_options=None):
         if series.empty:
             continue
 
+        if tab_label == "Promedio":
+            principal_value = series.mean()
+        elif tab_label == "Desviacion estandar":
+            principal_value = series.std(ddof=1) if len(series) > 1 else 0.0
+        else:
+            principal_value = series.var(ddof=1) if len(series) > 1 else 0.0
+
         metrics_data[variable_name] = {
-            'principal': series.mean() if tab_label == "Promedio" else (series.var(ddof=1) if len(series) > 1 else 0.0),
+            'principal': principal_value,
             'minimo': series.min(),
             'maximo': series.max()
         }
@@ -11695,6 +11731,14 @@ def _render_analysis_metric_cards_row(metrics_data, tab_label, single_day_analys
                 else:
                     descriptor = "Promedio general de todas las mediciones del rango seleccionado."
                     footer_label = "Promedio general del periodo"
+            elif tab_label == "Desviacion estandar":
+                display_value = _format_metric_card_value(value, decimals=2)
+                descriptor = "Desviacion estandar general calculada con todas las mediciones del rango seleccionado."
+                footer_label = "Desviacion estandar del periodo"
+                if single_day_analysis:
+                    display_value = "0.00"
+                    descriptor = "En un solo dia la desviacion estandar se reporta en 0 por consistencia analitica."
+                    footer_label = "Desviacion estandar en un dia"
             else:
                 display_value = _format_metric_card_value(value, decimals=2)
                 descriptor = "Varianza general calculada con todas las mediciones del rango seleccionado."
@@ -11834,7 +11878,7 @@ def _render_hourly_analysis_view(
 
     single_day_analysis = fecha_inicio == fecha_fin
 
-    metric_options = ["Promedio", "Varianza"]
+    metric_options = ["Promedio", "Desviacion estandar", "Varianza"]
     if forced_metric in metric_options:
         tab_label = forced_metric
     else:
@@ -11860,7 +11904,7 @@ def _render_hourly_analysis_view(
         width="stretch"
     )
 
-    grouped_df, pivot_promedio, pivot_varianza = _build_hourly_block_analysis(df_variables, variable_name)
+    grouped_df, pivot_promedio, pivot_varianza, pivot_desviacion = _build_hourly_block_analysis(df_variables, variable_name)
     if grouped_df.empty:
         st.info(f'No se encontraron datos para {variable_name} en el rango seleccionado.')
         return
@@ -11878,6 +11922,29 @@ def _render_hourly_analysis_view(
                 help_text="Descarga un Excel con la tabla calculada a partir de la gráfica visible."
             )
             _dataframe(promedio_table)
+    elif tab_label == "Desviacion estandar" and single_day_analysis:
+        _render_chart_explanation(
+            f'Desviacion estandar por franja horaria - {VARIABLE_SELECTOR_LABELS.get(variable_name, variable_name)}',
+            'La desviacion estandar necesita al menos dos dias para comparar la misma franja horaria entre dias. Con un solo dia se muestra la aclaracion, pero no se grafica una dispersion representativa.',
+            accent=VARIABLE_COLORS.get(variable_name, BRAND_COLORS['hero'])
+        )
+        st.info(
+            f'Desviacion estandar de un solo dia para {VARIABLE_SELECTOR_LABELS.get(variable_name, variable_name)}: '
+            'se muestra en 0 porque con un unico dia no hay suficiente repeticion por franja horaria para calcular una dispersion representativa.'
+        )
+    elif tab_label == "Desviacion estandar":
+        _render_hourly_metric_chart(grouped_df, variable_name, 'DesviacionEstandar')
+        desviacion_table = _prepare_hourly_pivot_display(pivot_desviacion)
+        with st.expander('Ver tabla dinamica de desviacion estandar', expanded=False):
+            report_slug = _build_report_slug("ponderosa", "desviacion_estandar", variable_name, period_text, variable_state_key)
+            _render_table_download_button(
+                desviacion_table,
+                "Descargar tabla de desviacion estandar",
+                f"ponderosa_desviacion_estandar_{report_slug}.xlsx",
+                f"descargar_ponderosa_desviacion_estandar_{report_slug}",
+                help_text="Descarga un Excel con la tabla calculada a partir de la grafica visible."
+            )
+            _dataframe(desviacion_table)
     elif single_day_analysis:
         _render_chart_explanation(
             f'Varianza por franja horaria - {VARIABLE_SELECTOR_LABELS.get(variable_name, variable_name)}',
@@ -11921,6 +11988,13 @@ def _render_hourly_analysis_view(
             accent=BRAND_COLORS['hero'],
             kicker='Cómo leer este análisis'
         )
+    elif len(selected_blocks) == 1 and tab_label == "Desviacion estandar":
+        _render_chart_explanation(
+            'Desviacion estandar general del bloque',
+            'La desviacion estandar resume cuanto se apartan las mediciones de su promedio dentro del periodo. Con un solo dia no hay dispersion temporal suficiente para una lectura util por franja.',
+            accent=BRAND_COLORS['hero'],
+            kicker='Como leer este analisis'
+        )
     elif len(selected_blocks) == 1 and tab_label == "Varianza":
         _render_chart_explanation(
             'Varianza general del bloque',
@@ -11934,6 +12008,13 @@ def _render_hourly_analysis_view(
             'Explora cada variable para ver el valor promedio por franja horaria y comparar el comportamiento típico de los bloques seleccionados.',
             accent=BRAND_COLORS['hero'],
             kicker='Cómo leer este análisis'
+        )
+    elif tab_label == "Desviacion estandar":
+        _render_chart_explanation(
+            'Desviacion estandar comparativa entre bloques',
+            'Explora cada variable para ver cuanto se dispersa cada bloque por franja horaria. Valores mas altos indican mediciones menos estables dentro del periodo analizado.',
+            accent=BRAND_COLORS['hero'],
+            kicker='Como leer este analisis'
         )
     else:
         _render_chart_explanation(
@@ -12079,7 +12160,7 @@ def _render_ponderosa_metric_dashboard(df_variables_all, df_cortinas_all, select
             selected_range = (fecha_unica, fecha_unica)
             navigation_state_key = f"ponderosa_{metric_key}_fecha_unica"
         else:
-            if metric_name == "Varianza":
+            if metric_name in ("Varianza", "Desviacion estandar"):
                 modo_fechas = "Varios días"
                 st.session_state[metric_date_mode_key] = modo_fechas
                 st.caption("La varianza se calcula automáticamente con varios días.")
@@ -12249,7 +12330,7 @@ with st.sidebar.expander("Vista", expanded=True):
         options=list(dashboard_view_groups.keys()),
         key="modo_dashboard_grupo",
         help=(
-            "Comparativas cruza sensores o cortinas; Análisis contiene varianza y promedio; Fuentes individuales muestra cada origen por separado."
+            "Comparativas cruza sensores o cortinas; Análisis contiene promedio, desviacion estandar y varianza; Fuentes individuales muestra cada origen por separado."
         )
     )
     group_view_options = dashboard_view_groups[selected_view_group]
@@ -12325,7 +12406,7 @@ if dashboard_mode == "APOGEE":
         _render_ponderosa_apogee_values_dashboard()
     st.stop()
 
-if dashboard_mode in ("Varianza", "Promedio"):
+if dashboard_mode in ("Varianza", "Desviacion estandar", "Promedio"):
     with _loading_context(
         st.session_state.get(f"ponderosa_{_build_normalized_text_key(dashboard_mode).replace(' ', '_')}_modo_fechas") == "Varios días",
         f"Cargando {dashboard_mode.lower()} de Ponderosa..."
@@ -12467,7 +12548,7 @@ if dashboard_mode == "Varianza Y Promedio":
             ]
 
     if _df_variables_all.empty:
-        st.warning("No se encontraron datos de variables para construir el análisis de varianza y promedio.")
+        st.warning("No se encontraron datos de variables para construir el análisis de promedio, desviacion estandar y varianza.")
     elif fecha_analisis is None:
         st.warning("Selecciona el periodo del análisis en la barra lateral.")
     elif not analysis_block_names:
