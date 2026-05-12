@@ -3141,43 +3141,46 @@ def _get_selected_correlacion_vars(options):
 
 
 def _render_correlacion_series_panel(available_vars, selected_block_code, df_variables_almacen):
-    st.markdown("#### Series visibles")
     if not available_vars:
         st.info("No hay series disponibles para el rango seleccionado.")
         return []
 
-    action_col, clear_col = st.columns(2)
-    with action_col:
-        if st.button("Todas", key="correlacion_select_all", width="stretch"):
-            _reset_correlacion_selector(available_vars)
-    with clear_col:
-        if st.button("Limpiar", key="correlacion_clear_all", width="stretch"):
-            for option in available_vars:
-                st.session_state[_selector_state_key(option)] = False
-            st.session_state['variables_correlacion'] = []
+    with st.expander("Configurar series visibles", expanded=True):
+        action_col, clear_col, external_col, ideal_col = st.columns([0.14, 0.14, 0.36, 0.36])
+        with action_col:
+            if st.button("Todas", key="correlacion_select_all", width="stretch"):
+                _reset_correlacion_selector(available_vars)
+        with clear_col:
+            if st.button("Limpiar", key="correlacion_clear_all", width="stretch"):
+                for option in available_vars:
+                    st.session_state[_selector_state_key(option)] = False
+                st.session_state['variables_correlacion'] = []
+        with external_col:
+            st.checkbox(
+                "Comparar con Estación externa",
+                key="comparar_con_almacen",
+                disabled=selected_block_code == 'ALMACEN' or df_variables_almacen.empty,
+                help=FILTER_HELP_TEXTS['comparar_almacen']
+            )
+        with ideal_col:
+            st.checkbox(
+                "Aperturas ideales",
+                key="mostrar_aperturas_ideales",
+                help=FILTER_HELP_TEXTS['aperturas_ideales']
+            )
 
-    for option in available_vars:
-        state_key = _selector_state_key(option)
-        if state_key not in st.session_state:
-            st.session_state[state_key] = True
-        st.checkbox(
-            VARIABLE_SELECTOR_LABELS.get(option, VARIABLE_LABELS.get(option, option)),
-            key=state_key,
-            help=VARIABLE_FILTER_HELP.get(option, FILTER_HELP_TEXTS['series_visibles'])
-        )
+        option_columns = st.columns(min(4, max(1, len(available_vars))))
+        for idx, option in enumerate(available_vars):
+            state_key = _selector_state_key(option)
+            if state_key not in st.session_state:
+                st.session_state[state_key] = True
+            with option_columns[idx % len(option_columns)]:
+                st.checkbox(
+                    VARIABLE_SELECTOR_LABELS.get(option, VARIABLE_LABELS.get(option, option)),
+                    key=state_key,
+                    help=VARIABLE_FILTER_HELP.get(option, FILTER_HELP_TEXTS['series_visibles'])
+                )
 
-    st.divider()
-    st.checkbox(
-        "Comparar con Estación externa",
-        key="comparar_con_almacen",
-        disabled=selected_block_code == 'ALMACEN' or df_variables_almacen.empty,
-        help=FILTER_HELP_TEXTS['comparar_almacen']
-    )
-    st.checkbox(
-        "Aperturas ideales",
-        key="mostrar_aperturas_ideales",
-        help=FILTER_HELP_TEXTS['aperturas_ideales']
-    )
     return _get_selected_correlacion_vars(available_vars)
 
 
@@ -12733,6 +12736,78 @@ def _render_variable_distribution_cards(stats_df, variable_configs=None, title='
     st.markdown('<div class="analysis-stat-grid">' + ''.join(cards_html) + '</div>', unsafe_allow_html=True)
 
 
+def _make_variable_stat_bar_chart(stats_df, metric_key, metric_label, variable_configs=None, block_label=None):
+    if stats_df.empty or metric_key not in stats_df.columns or 'Variable' not in stats_df.columns:
+        return None
+
+    variable_configs = variable_configs or {}
+    chart_df = stats_df[['Variable', metric_key]].copy()
+    chart_df[metric_key] = pd.to_numeric(chart_df[metric_key], errors='coerce')
+    chart_df = chart_df.dropna(subset=[metric_key])
+    if chart_df.empty:
+        return None
+
+    chart_df['Variable visible'] = chart_df['Variable'].apply(
+        lambda value: _format_variable_display_title(
+            variable_configs.get(value, {}).get('title', VARIABLE_SELECTOR_LABELS.get(value, value))
+        )
+    )
+    chart_df['Color'] = chart_df['Variable'].apply(
+        lambda value: variable_configs.get(value, {}).get('accent', VARIABLE_COLORS.get(value, BRAND_COLORS['hero']))
+    )
+
+    fig = go.Figure(go.Bar(
+        x=chart_df['Variable visible'],
+        y=chart_df[metric_key],
+        marker=dict(color=chart_df['Color'], line=dict(color='rgba(56,58,53,0.18)', width=1)),
+        text=chart_df[metric_key].apply(lambda value: f"{value:,.2f}"),
+        textposition='outside',
+        hovertemplate='<b>%{x}</b><br>' + metric_label + ': %{y:,.2f}<extra></extra>',
+    ))
+    fig.update_layout(
+        template='plotly_white',
+        title=f"{metric_label} por variable" + (f" - {block_label}" if block_label else ""),
+        height=430,
+        margin=dict(l=20, r=20, t=70, b=45),
+        xaxis_title='Variable',
+        yaxis_title=metric_label,
+        bargap=0.34,
+        font=dict(family='Montserrat, sans-serif', color=BRAND_COLORS['graphite']),
+    )
+    fig.update_yaxes(showgrid=True, gridcolor='rgba(84,83,134,0.10)', zeroline=False)
+    fig.update_xaxes(showgrid=False)
+    return fig
+
+
+def _render_variable_statistics_charts(stats_df, variable_configs=None, block_label=None):
+    if stats_df.empty:
+        st.info("No hay datos suficientes para graficar el análisis estadístico.")
+        return
+
+    metric_options = [
+        ("Promedio", "Promedio"),
+        ("Mediana", "Mediana"),
+        ("Mínimo", "Minimo"),
+        ("Máximo", "Maximo"),
+        ("Desv. est.", "Desviacion estandar"),
+        ("Varianza", "Varianza"),
+    ]
+    metric_tabs = st.tabs([label for label, _ in metric_options])
+    for tab, (metric_label, metric_key) in zip(metric_tabs, metric_options):
+        with tab:
+            fig = _make_variable_stat_bar_chart(
+                stats_df,
+                metric_key,
+                metric_label,
+                variable_configs=variable_configs,
+                block_label=block_label
+            )
+            if fig is None:
+                st.info(f"No hay datos suficientes para graficar {metric_label.lower()}.")
+            else:
+                _plotly_chart(fig)
+
+
 def _build_variables_30min_report(df_variables, variables):
     if (
         not isinstance(df_variables, pd.DataFrame) or
@@ -14240,38 +14315,35 @@ with tab_correlacion:
             "Registros"
         ])
         with tab_chart:
-            chart_col, controls_col = st.columns([0.76, 0.24], gap="large")
-            with controls_col:
-                selected_vars = _render_correlacion_series_panel(
-                    available_correlacion_vars,
-                    selected_block_code,
-                    df_variables_almacen_corr
-                )
-            with chart_col:
-                _render_chart_explanation(
-                    f"Bloque en visualización: {block_label}",
-                    "La gráfica cruza las variables ambientales seleccionadas con el comportamiento disponible de cortinas para el periodo filtrado.",
-                    accent=BRAND_COLORS['hero'],
-                    kicker='Vista activa'
-                )
-                if not df_variables_corr.empty and available_correlacion_vars:
-                    if not selected_vars:
-                        st.warning('Selecciona al menos una variable para mostrar la correlación.')
-                    else:
-                        with _loading_context(
-                            st.session_state.get("modo_fechas_compartidas") == "Varios días",
-                            "Cargando gráficas de correlación..."
-                        ):
-                            _render_correlacion(
-                                df_variables_corr,
-                                datos_cortinas_sel,
-                                fecha_variables,
-                                selected_vars,
-                                block_label=block_label,
-                                show_ideal_aperturas=st.session_state.get('mostrar_aperturas_ideales', False),
-                                df_variables_almacen=df_variables_almacen_corr,
-                                compare_with_almacen=st.session_state.get('comparar_con_almacen', False)
-                            )
+            selected_vars = _render_correlacion_series_panel(
+                available_correlacion_vars,
+                selected_block_code,
+                df_variables_almacen_corr
+            )
+            _render_chart_explanation(
+                f"Bloque en visualización: {block_label}",
+                "La gráfica cruza las variables ambientales seleccionadas con el comportamiento disponible de cortinas para el periodo filtrado.",
+                accent=BRAND_COLORS['hero'],
+                kicker='Vista activa'
+            )
+            if not df_variables_corr.empty and available_correlacion_vars:
+                if not selected_vars:
+                    st.warning('Selecciona al menos una variable para mostrar la correlación.')
+                else:
+                    with _loading_context(
+                        st.session_state.get("modo_fechas_compartidas") == "Varios días",
+                        "Cargando gráficas de correlación..."
+                    ):
+                        _render_correlacion(
+                            df_variables_corr,
+                            datos_cortinas_sel,
+                            fecha_variables,
+                            selected_vars,
+                            block_label=block_label,
+                            show_ideal_aperturas=st.session_state.get('mostrar_aperturas_ideales', False),
+                            df_variables_almacen=df_variables_almacen_corr,
+                            compare_with_almacen=st.session_state.get('comparar_con_almacen', False)
+                        )
 
         with tab_observations:
             _render_chart_explanation(
@@ -14299,12 +14371,11 @@ with tab_correlacion:
                 )
 
         with tab_stats:
-            _render_summary_cards_selector(
-                df_variables_corr,
-                fecha_variables,
-                df_reference=summary_reference_df,
-                reference_label='Estación externa',
-                base_label=block_label
+            _render_chart_explanation(
+                "Análisis estadístico de variables",
+                "Esta sección resume el comportamiento del bloque con métricas de tendencia central y dispersión. Usa las pestañas para revisar cada medida sin mezclar interpretaciones.",
+                accent=BRAND_COLORS['hero'],
+                kicker='Estadística del periodo'
             )
             stats_variables = [variable for variable in variables_sensor if variable in df_variables_corr.columns]
             stats_df = _build_variable_distribution_table(df_variables_corr, stats_variables)
@@ -14316,6 +14387,11 @@ with tab_correlacion:
                 }
                 for variable_name in stats_variables
             }
+            _render_variable_statistics_charts(
+                stats_df,
+                variable_stat_configs,
+                block_label=block_label
+            )
             _render_variable_distribution_cards(
                 stats_df,
                 variable_stat_configs,
