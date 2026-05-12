@@ -467,7 +467,7 @@ STREAMLIT_LOGO_HEIGHT = 108
 STREAMLIT_LOGO_BORDER_RADIUS = 8
 TEMP_FOCUS_CHART_ENABLED = True
 TEMP_FOCUS_CHART_PLACEMENT = 'below'  # Opciones: 'below', 'left', 'right'
-TEMP_FOCUS_CHART_HEIGHT = 260
+TEMP_FOCUS_CHART_HEIGHT = 330
 TEMP_FOCUS_CHART_COLUMN_LAYOUT = (1, 1)
 TEMP_FOCUS_CHART_TITLE = 'Temperatura del bloque'
 HUMIDITY_FOCUS_CHART_ENABLED = True
@@ -1689,7 +1689,7 @@ div[data-testid="stDataFrame"] {{
 }}
 .analysis-stat-grid {{
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 0.85rem;
     margin: 0.35rem 0 1rem 0;
 }}
@@ -1776,6 +1776,63 @@ div[data-testid="stDataFrame"] {{
     margin: 0.1rem 0 0.95rem 0;
     color: #6d727f;
     font-size: 0.9rem;
+}}
+.series-control-card {{
+    position: relative;
+    overflow: hidden;
+    margin: 0.2rem 0 0.85rem 0;
+    padding: 0.95rem 1rem;
+    border-radius: 12px;
+    border: 1px solid rgba(84,83,134,0.12);
+    background:
+        radial-gradient(circle at 8% 0%, rgba(231,200,122,0.18), transparent 30%),
+        linear-gradient(135deg, rgba(255,255,255,0.97), rgba(247,244,238,0.90));
+    box-shadow: 0 16px 34px rgba(45,48,64,0.07);
+}}
+.series-control-kicker {{
+    margin: 0 0 0.22rem 0;
+    color: var(--elite-hero);
+    font-size: 0.74rem;
+    font-weight: 900;
+    letter-spacing: 0.10em;
+    text-transform: uppercase;
+}}
+.series-control-title {{
+    margin: 0;
+    color: var(--elite-graphite);
+    font-family: var(--font-display);
+    font-size: 1.08rem;
+    font-weight: 900;
+}}
+.series-control-copy {{
+    margin: 0.45rem 0 0 0;
+    color: #666c78;
+    font-size: 0.9rem;
+    line-height: 1.5;
+}}
+[data-testid="stAppViewContainer"] div.stButton > button {{
+    border-radius: 999px;
+    min-height: 2.72rem;
+}}
+[data-testid="stAppViewContainer"] [data-testid="stCheckbox"] label {{
+    gap: 0.48rem;
+    align-items: center;
+    min-height: 2.55rem;
+    padding: 0.36rem 0.55rem;
+    border-radius: 999px;
+    border: 1px solid rgba(84,83,134,0.10);
+    background: rgba(255,255,255,0.70);
+    box-shadow: 0 8px 18px rgba(45,48,64,0.04);
+    transition: border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+}}
+[data-testid="stAppViewContainer"] [data-testid="stCheckbox"] label:hover {{
+    border-color: rgba(84,83,134,0.24);
+    background: rgba(255,255,255,0.92);
+    box-shadow: 0 12px 24px rgba(45,48,64,0.07);
+}}
+[data-testid="stAppViewContainer"] [data-testid="stCheckbox"] label p {{
+    font-weight: 700;
+    color: var(--elite-graphite);
 }}
 [data-testid="stRadio"] label,
 [data-testid="stSelectbox"] label,
@@ -3147,12 +3204,25 @@ def _render_correlacion_series_panel(available_vars, selected_block_code, df_var
         return []
 
     with st.expander("Configurar series visibles", expanded=True):
-        action_col, clear_col, external_col, ideal_col = st.columns([0.14, 0.14, 0.36, 0.36])
+        st.markdown(
+            """
+            <div class="series-control-card">
+                <p class="series-control-kicker">Selector de lectura</p>
+                <h3 class="series-control-title">Elige qué señales quieres cruzar en la gráfica</h3>
+                <p class="series-control-copy">
+                    Mantén visibles las variables ambientales clave y activa las referencias operativas solo cuando ayuden
+                    a explicar un cambio de temperatura, humedad, radiación o gramos de agua.
+                </p>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+        action_col, clear_col, external_col, ideal_col = st.columns([0.18, 0.18, 0.32, 0.32])
         with action_col:
-            if st.button("Todas", key="correlacion_select_all", width="stretch"):
+            if st.button("Seleccionar todo", key="correlacion_select_all", width="stretch"):
                 _reset_correlacion_selector(available_vars)
         with clear_col:
-            if st.button("Limpiar", key="correlacion_clear_all", width="stretch"):
+            if st.button("Limpiar selección", key="correlacion_clear_all", width="stretch"):
                 for option in available_vars:
                     st.session_state[_selector_state_key(option)] = False
                 st.session_state['variables_correlacion'] = []
@@ -3170,6 +3240,7 @@ def _render_correlacion_series_panel(available_vars, selected_block_code, df_var
                 help=FILTER_HELP_TEXTS['aperturas_ideales']
             )
 
+        st.markdown('<p class="analysis-note"><strong>Variables ambientales y operativas disponibles</strong></p>', unsafe_allow_html=True)
         option_columns = st.columns(min(4, max(1, len(available_vars))))
         for idx, option in enumerate(available_vars):
             state_key = _selector_state_key(option)
@@ -12072,11 +12143,8 @@ def _render_focus_chart_grid(df_variables, fecha_variables, block_label=None, he
         )
 
     if TEMP_FOCUS_CHART_PLACEMENT == 'below':
-        for start_index in range(0, len(figures), 2):
-            row_columns = st.columns(TEMP_FOCUS_CHART_COLUMN_LAYOUT)
-            for column, figure in zip(row_columns, figures[start_index:start_index + 2]):
-                with column:
-                    _plotly_chart(figure)
+        for figure in figures:
+            _plotly_chart(figure)
     elif TEMP_FOCUS_CHART_PLACEMENT == 'left':
         left_col, right_col = st.columns(TEMP_FOCUS_CHART_COLUMN_LAYOUT)
         with left_col:
@@ -12718,7 +12786,7 @@ def _build_variable_distribution_table(df_source, variables):
     return pd.DataFrame(records)
 
 
-def _render_variable_distribution_cards(stats_df, variable_configs=None, title='Resumen estadístico'):
+def _render_variable_distribution_cards(stats_df, variable_configs=None, title='Resumen estadístico', dispersion_available=True):
     if stats_df.empty or 'Variable' not in stats_df.columns:
         st.info("No hay datos suficientes para construir el resumen estadístico.")
         return
@@ -12742,12 +12810,15 @@ def _render_variable_distribution_cards(stats_df, variable_configs=None, title='
         minimo = _format_metric_card_value(row.get('Minimo'), decimals=2)
         maximo = _format_metric_card_value(row.get('Maximo'), decimals=2)
         rango = _format_metric_card_value(row.get('Rango'), decimals=2)
-        desviacion = _format_metric_card_value(row.get('Desviacion estandar'), decimals=2)
-        varianza = _format_metric_card_value(row.get('Varianza'), decimals=2)
+        desviacion = _format_metric_card_value(row.get('Desviacion estandar'), decimals=2) if dispersion_available else "Varios días"
+        varianza = _format_metric_card_value(row.get('Varianza'), decimals=2) if dispersion_available else "Varios días"
         registros = _format_metric_card_value(row.get('Registros'), decimals=0)
         cv_value = row.get('Coef. variacion (%)')
-        cv_text = _format_metric_card_value(cv_value, decimals=1) if pd.notna(cv_value) else "Sin dato"
-        cv_display = f"{cv_text}%" if cv_text != "Sin dato" else cv_text
+        if dispersion_available:
+            cv_text = _format_metric_card_value(cv_value, decimals=1) if pd.notna(cv_value) else "Sin dato"
+            cv_display = f"{cv_text}%" if cv_text != "Sin dato" else cv_text
+        else:
+            cv_display = "Varios días"
 
         cards_html.append(
             '<div class="analysis-stat-card" style="--analysis-accent: {accent};">'
@@ -12783,6 +12854,368 @@ def _render_variable_distribution_cards(stats_df, variable_configs=None, title='
         )
 
     st.markdown('<div class="analysis-stat-grid">' + ''.join(cards_html) + '</div>', unsafe_allow_html=True)
+
+
+def _build_correlacion_30min_stats(df_variables, variables):
+    if not isinstance(df_variables, pd.DataFrame) or df_variables.empty or 'DateTime' not in df_variables.columns:
+        return pd.DataFrame()
+
+    records = []
+    for variable_name in variables:
+        if variable_name not in df_variables.columns:
+            continue
+
+        data = df_variables[['DateTime', variable_name]].copy()
+        data['DateTime'] = pd.to_datetime(data['DateTime'], errors='coerce')
+        data[variable_name] = pd.to_numeric(data[variable_name], errors='coerce')
+        data = data.dropna(subset=['DateTime', variable_name])
+        if data.empty:
+            continue
+
+        data['Fecha'] = data['DateTime'].dt.date
+        data['FranjaDateTime'] = data['DateTime'].dt.round('30min')
+        data['FranjaMinutos'] = data['FranjaDateTime'].dt.hour * 60 + data['FranjaDateTime'].dt.minute
+        data['Franja'] = data['FranjaDateTime'].dt.strftime('%H:%M')
+
+        grouped = (
+            data.groupby(['FranjaMinutos', 'Franja'], as_index=False)
+            .agg(
+                Promedio=(variable_name, 'mean'),
+                DesviacionEstandar=(variable_name, lambda serie: serie.std(ddof=1) if len(serie) > 1 else 0.0),
+                Varianza=(variable_name, lambda serie: serie.var(ddof=1) if len(serie) > 1 else 0.0),
+                Registros=(variable_name, 'count'),
+                Dias=('Fecha', 'nunique'),
+            )
+            .sort_values('FranjaMinutos')
+        )
+        grouped['Variable'] = variable_name
+        records.append(grouped)
+
+    if not records:
+        return pd.DataFrame()
+
+    return pd.concat(records, ignore_index=True, sort=False)
+
+
+def _build_correlacion_30min_metric_chart(hourly_stats_df, variable_name, metric_column, block_label, fecha_variables):
+    if hourly_stats_df.empty or metric_column not in hourly_stats_df.columns:
+        return None
+
+    chart_df = hourly_stats_df[hourly_stats_df['Variable'] == variable_name].copy()
+    chart_df[metric_column] = pd.to_numeric(chart_df[metric_column], errors='coerce')
+    chart_df = chart_df.dropna(subset=[metric_column]).sort_values('FranjaMinutos')
+    if chart_df.empty:
+        return None
+
+    display_slots = [
+        f'{hour:02d}:{minute:02d}'
+        for hour in range(24)
+        for minute in (0, 30)
+    ]
+    metric_labels = {
+        'Promedio': 'Promedio',
+        'DesviacionEstandar': 'Desviación estándar',
+        'Varianza': 'Varianza',
+    }
+    metric_colors = {
+        'Promedio': VARIABLE_COLORS.get(variable_name, BRAND_COLORS['hero']),
+        'DesviacionEstandar': BRAND_COLORS['rose'],
+        'Varianza': BRAND_COLORS['beige'],
+    }
+    metric_label = metric_labels.get(metric_column, metric_column)
+    unit_text = _format_analysis_unit_text(VARIABLE_UNITS.get(variable_name, ''))
+    if metric_column == 'Varianza' and unit_text:
+        unit_text = f'{unit_text}²'
+    yaxis_title = f'{metric_label} ({unit_text})' if unit_text else metric_label
+    fecha_inicio, fecha_fin = fecha_variables
+    period_label = _format_selected_period_label(fecha_inicio, fecha_fin)
+    color = metric_colors.get(metric_column, BRAND_COLORS['hero'])
+
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(
+        x=chart_df['Franja'],
+        y=chart_df[metric_column],
+        customdata=chart_df[['Registros', 'Dias']],
+        mode='lines+markers',
+        name=metric_label,
+        line=dict(color=color, width=3.4, shape='spline', smoothing=0.42),
+        marker=dict(size=7, color=color, line=dict(color='rgba(255,255,255,0.86)', width=1)),
+        fill='tozeroy' if metric_column == 'Promedio' else None,
+        fillcolor=f"rgba{tuple(int(color.lstrip('#')[idx:idx+2], 16) for idx in (0, 2, 4)) + (0.13,)}" if str(color).startswith('#') else 'rgba(84,83,134,0.10)',
+        hovertemplate=(
+            '<b>%{x}</b><br>'
+            f'{metric_label}: %{{y:.2f}} {unit_text}<br>'
+            'Registros: %{customdata[0]}<br>'
+            'Días representados: %{customdata[1]}'
+            '<extra></extra>'
+        )
+    ))
+    fig.update_layout(
+        template='plotly_white',
+        title=dict(
+            text=f'{metric_label} cada 30 min · {VARIABLE_SELECTOR_LABELS.get(variable_name, variable_name)} · {block_label}',
+            x=0,
+            xanchor='left',
+            font=dict(size=19, color=BRAND_COLORS['graphite'], family='Montserrat, sans-serif')
+        ),
+        height=520,
+        margin=dict(l=44, r=28, t=86, b=92),
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor='rgba(250,248,243,0.68)',
+        hovermode='x unified',
+        font=dict(family='Montserrat, sans-serif', color=BRAND_COLORS['graphite']),
+        xaxis=dict(
+            title='<b>Franja horaria</b>',
+            type='category',
+            categoryorder='array',
+            categoryarray=display_slots,
+            tickmode='array',
+            tickvals=display_slots,
+            ticktext=display_slots,
+            tickangle=-90,
+            tickfont=dict(size=10, family='Montserrat, sans-serif', color=BRAND_COLORS['graphite']),
+            gridcolor='rgba(76, 70, 120, 0.07)',
+            zeroline=False,
+        ),
+        yaxis=dict(
+            title=f'<b>{yaxis_title}</b>',
+            tickfont=dict(size=11, family='Montserrat, sans-serif', color=BRAND_COLORS['graphite']),
+            gridcolor='rgba(76, 70, 120, 0.08)',
+            zeroline=False,
+        ),
+        annotations=[
+            dict(
+                text=f'Periodo: {period_label}',
+                xref='paper',
+                yref='paper',
+                x=0,
+                y=1.10,
+                showarrow=False,
+                align='left',
+                font=dict(size=12, color='#707684', family='Montserrat, sans-serif')
+            )
+        ],
+    )
+    return fig
+
+
+def _format_correlacion_30min_table(hourly_stats_df, variable_name, single_day):
+    if hourly_stats_df.empty:
+        return pd.DataFrame()
+
+    table = hourly_stats_df[hourly_stats_df['Variable'] == variable_name].copy()
+    if table.empty:
+        return pd.DataFrame()
+
+    columns = ['Franja', 'Promedio', 'Registros']
+    if not single_day:
+        columns = ['Franja', 'Promedio', 'DesviacionEstandar', 'Varianza', 'Registros', 'Dias']
+    table = table[columns].rename(columns={
+        'Franja': 'Franja 30 min',
+        'DesviacionEstandar': 'Desviación estándar',
+        'Dias': 'Días',
+    })
+    numeric_cols = [column for column in table.columns if column not in ('Franja 30 min',)]
+    table[numeric_cols] = table[numeric_cols].apply(pd.to_numeric, errors='coerce').round(2)
+    return table.reset_index(drop=True)
+
+
+def _render_correlacion_statistics_dashboard(df_variables_corr, fecha_variables, stats_variables, variable_stat_configs, block_label):
+    if not stats_variables:
+        st.info("No hay variables ambientales suficientes para construir el análisis estadístico.")
+        return
+
+    fecha_inicio, fecha_fin = fecha_variables
+    single_day = fecha_inicio == fecha_fin
+    period_title = "Lectura de un día" if single_day else "Lectura de varios días"
+    period_copy = (
+        "Para un solo día se muestra el perfil promedio por franjas de 30 minutos. La desviación estándar y la varianza se reservan para varios días, porque ahí sí comparan la dispersión de una misma hora entre jornadas."
+        if single_day else
+        "Para varios días, cada punto agrupa la misma franja horaria de todos los días seleccionados. Así el promedio muestra el comportamiento típico, y la desviación estándar y la varianza muestran qué tan estable o variable fue cada franja."
+    )
+    _render_chart_explanation(
+        period_title,
+        period_copy,
+        accent=BRAND_COLORS['hero'],
+        kicker='Estadística por franjas de 30 min'
+    )
+
+    stats_df = _build_variable_distribution_table(df_variables_corr, stats_variables)
+    _render_variable_distribution_cards(
+        stats_df,
+        variable_stat_configs,
+        title=f"Resumen estadístico ambiental - {block_label}",
+        dispersion_available=not single_day
+    )
+
+    hourly_stats_df = _build_correlacion_30min_stats(df_variables_corr, stats_variables)
+    if hourly_stats_df.empty:
+        st.info("No hay datos suficientes para calcular las franjas de 30 minutos.")
+        return
+
+    metric_options = ["Promedio"]
+    if not single_day:
+        metric_options.extend(["Desviación estándar", "Varianza"])
+    if st.session_state.get("correlacion_stats_metric") not in metric_options:
+        st.session_state["correlacion_stats_metric"] = metric_options[0]
+    selected_metric_label = st.segmented_control(
+        "Métrica por franja:",
+        options=metric_options,
+        key="correlacion_stats_metric",
+        help="Promedio siempre está disponible. Desviación estándar y varianza se habilitan cuando analizas varios días.",
+        width="stretch"
+    )
+    metric_column = {
+        "Promedio": "Promedio",
+        "Desviación estándar": "DesviacionEstandar",
+        "Varianza": "Varianza",
+    }[selected_metric_label]
+
+    if st.session_state.get("correlacion_stats_variable") not in stats_variables:
+        st.session_state["correlacion_stats_variable"] = stats_variables[0]
+    selected_variable = st.segmented_control(
+        "Variable ambiental:",
+        options=stats_variables,
+        format_func=lambda value: VARIABLE_SELECTOR_LABELS.get(value, VARIABLE_LABELS.get(value, value)),
+        key="correlacion_stats_variable",
+        width="stretch"
+    )
+
+    metric_chart = _build_correlacion_30min_metric_chart(
+        hourly_stats_df,
+        selected_variable,
+        metric_column,
+        block_label,
+        fecha_variables
+    )
+    if metric_chart is None:
+        st.info("No hay datos suficientes para construir la gráfica seleccionada.")
+    else:
+        _plotly_chart(
+            metric_chart,
+            config={
+                'displaylogo': False,
+                'responsive': True,
+                'modeBarButtonsToRemove': ['lasso2d', 'select2d']
+            }
+        )
+
+    table = _format_correlacion_30min_table(hourly_stats_df, selected_variable, single_day)
+    with st.expander("Ver tabla por franjas de 30 minutos", expanded=False):
+        if table.empty:
+            st.info("No hay tabla disponible para esta selección.")
+        else:
+            report_slug = _build_report_slug(block_label, selected_variable, selected_metric_label)
+            _render_table_download_button(
+                table,
+                "Descargar tabla estadística",
+                f"estadistica_30min_{report_slug}.xlsx",
+                f"download_correlacion_stats_30min_{report_slug}",
+                variable_column='Variable',
+                help_text="Descarga la tabla calculada por franjas de 30 minutos."
+            )
+            _dataframe(table, hide_index=True, height=300)
+
+
+def _render_correlacion_records_overview(sensor_30min_report, cortinas_30min_report, cortinas_event_report, datos_sensores_corr, datos_cortinas_sel):
+    overview_columns = st.columns(4)
+    overview_items = [
+        ("Variables 30 min", len(sensor_30min_report), "Promedios ambientales"),
+        ("Cortinas 30 min", len(cortinas_30min_report), "Estados por franja"),
+        ("Eventos cortinas", len(cortinas_event_report), "Movimientos registrados"),
+        ("Crudos", len(datos_sensores_corr) + len(datos_cortinas_sel), "Filas originales"),
+    ]
+    for column, (label, value, help_text) in zip(overview_columns, overview_items):
+        with column:
+            st.metric(label, f"{value:,}", help=help_text)
+
+
+def _render_correlacion_records_tab(df_variables_corr, datos_sensores_corr, datos_cortinas_sel, variables_sensor, fecha_variables, block_label):
+    _render_chart_explanation(
+        "Registros y exportables",
+        "Esta pestaña deja trazabilidad de lo que se está graficando: variables ambientales consolidadas cada 30 minutos, estados de cortinas por franja, eventos operativos y registros crudos del Excel.",
+        accent=BRAND_COLORS['hero'],
+        kicker='Base de datos visible'
+    )
+    sensor_30min_report = _build_variables_30min_report(df_variables_corr, variables_sensor)
+    cortinas_30min_report = _build_cortinas_30min_report(datos_cortinas_sel, fecha_variables, block_label)
+    cortinas_event_report = _build_cortinas_event_report(datos_cortinas_sel)
+    _render_correlacion_records_overview(
+        sensor_30min_report,
+        cortinas_30min_report,
+        cortinas_event_report,
+        datos_sensores_corr,
+        datos_cortinas_sel
+    )
+
+    record_content_options = [
+        "Variables cada 30 min",
+        "Cortinas cada 30 min",
+        "Eventos de cortinas",
+        "Registros crudos"
+    ]
+    if st.session_state.get("vista_registros_correlacion") not in record_content_options:
+        st.session_state["vista_registros_correlacion"] = record_content_options[0]
+    selected_record_content = st.segmented_control(
+        "Reporte",
+        options=record_content_options,
+        key="vista_registros_correlacion",
+        help=FILTER_HELP_TEXTS['registros'],
+        width="stretch"
+    )
+    if selected_record_content == "Variables cada 30 min":
+        if sensor_30min_report.empty:
+            st.info("No hay registros de variables para generar el reporte cada 30 minutos.")
+        else:
+            st.caption("Promedio de cada variable ambiental por franja de 30 minutos.")
+            _render_table_download_button(
+                sensor_30min_report,
+                "Descargar reporte de variables",
+                f"reporte_variables_30min_{_build_report_slug(block_label)}.xlsx",
+                "download_correlacion_variables_30min",
+                variable_column='Fecha'
+            )
+            _dataframe(sensor_30min_report, hide_index=True, height=360)
+    elif selected_record_content == "Cortinas cada 30 min":
+        if cortinas_30min_report.empty:
+            st.info("No hay registros de cortinas para generar el reporte cada 30 minutos.")
+        else:
+            st.caption("Estado estimado de frentes, puertas y culatas por franja de 30 minutos.")
+            _render_table_download_button(
+                cortinas_30min_report,
+                "Descargar reporte de cortinas",
+                f"reporte_cortinas_30min_{_build_report_slug(block_label)}.xlsx",
+                "download_correlacion_cortinas_30min",
+                variable_column='Motor'
+            )
+            _dataframe(cortinas_30min_report, hide_index=True, height=360)
+    elif selected_record_content == "Eventos de cortinas":
+        if cortinas_event_report.empty:
+            st.info("No hay eventos de cortinas para los filtros seleccionados.")
+        else:
+            st.caption("Eventos operativos tal como aparecen en el registro de cortinas.")
+            _render_table_download_button(
+                cortinas_event_report,
+                "Descargar eventos de cortinas",
+                f"eventos_cortinas_{_build_report_slug(block_label)}.xlsx",
+                "download_correlacion_eventos_cortinas",
+                variable_column='Fecha'
+            )
+            _dataframe(cortinas_event_report, hide_index=True, height=360)
+    elif selected_record_content == "Registros crudos":
+        raw_tab_sensors, raw_tab_cortinas = st.tabs(["Sensores", "Cortinas"])
+        with raw_tab_sensors:
+            if datos_sensores_corr.empty:
+                st.info("No hay registros de sensores para los filtros seleccionados.")
+            else:
+                st.caption("Filas ambientales originales filtradas para el bloque y periodo seleccionado.")
+                _dataframe(datos_sensores_corr, hide_index=True, height=360)
+        with raw_tab_cortinas:
+            if datos_cortinas_sel.empty:
+                st.info("No hay registros de cortinas para los filtros seleccionados.")
+            else:
+                st.caption("Filas originales de cortinas filtradas para el bloque y periodo seleccionado.")
+                _dataframe(datos_cortinas_sel, hide_index=True, height=360)
 
 
 def _prepare_variable_stats_chart_df(stats_df, metric_key, variable_configs=None):
@@ -14569,14 +15002,7 @@ with tab_correlacion:
                 )
 
         with tab_stats:
-            _render_chart_explanation(
-                "Análisis estadístico de variables",
-                "Esta sección separa tendencia central, extremos y dispersión. Promedio, mediana, mínimo y máximo se comparan en barras; desviación estándar y varianza se leen por variable para respetar sus unidades; el coeficiente de variación compara estabilidad relativa.",
-                accent=BRAND_COLORS['hero'],
-                kicker='Estadística del periodo'
-            )
             stats_variables = [variable for variable in variables_sensor if variable in df_variables_corr.columns]
-            stats_df = _build_variable_distribution_table(df_variables_corr, stats_variables)
             variable_stat_configs = {
                 variable_name: {
                     'title': VARIABLE_SELECTOR_LABELS.get(variable_name, VARIABLE_LABELS.get(variable_name, variable_name)),
@@ -14585,18 +15011,13 @@ with tab_correlacion:
                 }
                 for variable_name in stats_variables
             }
-            _render_variable_statistics_charts(
-                stats_df,
+            _render_correlacion_statistics_dashboard(
+                df_variables_corr,
+                fecha_variables,
+                stats_variables,
                 variable_stat_configs,
                 block_label=block_label
             )
-            _render_variable_distribution_cards(
-                stats_df,
-                variable_stat_configs,
-                title=f"Análisis estadístico de variables - {block_label}"
-            )
-            with st.expander("Ver estadística en tabla", expanded=False):
-                _dataframe(stats_df, hide_index=True)
 
         with tab_detail:
             _render_temperature_focus_chart(
@@ -14608,72 +15029,14 @@ with tab_correlacion:
             )
 
         with tab_records:
-            sensor_30min_report = _build_variables_30min_report(df_variables_corr, variables_sensor)
-            cortinas_30min_report = _build_cortinas_30min_report(datos_cortinas_sel, fecha_variables, block_label)
-            cortinas_event_report = _build_cortinas_event_report(datos_cortinas_sel)
-            record_content_options = [
-                "Variables cada 30 min",
-                "Cortinas cada 30 min",
-                "Eventos de cortinas",
-                "Registros crudos"
-            ]
-            if st.session_state.get("vista_registros_correlacion") not in record_content_options:
-                st.session_state["vista_registros_correlacion"] = record_content_options[0]
-            selected_record_content = st.segmented_control(
-                "Reporte",
-                options=record_content_options,
-                key="vista_registros_correlacion",
-                help=FILTER_HELP_TEXTS['registros'],
-                width="stretch"
+            _render_correlacion_records_tab(
+                df_variables_corr,
+                datos_sensores_corr,
+                datos_cortinas_sel,
+                variables_sensor,
+                fecha_variables,
+                block_label
             )
-            if selected_record_content == "Variables cada 30 min":
-                if sensor_30min_report.empty:
-                    st.info("No hay registros de variables para generar el reporte cada 30 minutos.")
-                else:
-                    _render_table_download_button(
-                        sensor_30min_report,
-                        "Descargar reporte de variables",
-                        f"reporte_variables_30min_{_build_report_slug(block_label)}.xlsx",
-                        "download_correlacion_variables_30min",
-                        variable_column='Fecha'
-                    )
-                    _dataframe(sensor_30min_report, hide_index=True)
-            elif selected_record_content == "Cortinas cada 30 min":
-                if cortinas_30min_report.empty:
-                    st.info("No hay registros de cortinas para generar el reporte cada 30 minutos.")
-                else:
-                    _render_table_download_button(
-                        cortinas_30min_report,
-                        "Descargar reporte de cortinas",
-                        f"reporte_cortinas_30min_{_build_report_slug(block_label)}.xlsx",
-                        "download_correlacion_cortinas_30min",
-                        variable_column='Motor'
-                    )
-                    _dataframe(cortinas_30min_report, hide_index=True)
-            elif selected_record_content == "Eventos de cortinas":
-                if cortinas_event_report.empty:
-                    st.info("No hay eventos de cortinas para los filtros seleccionados.")
-                else:
-                    _render_table_download_button(
-                        cortinas_event_report,
-                        "Descargar eventos de cortinas",
-                        f"eventos_cortinas_{_build_report_slug(block_label)}.xlsx",
-                        "download_correlacion_eventos_cortinas",
-                        variable_column='Fecha'
-                    )
-                    _dataframe(cortinas_event_report, hide_index=True)
-            elif selected_record_content == "Registros crudos":
-                raw_tab_sensors, raw_tab_cortinas = st.tabs(["Sensores", "Cortinas"])
-                with raw_tab_sensors:
-                    if datos_sensores_corr.empty:
-                        st.info("No hay registros de sensores para los filtros seleccionados.")
-                    else:
-                        _dataframe(datos_sensores_corr)
-                with raw_tab_cortinas:
-                    if datos_cortinas_sel.empty:
-                        st.info("No hay registros de cortinas para los filtros seleccionados.")
-                    else:
-                        _dataframe(datos_cortinas_sel)
 
         st.stop()
 
