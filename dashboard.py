@@ -6351,7 +6351,10 @@ def _get_ponderosa_y_axis_config(df, variable):
 
 
 def _make_ponderosa_comparison_chart(comparison, variable, selected_range, resolution_label=COMPARISON_RESOLUTION_OPTIONS[0]):
-    config = PONDEROSA_COMPARISON_VARIABLES[variable]
+    config = PONDEROSA_COMPARISON_VARIABLES.get(variable)
+    if config is None:
+        return None
+
     fig = go.Figure()
     time_axis = _get_marley_time_axis_config(comparison)
     y_axis = _get_ponderosa_y_axis_config(
@@ -6440,7 +6443,10 @@ def _make_ponderosa_difference_chart(comparison, variable, selected_range, resol
     if diff_df.empty:
         return None
 
-    config = PONDEROSA_COMPARISON_VARIABLES[variable]
+    config = PONDEROSA_COMPARISON_VARIABLES.get(variable)
+    if config is None:
+        return None
+
     time_axis = _get_marley_time_axis_config(comparison)
     start_date, end_date = selected_range
     multi_day_view = start_date != end_date
@@ -6501,11 +6507,17 @@ def _make_ponderosa_difference_chart(comparison, variable, selected_range, resol
 
 
 def _make_ponderosa_scatter_chart(comparison, variable):
+    if not all(sensor_name in comparison.columns for sensor_name in PONDEROSA_SENSOR_NAMES):
+        return None
+
     hourly = comparison.dropna(subset=list(PONDEROSA_SENSOR_NAMES)).copy()
     if hourly.empty:
         return None
 
-    config = PONDEROSA_COMPARISON_VARIABLES[variable]
+    config = PONDEROSA_COMPARISON_VARIABLES.get(variable)
+    if config is None:
+        return None
+
     axis_min = float(min(hourly['WIGA'].min(), hourly['ECOWITT'].min()))
     axis_max = float(max(hourly['WIGA'].max(), hourly['ECOWITT'].max()))
     padding = max((axis_max - axis_min) * 0.08, 0.5)
@@ -8429,7 +8441,11 @@ def _render_ponderosa_apogee_mci_wiga_dashboard(df_variables_all, df_cortinas_al
 
 
 def _render_ponderosa_comparison_metric_cards(overlap, selected_variable):
-    config = PONDEROSA_COMPARISON_VARIABLES[selected_variable]
+    config = PONDEROSA_COMPARISON_VARIABLES.get(selected_variable)
+    if config is None:
+        st.info("La variable seleccionada ya no está disponible para la comparación WIGA / ECOWITT.")
+        return
+
     avg_abs_diff = overlap['DiffValue'].mean() if not overlap.empty else None
     avg_signed_diff = overlap['SignedDiff'].mean() if not overlap.empty else None
     std_diff = overlap['SignedDiff'].std() if not overlap.empty else None
@@ -8747,8 +8763,25 @@ def _render_ponderosa_ecowitt_dashboard(df_variables_all, df_cortinas_all, selec
     )
     point_mode = comparison_resolution == COMPARISON_RESOLUTION_OPTIONS[1]
     nearest_wiga_mode = comparison_resolution == COMPARISON_RESOLUTION_OPTIONS[2]
-    compared_variables = list(PONDEROSA_COMPARISON_VARIABLES.keys())
-    tab_compare, tab_stats, tab_tables, tab_detail = st.tabs(["Gráfica", "Resumen estadístico", "Tabla", "Detalle y registros"])
+    compared_variables = [
+        variable_name
+        for variable_name in PONDEROSA_COMPARISON_VARIABLES
+        if f"{variable_name} - WIGA" in filtered_df.columns or f"{variable_name} - ECOWITT" in filtered_df.columns
+    ]
+    if not compared_variables:
+        st.warning("No hay variables compartidas disponibles para comparar WIGA / ECOWITT en este periodo.")
+        st.stop()
+
+    if st.session_state.get("ponderosa_ecowitt_stats_variable") not in compared_variables:
+        st.session_state["ponderosa_ecowitt_stats_variable"] = compared_variables[0]
+
+    tab_compare, tab_stats, tab_tables, tab_detail, tab_records = st.tabs([
+        "Gráfica",
+        "Resumen estadístico",
+        "Tabla",
+        "Gráficas individuales",
+        "Registros"
+    ])
 
     with tab_compare:
         for variable_name in compared_variables:
@@ -8766,9 +8799,12 @@ def _render_ponderosa_ecowitt_dashboard(df_variables_all, df_cortinas_all, selec
                 _build_ponderosa_hourly_comparison(filtered_df, variable_name, selected_range)
             )
             if comparison.empty or comparison.dropna(how='all', subset=list(PONDEROSA_SENSOR_NAMES)).empty:
-                st.info(f"No hay datos suficientes para graficar {_format_variable_display_title(PONDEROSA_COMPARISON_VARIABLES[variable_name]['title'])}.")
+                variable_title = PONDEROSA_COMPARISON_VARIABLES.get(variable_name, {}).get('title', variable_name)
+                st.info(f"No hay datos suficientes para graficar {_format_variable_display_title(variable_title)}.")
                 continue
-            _plotly_chart(_make_ponderosa_comparison_chart(comparison, variable_name, selected_range, comparison_resolution))
+            comparison_chart = _make_ponderosa_comparison_chart(comparison, variable_name, selected_range, comparison_resolution)
+            if comparison_chart is not None:
+                _plotly_chart(comparison_chart)
             difference_chart = _make_ponderosa_difference_chart(comparison, variable_name, selected_range, comparison_resolution)
             if difference_chart is not None:
                 _plotly_chart(difference_chart)
@@ -8777,10 +8813,12 @@ def _render_ponderosa_ecowitt_dashboard(df_variables_all, df_cortinas_all, selec
         selected_variable_stats = st.segmented_control(
             "Variable para resumen:",
             options=compared_variables,
-            format_func=lambda value: _format_variable_display_title(PONDEROSA_COMPARISON_VARIABLES[value]['title']),
+            format_func=lambda value: _format_variable_display_title(PONDEROSA_COMPARISON_VARIABLES.get(value, {}).get('title', value)),
             key="ponderosa_ecowitt_stats_variable",
             width="stretch"
         )
+        if selected_variable_stats not in compared_variables:
+            selected_variable_stats = compared_variables[0]
         comparison_stats = (
             _build_point_comparison(filtered_df, selected_variable_stats, PONDEROSA_SENSOR_NAMES)
             if point_mode else
@@ -8794,16 +8832,22 @@ def _render_ponderosa_ecowitt_dashboard(df_variables_all, df_cortinas_all, selec
             if nearest_wiga_mode else
             _build_ponderosa_hourly_comparison(filtered_df, selected_variable_stats, selected_range)
         )
-        overlap = comparison_stats.dropna(subset=list(PONDEROSA_SENSOR_NAMES)).copy()
-        _render_ponderosa_comparison_metric_cards(overlap, selected_variable_stats)
-        scatter_chart = _make_ponderosa_scatter_chart(comparison_stats, selected_variable_stats)
-        if scatter_chart is not None:
-            _render_chart_explanation(
-                'Dispersión entre sensores',
-                'Cada punto cruza una lectura simultánea de WIGA y ECOWITT. Mientras más cerca esté de la línea diagonal, más parecidos fueron ambos sensores.',
-                accent=PONDEROSA_COMPARISON_VARIABLES[selected_variable_stats]['colors']['WIGA']
-            )
-            _plotly_chart(scatter_chart)
+        if not all(sensor_name in comparison_stats.columns for sensor_name in PONDEROSA_SENSOR_NAMES):
+            st.info("No hay columnas suficientes para construir el resumen estadístico de esta variable.")
+        else:
+            overlap = comparison_stats.dropna(subset=list(PONDEROSA_SENSOR_NAMES)).copy()
+            _render_ponderosa_comparison_metric_cards(overlap, selected_variable_stats)
+            scatter_chart = _make_ponderosa_scatter_chart(comparison_stats, selected_variable_stats)
+            if scatter_chart is not None:
+                selected_config = PONDEROSA_COMPARISON_VARIABLES.get(selected_variable_stats, {})
+                _render_chart_explanation(
+                    'Dispersión entre sensores',
+                    'Cada punto cruza una lectura simultánea de WIGA y ECOWITT. Mientras más cerca esté de la línea diagonal, más parecidos fueron ambos sensores.',
+                    accent=selected_config.get('colors', {}).get('WIGA', BRAND_COLORS['hero'])
+                )
+                _plotly_chart(scatter_chart)
+            else:
+                st.info("No hay suficientes datos simultáneos para construir la dispersión entre sensores.")
 
     with tab_tables:
         _render_difference_table_30min(
@@ -8819,37 +8863,41 @@ def _render_ponderosa_ecowitt_dashboard(df_variables_all, df_cortinas_all, selec
         )
 
     with tab_detail:
-        if st.checkbox(
-            "Mostrar gráficas individuales WIGA / ECOWITT",
-            key="mostrar_ponderosa_ecowitt_detalles",
-            help="Activa esta sección para ver cada variable por separado debajo de la comparativa principal."
-        ):
-            _render_ponderosa_source_individual_charts(
-                filtered_df,
-                selected_range,
-                compared_variables,
-                PONDEROSA_SENSOR_NAMES,
-                "Variables individuales WIGA / ECOWITT Ponderosa",
-                "Estas gráficas separan cada variable compartida por sensor para revisar la forma de cada lectura sin la superposición de la comparativa.",
-                comparison_resolution
-            )
+        _render_ponderosa_source_individual_charts(
+            filtered_df,
+            selected_range,
+            compared_variables,
+            PONDEROSA_SENSOR_NAMES,
+            "Variables individuales WIGA / ECOWITT Ponderosa",
+            "Estas gráficas separan cada variable compartida por sensor para revisar la forma de cada lectura sin la superposición de la comparativa.",
+            comparison_resolution
+        )
 
-        if st.checkbox(
-            "Cargar registros consolidados de Ponderosa",
-            key="mostrar_ponderosa_ecowitt_registros",
-            help=FILTER_HELP_TEXTS['registros']
-        ):
-            _dataframe(filtered_df.drop(columns=['Fecha_Filtro'], errors='ignore'), hide_index=True)
-            summary_rows = []
-            for source_name, source_df in source_frames.items():
-                current = source_df[source_df['Fecha_Filtro'].between(*selected_range)] if not source_df.empty else pd.DataFrame()
-                summary_rows.append({
-                    'Equipo': source_name,
-                    'Registros': len(current),
-                    'Inicio': current['FechaHora'].min().strftime('%Y-%m-%d %H:%M') if not current.empty else '-',
-                    'Fin': current['FechaHora'].max().strftime('%Y-%m-%d %H:%M') if not current.empty else '-',
-                })
-            _dataframe(pd.DataFrame(summary_rows), hide_index=True)
+    with tab_records:
+        _render_chart_explanation(
+            "Registros consolidados WIGA / ECOWITT",
+            "Esta tabla conserva los datos base usados para las gráficas y el resumen del periodo por equipo.",
+            accent=BRAND_COLORS['hero'],
+            kicker='Datos fuente'
+        )
+        summary_rows = []
+        for source_name, source_df in source_frames.items():
+            current = source_df[source_df['Fecha_Filtro'].between(*selected_range)] if not source_df.empty else pd.DataFrame()
+            summary_rows.append({
+                'Equipo': source_name,
+                'Registros': len(current),
+                'Inicio': current['FechaHora'].min().strftime('%Y-%m-%d %H:%M') if not current.empty else '-',
+                'Fin': current['FechaHora'].max().strftime('%Y-%m-%d %H:%M') if not current.empty else '-',
+            })
+        _render_table_download_button(
+            filtered_df.drop(columns=['Fecha_Filtro'], errors='ignore'),
+            "Descargar registros consolidados",
+            f"registros_wiga_ecowitt_{_build_report_slug(block_label, comparison_resolution)}.xlsx",
+            "download_ponderosa_ecowitt_registros",
+            variable_column='__consolidado__'
+        )
+        _dataframe(pd.DataFrame(summary_rows), hide_index=True)
+        _dataframe(filtered_df.drop(columns=['Fecha_Filtro'], errors='ignore'), hide_index=True)
 
     st.stop()
 
@@ -12736,7 +12784,7 @@ def _render_variable_distribution_cards(stats_df, variable_configs=None, title='
     st.markdown('<div class="analysis-stat-grid">' + ''.join(cards_html) + '</div>', unsafe_allow_html=True)
 
 
-def _make_variable_stat_bar_chart(stats_df, metric_key, metric_label, variable_configs=None, block_label=None):
+def _prepare_variable_stats_chart_df(stats_df, metric_key, variable_configs=None):
     if stats_df.empty or metric_key not in stats_df.columns or 'Variable' not in stats_df.columns:
         return None
 
@@ -12755,6 +12803,16 @@ def _make_variable_stat_bar_chart(stats_df, metric_key, metric_label, variable_c
     chart_df['Color'] = chart_df['Variable'].apply(
         lambda value: variable_configs.get(value, {}).get('accent', VARIABLE_COLORS.get(value, BRAND_COLORS['hero']))
     )
+    chart_df['Unidad'] = chart_df['Variable'].apply(
+        lambda value: variable_configs.get(value, {}).get('unit', VARIABLE_UNITS.get(value, ''))
+    )
+    return chart_df
+
+
+def _make_variable_stat_bar_chart(stats_df, metric_key, metric_label, variable_configs=None, block_label=None):
+    chart_df = _prepare_variable_stats_chart_df(stats_df, metric_key, variable_configs)
+    if chart_df is None:
+        return None
 
     fig = go.Figure(go.Bar(
         x=chart_df['Variable visible'],
@@ -12779,23 +12837,162 @@ def _make_variable_stat_bar_chart(stats_df, metric_key, metric_label, variable_c
     return fig
 
 
+def _make_variable_cv_chart(stats_df, variable_configs=None, block_label=None):
+    chart_df = _prepare_variable_stats_chart_df(stats_df, 'Coef. variacion (%)', variable_configs)
+    if chart_df is None:
+        return None
+
+    chart_df = chart_df.sort_values('Coef. variacion (%)', ascending=True)
+    fig = go.Figure(go.Bar(
+        x=chart_df['Coef. variacion (%)'],
+        y=chart_df['Variable visible'],
+        orientation='h',
+        marker=dict(color=chart_df['Color'], line=dict(color='rgba(56,58,53,0.18)', width=1)),
+        text=chart_df['Coef. variacion (%)'].apply(lambda value: f"{value:,.1f}%"),
+        textposition='outside',
+        hovertemplate='<b>%{y}</b><br>Coef. variación: %{x:,.1f}%<extra></extra>',
+    ))
+    fig.update_layout(
+        template='plotly_white',
+        title="Estabilidad relativa por variable" + (f" - {block_label}" if block_label else ""),
+        height=420,
+        margin=dict(l=20, r=45, t=70, b=40),
+        xaxis_title='Coeficiente de variación (%)',
+        yaxis_title='Variable',
+        font=dict(family='Montserrat, sans-serif', color=BRAND_COLORS['graphite']),
+    )
+    fig.update_xaxes(showgrid=True, gridcolor='rgba(84,83,134,0.10)', zeroline=False)
+    fig.update_yaxes(showgrid=False)
+    return fig
+
+
+def _make_variable_stat_small_multiples(stats_df, metric_key, metric_label, variable_configs=None, block_label=None):
+    chart_df = _prepare_variable_stats_chart_df(stats_df, metric_key, variable_configs)
+    if chart_df is None:
+        return None
+
+    subplot_count = len(chart_df)
+    cols = min(2, max(1, subplot_count))
+    rows = math.ceil(subplot_count / cols)
+    fig = make_subplots(
+        rows=rows,
+        cols=cols,
+        subplot_titles=chart_df['Variable visible'].tolist(),
+        vertical_spacing=0.18 if rows > 1 else 0.12,
+        horizontal_spacing=0.12,
+    )
+
+    for idx, (_, row) in enumerate(chart_df.iterrows(), start=1):
+        row_idx = math.ceil(idx / cols)
+        col_idx = ((idx - 1) % cols) + 1
+        unit = str(row.get('Unidad') or '').strip()
+        if metric_key == "Varianza" and unit:
+            unit = f"{unit}²"
+        unit_suffix = f" {unit}" if unit else ""
+        value = row[metric_key]
+        fig.add_trace(
+            go.Bar(
+                x=[metric_label],
+                y=[value],
+                marker=dict(color=row['Color'], line=dict(color='rgba(56,58,53,0.18)', width=1)),
+                text=[f"{value:,.2f}{unit_suffix}"],
+                textposition='outside',
+                hovertemplate=f"<b>{row['Variable visible']}</b><br>{metric_label}: %{{y:,.2f}}{unit_suffix}<extra></extra>",
+                showlegend=False,
+            ),
+            row=row_idx,
+            col=col_idx,
+        )
+        fig.update_yaxes(
+            title_text=metric_label,
+            showgrid=True,
+            gridcolor='rgba(84,83,134,0.10)',
+            zeroline=False,
+            row=row_idx,
+            col=col_idx,
+        )
+        fig.update_xaxes(showticklabels=False, row=row_idx, col=col_idx)
+
+    fig.update_layout(
+        template='plotly_white',
+        title=f"{metric_label} por variable" + (f" - {block_label}" if block_label else ""),
+        height=max(420, rows * 320),
+        margin=dict(l=20, r=20, t=82, b=35),
+        font=dict(family='Montserrat, sans-serif', color=BRAND_COLORS['graphite']),
+    )
+    return fig
+
+
 def _render_variable_statistics_charts(stats_df, variable_configs=None, block_label=None):
     if stats_df.empty:
         st.info("No hay datos suficientes para graficar el análisis estadístico.")
         return
 
-    metric_options = [
-        ("Promedio", "Promedio"),
-        ("Mediana", "Mediana"),
-        ("Mínimo", "Minimo"),
-        ("Máximo", "Maximo"),
-        ("Desv. est.", "Desviacion estandar"),
-        ("Varianza", "Varianza"),
+    metric_tabs = st.tabs([
+        "Promedio / media",
+        "Mediana",
+        "Mínimo",
+        "Máximo",
+        "Estabilidad relativa",
+        "Desv. est.",
+        "Varianza",
+    ])
+
+    comparable_metrics = [
+        ("Promedio / media", "Promedio", metric_tabs[0]),
+        ("Mediana", "Mediana", metric_tabs[1]),
+        ("Mínimo", "Minimo", metric_tabs[2]),
+        ("Máximo", "Maximo", metric_tabs[3]),
     ]
-    metric_tabs = st.tabs([label for label, _ in metric_options])
-    for tab, (metric_label, metric_key) in zip(metric_tabs, metric_options):
+    for metric_label, metric_key, tab in comparable_metrics:
         with tab:
             fig = _make_variable_stat_bar_chart(
+                stats_df,
+                metric_key,
+                metric_label,
+                variable_configs=variable_configs,
+                block_label=block_label
+            )
+            if fig is None:
+                st.info(f"No hay datos suficientes para graficar {metric_label.lower()}.")
+            else:
+                _plotly_chart(fig)
+
+    with metric_tabs[4]:
+        _render_chart_explanation(
+            "Coeficiente de variación",
+            "Esta gráfica compara la variabilidad relativa entre variables. Es más justa que comparar desviaciones o varianzas crudas porque expresa la dispersión como porcentaje del promedio.",
+            accent=BRAND_COLORS['sky'],
+            kicker='Comparación estadística'
+        )
+        cv_fig = _make_variable_cv_chart(stats_df, variable_configs=variable_configs, block_label=block_label)
+        if cv_fig is None:
+            st.info("No hay datos suficientes para graficar el coeficiente de variación.")
+        else:
+            _plotly_chart(cv_fig)
+
+    for tab, metric_label, metric_key, description in [
+        (
+            metric_tabs[5],
+            "Desviación estándar",
+            "Desviacion estandar",
+            "Cada panel usa su propia escala porque las variables tienen unidades diferentes. Lee este valor dentro de cada variable, no como competencia directa entre barras."
+        ),
+        (
+            metric_tabs[6],
+            "Varianza",
+            "Varianza",
+            "La varianza queda en unidades al cuadrado, por eso se muestra separada por variable. Sirve para entender dispersión interna del periodo, no para mezclar escalas distintas."
+        ),
+    ]:
+        with tab:
+            _render_chart_explanation(
+                metric_label,
+                description,
+                accent=BRAND_COLORS['hero'],
+                kicker='Dispersión por variable'
+            )
+            fig = _make_variable_stat_small_multiples(
                 stats_df,
                 metric_key,
                 metric_label,
@@ -14373,7 +14570,7 @@ with tab_correlacion:
         with tab_stats:
             _render_chart_explanation(
                 "Análisis estadístico de variables",
-                "Esta sección resume el comportamiento del bloque con métricas de tendencia central y dispersión. Usa las pestañas para revisar cada medida sin mezclar interpretaciones.",
+                "Esta sección separa tendencia central, extremos y dispersión. Promedio, mediana, mínimo y máximo se comparan en barras; desviación estándar y varianza se leen por variable para respetar sus unidades; el coeficiente de variación compara estabilidad relativa.",
                 accent=BRAND_COLORS['hero'],
                 kicker='Estadística del periodo'
             )
