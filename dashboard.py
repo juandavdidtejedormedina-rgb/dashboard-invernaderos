@@ -223,7 +223,7 @@ BRAND_COLORS = {
 APP_DIR = Path(__file__).resolve().parent
 DATA_REPO_OWNER = "juandavdidtejedormedina-rgb"
 DATA_REPO_NAME = "dashboard-invernaderos"
-DATA_REPO_COMMIT = "9a58ee95293848857af7593db7358ed7efd4afaf"
+DATA_REPO_COMMIT = "90aba152212a422fa2de3d72f266f2f33dcab01f"
 DATA_REPO_RAW_BASE = (
     "https://raw.githubusercontent.com/"
     f"{DATA_REPO_OWNER}/{DATA_REPO_NAME}/{DATA_REPO_COMMIT}"
