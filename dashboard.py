@@ -125,6 +125,7 @@ def _render_dashboard_media(selected_finca, lazy_load=False):
 
 SENSOR_VARIABLES = ['Temperatura', 'Humedad Relativa', 'Radiación PAR', 'Gramos de agua']
 PPFD_DISPLAY_NAME = 'PPFD (PAR)'
+PPFD_HELP_TEXT = ''
 PPFD_DISPLAY_LABEL = 'PPFD (PAR, µmol m⁻² s⁻¹)'
 PPFD_DISPLAY_LABEL_ASCII = 'PPFD (PAR, µmol m-2 s-1)'
 VARIABLE_LABELS = {
@@ -278,11 +279,6 @@ VIEW_DISPLAY_LABELS = {
     "Solo WIGA": "WIGA",
     "Solo ECOWITT": "ECOWITT",
 }
-PPFD_HELP_TEXT = (
-    "PPFD significa Photosynthetic Photon Flux Density: mide el flujo de fotones de luz PAR "
-    "útiles para fotosíntesis que llegan a un metro cuadrado cada segundo. En el dashboard se "
-    "muestra como PPFD (PAR, µmol m-2 s-1)."
-)
 MARLEY_SHEETS = {
     "WIGA": ["WIGGA MONTAÑA", "WIGA MARLEY"],
     "ECOWITT": ["ECOWITT MONTAÑA", "ECOWIT MARLEY"],
@@ -711,18 +707,45 @@ section[data-testid="stSidebar"] > div {{
     overflow: visible !important;
 }}
 [data-testid="stSidebarCollapseButton"] {{
-    position: absolute !important;
-    top: 2rem !important;
-    right: 0.45rem !important;
-    left: auto !important;
-    z-index: 20 !important;
+    z-index: 30 !important;
 }}
-[data-testid="stSidebarHeader"] button {{
+section[data-testid="stSidebar"][aria-expanded="true"] [data-testid="stSidebarCollapseButton"],
+section[data-testid="stSidebar"][aria-expanded="true"] [data-testid="stSidebarHeader"] button {{
     position: absolute !important;
     top: 2rem !important;
     right: 0.45rem !important;
     left: auto !important;
-    z-index: 20 !important;
+    z-index: 30 !important;
+}}
+[data-testid="stAppViewContainer"] > section[data-testid="stSidebar"][aria-expanded="false"] [data-testid="stSidebarCollapseButton"],
+[data-testid="stAppViewContainer"] > section[data-testid="stSidebar"][aria-expanded="false"] [data-testid="stSidebarHeader"] button {{
+    position: fixed !important;
+    top: 0.95rem !important;
+    left: 4.35rem !important;
+    right: auto !important;
+    z-index: 40 !important;
+}}
+[data-testid="stSidebarCollapseButton"] > button,
+[data-testid="stSidebarHeader"] button {{
+    width: 2.5rem !important;
+    height: 2.5rem !important;
+    min-width: 2.5rem !important;
+    min-height: 2.5rem !important;
+    border-radius: 999px !important;
+    border: 1px solid rgba(84, 83, 134, 0.14) !important;
+    background: rgba(255, 255, 255, 0.88) !important;
+    box-shadow: 0 12px 24px rgba(45, 48, 64, 0.12) !important;
+    backdrop-filter: blur(10px);
+}}
+[data-testid="stSidebarCollapseButton"] > button:hover,
+[data-testid="stSidebarHeader"] button:hover {{
+    border-color: rgba(84, 83, 134, 0.24) !important;
+    background: rgba(255, 255, 255, 0.98) !important;
+}}
+[data-testid="stSidebarCollapseButton"] svg,
+[data-testid="stSidebarHeader"] button svg {{
+    width: 1.15rem !important;
+    height: 1.15rem !important;
 }}
 [data-testid="stSidebarHeader"] a {{
     display: inline-flex;
@@ -1809,6 +1832,95 @@ div[data-testid="stDataFrame"] {{
     color: #666c78;
     font-size: 0.9rem;
     line-height: 1.5;
+}}
+.series-toolbar-label {{
+    margin: 0.2rem 0 0.55rem 0.12rem;
+    color: var(--elite-hero);
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}}
+.series-toolbar-spacer {{
+    height: 0.25rem;
+}}
+.series-chip-note {{
+    margin: 0.2rem 0 0.85rem 0;
+    color: rgba(56, 58, 53, 0.68);
+    font-size: 0.84rem;
+}}
+[data-testid="stExpander"]:has(.series-control-card) {{
+    border-radius: 12px;
+    border: 1px solid rgba(84,83,134,0.12);
+    background: linear-gradient(180deg, rgba(255,255,255,0.70), rgba(255,255,255,0.62));
+    box-shadow: 0 14px 30px rgba(45,48,64,0.05);
+}}
+[data-testid="stExpander"]:has(.series-control-card) details {{
+    padding: 0.15rem 0.2rem 0.35rem 0.2rem;
+}}
+[data-testid="stExpander"]:has(.series-control-card) details summary {{
+    padding-bottom: 0.55rem;
+}}
+[data-testid="stExpander"]:has(.series-control-card) div.stButton > button {{
+    height: 3.1rem;
+    min-height: 3.1rem;
+    padding: 0 1rem;
+    border-radius: 8px;
+    border: 1px solid rgba(84,83,134,0.18);
+    background:
+        linear-gradient(180deg, rgba(255,255,255,0.98), rgba(248,246,241,0.98));
+    color: var(--elite-hero);
+    font-size: 0.9rem;
+    font-weight: 800;
+    line-height: 1.15;
+    box-shadow: 0 8px 18px rgba(84,83,134,0.07);
+}}
+[data-testid="stExpander"]:has(.series-control-card) div.stButton > button:hover {{
+    border-color: rgba(84,83,134,0.32);
+    background:
+        linear-gradient(180deg, rgba(255,255,255,1), rgba(239,236,229,1));
+    color: var(--elite-hero);
+    box-shadow: 0 12px 24px rgba(84,83,134,0.12);
+}}
+[data-testid="stExpander"]:has(.series-control-card) [data-testid="stCheckbox"] {{
+    margin-bottom: 0.25rem;
+}}
+[data-testid="stExpander"]:has(.series-control-card) [data-testid="stCheckbox"] label {{
+    width: 100%;
+    height: 3.1rem;
+    min-height: 3.1rem;
+    padding: 0 0.78rem;
+    border-radius: 8px;
+    border: 1px solid rgba(84,83,134,0.14);
+    background:
+        linear-gradient(180deg, rgba(255,255,255,0.98), rgba(248,246,241,0.96));
+    box-shadow: 0 8px 18px rgba(45,48,64,0.055);
+}}
+[data-testid="stExpander"]:has(.series-control-card) [data-testid="stCheckbox"] label:hover {{
+    border-color: rgba(84,83,134,0.30);
+    background:
+        linear-gradient(180deg, rgba(255,255,255,1), rgba(239,236,229,0.98));
+    box-shadow: 0 12px 24px rgba(45,48,64,0.08);
+}}
+[data-testid="stExpander"]:has(.series-control-card) [data-testid="stCheckbox"] label p {{
+    font-size: 0.9rem;
+    font-weight: 800;
+    line-height: 1.18;
+    color: var(--elite-graphite);
+}}
+[data-testid="stExpander"]:has(.series-control-card) [data-testid="stCheckbox"] [role="checkbox"] {{
+    width: 1rem;
+    height: 1rem;
+    border-radius: 6px;
+    border-color: rgba(84,83,134,0.24);
+}}
+[data-testid="stExpander"]:has(.series-control-card) [data-testid="stCheckbox"]:has([aria-checked="true"]) label {{
+    border-color: rgba(84,83,134,0.30);
+    background:
+        linear-gradient(180deg, rgba(255,255,255,1), rgba(237,232,247,0.98));
+    box-shadow:
+        inset 0 1px 0 rgba(255,255,255,0.95),
+        0 14px 28px rgba(84,83,134,0.10);
 }}
 [data-testid="stAppViewContainer"] div.stButton > button {{
     border-radius: 999px;
@@ -3217,12 +3329,13 @@ def _render_correlacion_series_panel(available_vars, selected_block_code, df_var
             """,
             unsafe_allow_html=True
         )
-        action_col, clear_col, external_col, ideal_col = st.columns([0.18, 0.18, 0.32, 0.32])
+        st.markdown('<p class="series-toolbar-label">Acciones rápidas</p>', unsafe_allow_html=True)
+        action_col, clear_col, external_col, ideal_col = st.columns([0.22, 0.22, 0.34, 0.22], vertical_alignment="center")
         with action_col:
-            if st.button("Seleccionar todo", key="correlacion_select_all", width="stretch"):
+            if st.button("Seleccionar todas", key="correlacion_select_all", width="stretch"):
                 _reset_correlacion_selector(available_vars)
         with clear_col:
-            if st.button("Limpiar selección", key="correlacion_clear_all", width="stretch"):
+            if st.button("Quitar todas", key="correlacion_clear_all", width="stretch"):
                 for option in available_vars:
                     st.session_state[_selector_state_key(option)] = False
                 st.session_state['variables_correlacion'] = []
@@ -3240,7 +3353,12 @@ def _render_correlacion_series_panel(available_vars, selected_block_code, df_var
                 help=FILTER_HELP_TEXTS['aperturas_ideales']
             )
 
+        st.markdown('<div class="series-toolbar-spacer"></div>', unsafe_allow_html=True)
         st.markdown('<p class="analysis-note"><strong>Variables ambientales y operativas disponibles</strong></p>', unsafe_allow_html=True)
+        st.markdown(
+            '<p class="series-chip-note">Activa solo las señales que realmente aporten lectura al cruce. Así la gráfica respira mejor y se vuelve más clara.</p>',
+            unsafe_allow_html=True
+        )
         option_columns = st.columns(min(4, max(1, len(available_vars))))
         for idx, option in enumerate(available_vars):
             state_key = _selector_state_key(option)
@@ -11956,14 +12074,24 @@ def _render_correlacion(
                 title_standoff=10
             )
 
+    visible_cortina_legend_items = sum(
+        1 for _, trace, _ in cortina_traces
+        if trace.get('showlegend', True)
+    )
+    legend_item_count = len(sensor_traces) + len(compare_sensor_traces) + visible_cortina_legend_items
+    legend_columns = 4 if legend_item_count >= 4 else max(1, legend_item_count)
+    legend_rows = max(1, math.ceil(legend_item_count / legend_columns)) if legend_item_count else 1
+    legend_band_height = 38 + max(0, legend_rows - 1) * 25
+    chart_height = 600 + max(0, legend_rows - 1) * 14
+
     fig_corr.update_layout(
         title=dict(
             text=chart_title,
             x=0,
             xanchor='left',
-            y=0.98,
+            y=0.99,
             yanchor='top',
-            pad=dict(b=8),
+            pad=dict(b=4),
             font=dict(size=22, color=BRAND_COLORS['graphite'], family='Montserrat, sans-serif')
         ),
         xaxis=dict(
@@ -11991,11 +12119,11 @@ def _render_correlacion(
             bordercolor='rgba(76, 70, 120, 0.16)',
             font=dict(family='Montserrat, sans-serif', color=BRAND_COLORS['graphite'], size=12)
         ),
-        height=600,
+        height=chart_height,
         legend=dict(
             orientation='h',
             yanchor='bottom',
-            y=1.055,
+            y=1.045,
             xanchor='left',
             x=0,
             traceorder='normal',
@@ -12003,9 +12131,12 @@ def _render_correlacion(
             grouptitlefont=dict(size=11, family='Montserrat, sans-serif', color=BRAND_COLORS['hero']),
             bgcolor='rgba(255,255,255,0.76)',
             bordercolor='rgba(76, 70, 120, 0.08)',
-            borderwidth=1
+            borderwidth=1,
+            entrywidth=242 if legend_item_count > 4 else 150,
+            entrywidthmode='pixels',
+            itemsizing='trace'
         ),
-        margin=dict(l=50, r=right_margin, t=104, b=70),
+        margin=dict(l=50, r=right_margin, t=96 + legend_band_height, b=70),
         **{f'yaxis{axis_name[1:]}': config for axis_name, config in axis_configs.items()}
     )
 
@@ -12786,6 +12917,66 @@ def _build_variable_distribution_table(df_source, variables):
     return pd.DataFrame(records)
 
 
+def _build_variable_daily_distribution_table(df_source, variables):
+    if not isinstance(df_source, pd.DataFrame) or df_source.empty or 'DateTime' not in df_source.columns:
+        return pd.DataFrame()
+
+    available_variables = [variable for variable in variables if variable in df_source.columns]
+    if not available_variables:
+        return pd.DataFrame()
+
+    data = df_source[['DateTime'] + available_variables].copy()
+    data['DateTime'] = pd.to_datetime(data['DateTime'], errors='coerce')
+    data = data.dropna(subset=['DateTime'])
+    if data.empty:
+        return pd.DataFrame()
+
+    data['Fecha'] = data['DateTime'].dt.date
+    records = []
+    for fecha_value, day_df in data.groupby('Fecha'):
+        day_stats = _build_variable_distribution_table(day_df, variables)
+        if day_stats.empty:
+            continue
+        day_stats.insert(0, 'Fecha', fecha_value)
+        records.append(day_stats)
+
+    if not records:
+        return pd.DataFrame()
+
+    return pd.concat(records, ignore_index=True, sort=False)
+
+
+def _format_variable_daily_distribution_table(daily_stats_df, variable_configs=None):
+    if daily_stats_df.empty:
+        return pd.DataFrame()
+
+    variable_configs = variable_configs or {}
+    table = daily_stats_df.copy()
+    if 'Fecha' in table.columns:
+        table['Fecha'] = pd.to_datetime(table['Fecha'], errors='coerce').dt.strftime('%Y-%m-%d')
+    if 'Variable' in table.columns:
+        table['Variable'] = table['Variable'].apply(
+            lambda value: _format_variable_display_title(
+                variable_configs.get(value, {}).get('title', value)
+            )
+        )
+
+    table = table.rename(columns={
+        'Desviacion estandar': 'Desv. est.',
+        'Coef. variacion (%)': 'Coef. var. (%)',
+    })
+    numeric_columns = [column for column in table.columns if column not in ('Fecha', 'Variable')]
+    for column in numeric_columns:
+        decimals = 0 if column == 'Registros' else 2
+        table[column] = pd.to_numeric(table[column], errors='coerce').round(decimals)
+
+    preferred_columns = [
+        'Fecha', 'Variable', 'Promedio', 'Mediana', 'Minimo', 'Maximo',
+        'Rango', 'Desv. est.', 'Varianza', 'Coef. var. (%)', 'Registros'
+    ]
+    return table[[column for column in preferred_columns if column in table.columns]].reset_index(drop=True)
+
+
 def _render_variable_distribution_cards(stats_df, variable_configs=None, title='Resumen estadístico', dispersion_available=True):
     if stats_df.empty or 'Variable' not in stats_df.columns:
         st.info("No hay datos suficientes para construir el resumen estadístico.")
@@ -13041,12 +13232,64 @@ def _render_correlacion_statistics_dashboard(df_variables_corr, fecha_variables,
     )
 
     stats_df = _build_variable_distribution_table(df_variables_corr, stats_variables)
-    _render_variable_distribution_cards(
-        stats_df,
-        variable_stat_configs,
-        title=f"Resumen estadístico ambiental - {block_label}",
-        dispersion_available=not single_day
+    daily_stats_df = (
+        _build_variable_daily_distribution_table(df_variables_corr, stats_variables)
+        if not single_day else
+        pd.DataFrame()
     )
+    stats_view_options = ["Resumen del periodo"]
+    if not single_day:
+        stats_view_options.extend(["Listado por día", "Tabla variable/día"])
+    if st.session_state.get("correlacion_stats_summary_view") not in stats_view_options:
+        st.session_state["correlacion_stats_summary_view"] = stats_view_options[0]
+    selected_stats_view = st.segmented_control(
+        "Vista del resumen estadístico:",
+        options=stats_view_options,
+        key="correlacion_stats_summary_view",
+        help="Cambia entre el resumen consolidado del rango, el desglose por cada día y una tabla completa por variable y fecha.",
+        width="stretch"
+    )
+
+    if selected_stats_view == "Resumen del periodo":
+        _render_variable_distribution_cards(
+            stats_df,
+            variable_stat_configs,
+            title=f"Resumen estadístico ambiental - {block_label}",
+            dispersion_available=not single_day
+        )
+    elif selected_stats_view == "Listado por día":
+        if daily_stats_df.empty:
+            st.info("No hay datos suficientes para construir el listado diario.")
+        else:
+            st.markdown(
+                f'<p class="analysis-note"><strong>Resumen diario ambiental - {html.escape(str(block_label))}</strong></p>',
+                unsafe_allow_html=True
+            )
+            for fecha_value in sorted(daily_stats_df['Fecha'].dropna().unique()):
+                day_stats = daily_stats_df[daily_stats_df['Fecha'] == fecha_value].drop(columns=['Fecha'], errors='ignore')
+                fecha_label = pd.to_datetime(fecha_value).strftime('%Y-%m-%d')
+                with st.expander(f"Resumen del día {fecha_label}", expanded=False):
+                    _render_variable_distribution_cards(
+                        day_stats,
+                        variable_stat_configs,
+                        title=f"Variables ambientales - {fecha_label}",
+                        dispersion_available=True
+                    )
+    else:
+        daily_table = _format_variable_daily_distribution_table(daily_stats_df, variable_stat_configs)
+        if daily_table.empty:
+            st.info("No hay datos suficientes para construir la tabla diaria.")
+        else:
+            report_slug = _build_report_slug(block_label, "resumen_diario")
+            _render_table_download_button(
+                daily_table,
+                "Descargar resumen diario",
+                f"resumen_diario_variables_{report_slug}.xlsx",
+                f"download_correlacion_stats_daily_{report_slug}",
+                variable_column='Variable',
+                help_text="Descarga el resumen estadístico por variable y por día."
+            )
+            _dataframe(daily_table, hide_index=True, height=420)
 
     hourly_stats_df = _build_correlacion_30min_stats(df_variables_corr, stats_variables)
     if hourly_stats_df.empty:
