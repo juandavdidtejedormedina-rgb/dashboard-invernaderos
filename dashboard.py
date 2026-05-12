@@ -6207,13 +6207,22 @@ def _build_ponderosa_full_time_index(selected_range):
 
 
 def _build_ponderosa_hourly_series(df, column_name, selected_range):
+    full_index = _build_ponderosa_full_time_index(selected_range)
+    if 'FechaHora' not in df.columns or column_name not in df.columns:
+        return pd.DataFrame({
+            'FechaHora': full_index,
+            column_name: [pd.NA] * len(full_index)
+        })
+
     source_df = df[['FechaHora', column_name]].dropna(subset=[column_name]).copy()
     if source_df.empty:
-        return source_df
+        return pd.DataFrame({
+            'FechaHora': full_index,
+            column_name: [pd.NA] * len(full_index)
+        })
 
     source_df['FechaHora'] = source_df['FechaHora'].dt.floor(MARLEY_TIME_BUCKET)
     source_df = source_df.groupby('FechaHora', as_index=False)[column_name].mean()
-    full_index = _build_ponderosa_full_time_index(selected_range)
     source_df = source_df.set_index('FechaHora').reindex(full_index).rename_axis('FechaHora').reset_index()
     return source_df
 
