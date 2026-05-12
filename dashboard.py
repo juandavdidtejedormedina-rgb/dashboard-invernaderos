@@ -11,10 +11,24 @@ import html
 import base64
 import unicodedata
 import shutil
+from functools import lru_cache
 from contextlib import nullcontext
 from pathlib import Path
 from datetime import date, datetime, timedelta
 from urllib.parse import quote_plus
+
+
+@lru_cache(maxsize=4096)
+def _normalize_text_key_cached(text):
+    normalized = unicodedata.normalize('NFKD', text)
+    normalized = ''.join(char for char in normalized if not unicodedata.combining(char))
+    normalized = normalized.replace(chr(181), 'u').replace(chr(176), ' ')
+    normalized = normalized.lower()
+    normalized = re.sub(r'[^a-z0-9]+', ' ', normalized)
+    return re.sub(r'\s+', ' ', normalized).strip()
+
+
+@lru_cache(maxsize=8)
 def _image_to_base64(image_path):
     try:
         return base64.b64encode(Path(image_path).read_bytes()).decode('utf-8')
@@ -207,19 +221,25 @@ BRAND_COLORS = {
     'white': '#FFFFFF'
 }
 APP_DIR = Path(__file__).resolve().parent
-DATA_CACHE_VERSION = "2026-05-04-ponderosa-ecowitt-v1"
+DATA_REPO_OWNER = "juandavdidtejedormedina-rgb"
+DATA_REPO_NAME = "dashboard-invernaderos"
+DATA_REPO_COMMIT = "9a58ee95293848857af7593db7358ed7efd4afaf"
+DATA_REPO_RAW_BASE = (
+    "https://raw.githubusercontent.com/"
+    f"{DATA_REPO_OWNER}/{DATA_REPO_NAME}/{DATA_REPO_COMMIT}"
+)
+DATA_REPO_MAIN_RAW_BASE = (
+    "https://raw.githubusercontent.com/"
+    f"{DATA_REPO_OWNER}/{DATA_REPO_NAME}/main"
+)
+DATA_CACHE_VERSION = "2026-05-12-data-refresh-v1"
 LOGO_PATH = APP_DIR / 'logo elite.png'
 MARLEY_LOCAL_EXCEL_PATHS = [
     APP_DIR / 'Datos Final marley.xlsx',
     APP_DIR / 'Datos Final marley (2).xlsx'
 ]
 MARLEY_REMOTE_EXCEL_URLS = [
-    (
-        "https://raw.githubusercontent.com/"
-        "juandavdidtejedormedina-rgb/dashboard-invernaderos/"
-        "89ab929cbeba025053c07941988fc5366e9727bd/"
-        "Datos%20Final%20marley.xlsx"
-    )
+    f"{DATA_REPO_RAW_BASE}/Datos%20Final%20Marley.xlsx"
 ]
 MARLEY_SENSOR_NAMES = ("WIGA", "ECOWITT")
 MARLEY_TIME_BUCKET = "30min"
@@ -244,12 +264,7 @@ GREENHOUSE_ANALYSIS_LOCAL_EXCEL_PATHS = [
     Path.home() / 'OneDrive - Elite Flower' / 'Escritorio' / 'Analisis invernaderos.xlsx',
 ]
 PONDEROSA_ECOWITT_REMOTE_EXCEL_URLS = [
-    (
-        "https://raw.githubusercontent.com/"
-        "juandavdidtejedormedina-rgb/dashboard-invernaderos/"
-        "2a0c6005a0ce0e60ae0ab3af99dfc117cf746576/"
-        "ECOWITT%20Ponderosa.xlsx"
-    )
+    f"{DATA_REPO_RAW_BASE}/ECOWITT%20Ponderosa.xlsx"
 ]
 PONDEROSA_SENSOR_NAMES = ("WIGA", "ECOWITT")
 PONDEROSA_ECOWITT_BLOCK_CODE = "35"
@@ -2099,14 +2114,20 @@ selected_finca_media = st.session_state.get('finca_compartida', 'La Ponderosa')
 _render_dashboard_media(selected_finca_media, lazy_load=LAZY_LOAD_MEDIA)
 
 # --- Configuracion de URLs (Mover aqui para evitar NameError) ---
-URL_VARIABLES = "https://raw.githubusercontent.com/juandavdidtejedormedina-rgb/dashboard-invernaderos/main/Datos_Variables.xlsx"
+URL_VARIABLES = f"{DATA_REPO_RAW_BASE}/Datos_Variables.xlsx"
 URL_VARIABLES_FALLBACKS = (
     URL_VARIABLES,
+    f"{DATA_REPO_MAIN_RAW_BASE}/Datos_Variables.xlsx",
     "https://raw.githubusercontent.com/juandavdidtejedormedina-rgb/dashboard-invernaderos/8ad936f88e1d3bb9363c8223ec6deeb8222f238c/Datos_Variables.xlsx",
 )
-URL_CORTINAS = "https://raw.githubusercontent.com/juandavdidtejedormedina-rgb/dashboard-invernaderos/main/Registro_Cortinas_Final.xlsx"
+URL_CORTINAS = f"{DATA_REPO_RAW_BASE}/Registro_Cortinas_Final.xlsx"
+URL_CORTINAS_FALLBACKS = (
+    URL_CORTINAS,
+    f"{DATA_REPO_MAIN_RAW_BASE}/Registro_Cortinas_Final.xlsx",
+)
 URL_ANALYSIS_FALLBACKS = (
-    "https://raw.githubusercontent.com/juandavdidtejedormedina-rgb/dashboard-invernaderos/main/Analisis%20invernaderos.xlsx",
+    f"{DATA_REPO_RAW_BASE}/Analisis%20invernaderos.xlsx",
+    f"{DATA_REPO_MAIN_RAW_BASE}/Analisis%20invernaderos.xlsx",
     "https://raw.githubusercontent.com/juandavdidtejedormedina-rgb/dashboard-invernaderos/ef0c3dbe72a317574b9c656386a74a34582aabdf/Analisis%20invernaderos.xlsx",
 )
 LOCAL_VARIABLES_PATHS = (
@@ -2177,6 +2198,8 @@ def _limpiar_columnas(df):
 
 
 def _build_normalized_text_key(value):
+    text = str(value).replace('Âµ', 'u').replace('Â°', ' ')
+    return _normalize_text_key_cached(text)
     normalized = unicodedata.normalize('NFKD', str(value))
     normalized = ''.join(char for char in normalized if not unicodedata.combining(char))
     normalized = normalized.replace('µ', 'u').replace('°', ' ')
@@ -2187,7 +2210,7 @@ def _build_normalized_text_key(value):
 
 def _parse_date_series(date_series):
     if pd.api.types.is_datetime64_any_dtype(date_series):
-        return pd.to_datetime(date_series, errors='coerce')
+        return date_series
 
     text_values = date_series.astype(str).str.strip()
     text_values = text_values.replace({'': None, 'nan': None, 'NaT': None, 'None': None})
@@ -2421,7 +2444,8 @@ def _render_selected_period_banner(
     max_fecha=None,
     navigation_state_key=None,
     title_text='Periodo visible',
-    available_dates=None
+    available_dates=None,
+    context_text=None
 ):
     if not fecha_periodo:
         return
@@ -2434,6 +2458,8 @@ def _render_selected_period_banner(
         if single_day else
         'Estás viendo un rango completo de días.'
     )
+    if context_text:
+        helper_text = f"{context_text} {helper_text}"
 
     col_info, col_prev, col_next = st.columns([8.5, 1.1, 1.1])
     with col_info:
@@ -4018,19 +4044,18 @@ def _load_marley_ecowitt_sheet(workbook, sheet_name):
 
 
 def _resolve_marley_excel_sources():
-    sources = []
+    sources = list(MARLEY_REMOTE_EXCEL_URLS)
     for candidate in MARLEY_LOCAL_EXCEL_PATHS:
         if candidate.exists():
             sources.append(candidate)
-    sources.extend(MARLEY_REMOTE_EXCEL_URLS)
     return sources
 
 
 def _build_marley_source_signature(excel_source):
     if isinstance(excel_source, Path):
         stat = excel_source.stat()
-        return f"{excel_source}|{stat.st_mtime_ns}|{stat.st_size}"
-    return str(excel_source)
+        return f"{excel_source}|{stat.st_mtime_ns}|{stat.st_size}|{DATA_CACHE_VERSION}"
+    return f"{excel_source}|{DATA_CACHE_VERSION}"
 
 
 def _open_marley_workbook(excel_source):
@@ -5033,13 +5058,15 @@ def _build_marley_hourly_metric(df, variable, metric_column):
         if metric_column == 'Promedio':
             aggregation = 'mean'
         elif metric_column == 'Desviacion estandar':
-            aggregation = lambda serie: serie.std(ddof=1) if len(serie) > 1 else 0.0
+            aggregation = 'std'
         else:
-            aggregation = lambda serie: serie.var(ddof=1) if len(serie) > 1 else 0.0
+            aggregation = 'var'
         grouped = (
             source_df.groupby(['FranjaMinutos', 'Franja'], as_index=False)
             .agg(Valor=(column_name, aggregation), Registros=(column_name, 'count'))
         )
+        if metric_column != 'Promedio':
+            grouped['Valor'] = grouped['Valor'].fillna(0.0)
         grouped['Sensor'] = source_name
         records.append(grouped)
 
@@ -6079,11 +6106,10 @@ def _render_marley_dashboard(dashboard_mode):
 
 
 def _resolve_ponderosa_ecowitt_sources():
-    sources = []
+    sources = list(PONDEROSA_ECOWITT_REMOTE_EXCEL_URLS)
     for candidate in PONDEROSA_ECOWITT_LOCAL_EXCEL_PATHS:
         if candidate.exists():
             sources.append(candidate)
-    sources.extend(PONDEROSA_ECOWITT_REMOTE_EXCEL_URLS)
     return sources
 
 
@@ -8463,15 +8489,6 @@ def _render_ponderosa_apogee_mci_wiga_dashboard(df_variables_all, df_cortinas_al
         st.warning("No hay datos APOGEE / MCI / WIGA en el periodo seleccionado.")
         st.stop()
 
-    _render_selected_period_banner(
-        selected_range,
-        min_fecha=min_date,
-        max_fecha=max_date,
-        navigation_state_key=navigation_state_key,
-        title_text='Periodo APOGEE / MCI / WIGA',
-        available_dates=available_dates
-    )
-
     block_label = _format_block_display_name(selected_source_code)
     st.markdown("## La Ponderosa - APOGEE / MCI / WIGA")
     st.caption(f"Comparación de LUX y PPFD (PAR, µmol m-2 s-1) para {block_label}. WIGA usa Datos_Variables; MCI y APOGEE usan ECOWITT Ponderosa.")
@@ -8500,29 +8517,111 @@ def _render_ponderosa_apogee_mci_wiga_dashboard(df_variables_all, df_cortinas_al
         comparison = comparison.dropna(how='all', subset=list(PONDEROSA_LIGHT_SENSOR_NAMES)) if not comparison.empty else comparison
         comparisons[variable] = comparison
 
-    tab_compare, tab_table, tab_detail, tab_records = st.tabs(["Gráfica", "Tabla y resumen", "Detalle individual", "Registros"])
-    with tab_compare:
-        for variable, comparison in comparisons.items():
-            chart = _make_ponderosa_light_comparison_chart(comparison, variable, selected_range, comparison_resolution)
-            if chart is None:
-                st.info(f"No hay suficientes datos para graficar {PONDEROSA_LIGHT_VARIABLES[variable]['title'].lower()}.")
-                continue
-            _plotly_chart(chart)
-            difference_chart = _make_ponderosa_light_difference_chart(
-                comparison,
-                variable,
-                selected_range,
-                comparison_resolution
-            )
-            if difference_chart is not None:
-                _render_chart_explanation(
-                    f'Diferencia de {PONDEROSA_LIGHT_VARIABLES[variable]["title"].replace("Comparativa de ", "")}',
-                    'Esta gráfica no muestra el valor absoluto, sino cuánto se separan MCI y APOGEE respecto a WIGA. La línea cero significa que el sensor está igual a WIGA; arriba mide más alto y abajo mide más bajo.',
-                    accent=PONDEROSA_LIGHT_VARIABLES[variable]['accent']
-                )
-                _plotly_chart(difference_chart)
+    light_variables = list(PONDEROSA_LIGHT_VARIABLES.keys())
+    if st.session_state.get("ponderosa_light_chart_variable") not in light_variables:
+        st.session_state["ponderosa_light_chart_variable"] = light_variables[0]
+    if st.session_state.get("ponderosa_light_stats_variable") not in light_variables:
+        st.session_state["ponderosa_light_stats_variable"] = light_variables[0]
 
-    with tab_table:
+    tab_compare, tab_stats, tab_detail, tab_records = st.tabs([
+        "Gráfica",
+        "Análisis estadístico",
+        "Gráficas individuales",
+        "Registros"
+    ])
+    with tab_compare:
+        _render_chart_explanation(
+            "Comparación directa APOGEE / MCI / WIGA",
+            "Elige LUX o PPFD (PAR) para revisar los tres sensores sobre la misma línea de tiempo. Las diferencias y tablas quedan organizadas en análisis y registros.",
+            accent=BRAND_COLORS['hero'],
+            kicker='Vista principal'
+        )
+        _render_selected_period_banner(
+            selected_range,
+            min_fecha=min_date,
+            max_fecha=max_date,
+            navigation_state_key=navigation_state_key,
+            title_text='Periodo APOGEE / MCI / WIGA',
+            available_dates=available_dates,
+            context_text=f'Estás viendo {block_label}; WIGA usa Datos_Variables y MCI/APOGEE usan ECOWITT Ponderosa.'
+        )
+        selected_light_chart_variable = st.segmented_control(
+            "Variable en gráfica:",
+            options=light_variables,
+            format_func=lambda value: _format_variable_display_title(PONDEROSA_LIGHT_VARIABLES.get(value, {}).get('title', value)),
+            key="ponderosa_light_chart_variable",
+            width="stretch"
+        )
+        if selected_light_chart_variable not in light_variables:
+            selected_light_chart_variable = light_variables[0]
+        comparison = comparisons.get(selected_light_chart_variable, pd.DataFrame())
+        chart = _make_ponderosa_light_comparison_chart(
+            comparison,
+            selected_light_chart_variable,
+            selected_range,
+            comparison_resolution
+        )
+        if chart is None:
+            st.info(f"No hay suficientes datos para graficar {PONDEROSA_LIGHT_VARIABLES[selected_light_chart_variable]['title'].lower()}.")
+        else:
+            _plotly_chart(chart)
+
+    with tab_stats:
+        _render_chart_explanation(
+            "Análisis de relación APOGEE / MCI / WIGA",
+            (
+                "Esta sección muestra la lectura visual de los tres sensores: comportamiento por franja, "
+                "tarjetas de resumen y diferencias contra WIGA. Las tablas y descargas están reunidas en Registros."
+            ),
+            accent=BRAND_COLORS['rose'],
+            kicker='Lectura estadística'
+        )
+        light_stats_source = _build_ponderosa_light_stats_source(filtered_df, light_variables)
+        if light_stats_source.empty:
+            st.info("No hay datos suficientes para construir la gráfica estadística APOGEE / MCI / WIGA.")
+        else:
+            _render_ponderosa_light_combined_metric_analysis(
+                light_stats_source,
+                selected_range,
+                light_variables
+            )
+
+        selected_light_stats_variable = st.segmented_control(
+            "Variable para diferencia:",
+            options=light_variables,
+            format_func=lambda value: _format_variable_display_title(PONDEROSA_LIGHT_VARIABLES.get(value, {}).get('title', value)),
+            key="ponderosa_light_stats_variable",
+            width="stretch"
+        )
+        if selected_light_stats_variable not in light_variables:
+            selected_light_stats_variable = light_variables[0]
+        stats_comparison = comparisons.get(selected_light_stats_variable, pd.DataFrame())
+        difference_chart = _make_ponderosa_light_difference_chart(
+            stats_comparison,
+            selected_light_stats_variable,
+            selected_range,
+            comparison_resolution
+        )
+        if difference_chart is not None:
+            _render_chart_explanation(
+                f'Diferencia de {PONDEROSA_LIGHT_VARIABLES[selected_light_stats_variable]["title"].replace("Comparativa de ", "")}',
+                'Esta gráfica no muestra el valor absoluto, sino cuánto se separan MCI y APOGEE respecto a WIGA. La línea cero significa que el sensor está igual a WIGA; arriba mide más alto y abajo mide más bajo.',
+                accent=PONDEROSA_LIGHT_VARIABLES[selected_light_stats_variable]['accent']
+            )
+            _plotly_chart(difference_chart)
+        else:
+            st.info("No hay suficientes datos comparables para construir la gráfica de diferencias.")
+
+    with tab_detail:
+        _render_ponderosa_light_individual_charts(comparisons, selected_range, comparison_resolution)
+
+    with tab_records:
+        _render_chart_explanation(
+            "Registros y reportes APOGEE / MCI / WIGA",
+            "Aquí quedan reunidas las tablas que soportan la comparación: resumen por sensor, tabla por franja, diferencias y registros base.",
+            accent=BRAND_COLORS['hero'],
+            kicker='Datos fuente'
+        )
         table_mode = (
             "Promedio de cada sensor en bloques de 30 minutos"
             if comparison_resolution == COMPARISON_RESOLUTION_OPTIONS[0] else
@@ -8530,35 +8629,102 @@ def _render_ponderosa_apogee_mci_wiga_dashboard(df_variables_all, df_cortinas_al
             if comparison_resolution == COMPARISON_RESOLUTION_OPTIONS[1] else
             "WIGA 30 min con MCI/APOGEE más cercanos"
         )
-        table = _build_ponderosa_light_comparison_table(filtered_df, selected_range, comparison_resolution)
-        if table.empty:
-            st.info("No hay datos suficientes para construir la tabla comparativa.")
-        else:
-            st.caption(f"Tabla calculada con: {table_mode}. Las diferencias se leen como sensor comparado menos WIGA o APOGEE menos MCI.")
-            _render_comparison_table_summary(table, title="Resumen ejecutivo APOGEE / MCI / WIGA")
-            _render_variable_split_tables(
-                table,
-                default_expanded=True,
-                download_label="Descargar reporte APOGEE / MCI / WIGA",
-                download_file_name=f"reporte_apogee_mci_wiga_{_build_normalized_text_key(comparison_resolution).replace(' ', '_')}.xlsx",
-                download_key="descargar_ponderosa_light_reporte"
+        summary_rows = []
+        for source_name, source_df in source_frames.items():
+            current = source_df[source_df['Fecha_Filtro'].between(*selected_range)] if not source_df.empty else pd.DataFrame()
+            summary_rows.append({
+                'Sensor': source_name,
+                'Registros': len(current),
+                'Inicio': current['FechaHora'].min().strftime('%Y-%m-%d %H:%M') if not current.empty else '-',
+                'Fin': current['FechaHora'].max().strftime('%Y-%m-%d %H:%M') if not current.empty else '-',
+            })
+        source_summary_table = pd.DataFrame(summary_rows)
+        consolidated_records = filtered_df.drop(columns=['Fecha_Filtro'], errors='ignore')
+
+        record_report_options = [
+            "Resumen por sensor",
+            "Tabla por franja",
+            "Diferencias y comparativa",
+            "Registros consolidados",
+        ]
+        if st.session_state.get("ponderosa_light_records_report") not in record_report_options:
+            st.session_state["ponderosa_light_records_report"] = record_report_options[0]
+        selected_records_report = st.segmented_control(
+            "Reporte",
+            options=record_report_options,
+            key="ponderosa_light_records_report",
+            help="Selecciona qué tabla quieres revisar o descargar.",
+            width="stretch"
+        )
+
+        if selected_records_report == "Resumen por sensor":
+            st.caption("Conteo y ventana temporal disponible por sensor dentro del periodo seleccionado.")
+            _dataframe(source_summary_table, hide_index=True)
+
+        elif selected_records_report == "Tabla por franja":
+            if light_stats_source.empty:
+                st.info("No hay datos suficientes para construir la tabla por franja.")
+            else:
+                selected_metric_label = st.session_state.get("ponderosa_light_stats_metric", "Promedio")
+                metric_column = {
+                    "Promedio": "Promedio",
+                    "Desviacion estandar": "DesviacionEstandar",
+                    "Varianza": "Varianza",
+                }.get(selected_metric_label, "Promedio")
+                selected_variable_table = st.session_state.get("ponderosa_light_stats_graph_variable", light_variables[0])
+                if selected_variable_table not in light_variables:
+                    selected_variable_table = light_variables[0]
+                grouped_df, pivot_promedio, pivot_varianza, pivot_desviacion = _build_hourly_block_analysis(
+                    light_stats_source,
+                    selected_variable_table
+                )
+                pivot_map = {
+                    "Promedio": pivot_promedio,
+                    "DesviacionEstandar": pivot_desviacion,
+                    "Varianza": pivot_varianza,
+                }
+                table = _prepare_hourly_pivot_display(pivot_map.get(metric_column, pivot_promedio))
+                if table.empty:
+                    st.info("No hay tabla disponible para la métrica y variable seleccionadas en análisis.")
+                else:
+                    st.caption(
+                        "Tabla calculada con la métrica y variable seleccionadas en Análisis estadístico. "
+                        "Cambia la gráfica allí para actualizar esta salida."
+                    )
+                    report_slug = _build_report_slug(block_label, selected_variable_table, selected_metric_label, comparison_resolution)
+                    _render_table_download_button(
+                        table,
+                        f"Descargar tabla de {selected_metric_label.lower()}",
+                        f"apogee_mci_wiga_franja_{report_slug}.xlsx",
+                        "download_ponderosa_light_tabla_franja"
+                    )
+                    _dataframe(table, hide_index=True)
+
+        elif selected_records_report == "Diferencias y comparativa":
+            table = _build_ponderosa_light_comparison_table(filtered_df, selected_range, comparison_resolution)
+            if table.empty:
+                st.info("No hay datos suficientes para construir la tabla comparativa.")
+            else:
+                st.caption(f"Tabla calculada con: {table_mode}. Las diferencias se leen como sensor comparado menos WIGA o APOGEE menos MCI.")
+                _render_comparison_table_summary(table, title="Resumen ejecutivo APOGEE / MCI / WIGA")
+                _render_variable_split_tables(
+                    table,
+                    default_expanded=True,
+                    download_label="Descargar reporte APOGEE / MCI / WIGA",
+                    download_file_name=f"reporte_apogee_mci_wiga_{_build_report_slug(block_label, table_mode)}.xlsx",
+                    download_key="descargar_ponderosa_light_reporte"
+                )
+
+        elif selected_records_report == "Registros consolidados":
+            st.caption("Datos base consolidados que alimentan las gráficas y cálculos de APOGEE / MCI / WIGA.")
+            _render_table_download_button(
+                consolidated_records,
+                "Descargar registros consolidados",
+                f"registros_apogee_mci_wiga_{_build_report_slug(block_label, comparison_resolution)}.xlsx",
+                "download_ponderosa_light_registros",
+                variable_column='__consolidado__'
             )
-
-    with tab_detail:
-        if st.checkbox(
-            "Mostrar gráficas individuales APOGEE / MCI / WIGA",
-            key="mostrar_ponderosa_light_detalles",
-            help="Activa esta sección para ver cada variable por separado debajo de la comparativa principal."
-        ):
-            _render_ponderosa_light_individual_charts(comparisons, selected_range, comparison_resolution)
-
-    with tab_records:
-        if st.checkbox(
-            "Cargar registros base APOGEE / MCI / WIGA",
-            key="mostrar_ponderosa_light_registros",
-            help=FILTER_HELP_TEXTS['registros']
-        ):
-            _dataframe(filtered_df.drop(columns=['Fecha_Filtro'], errors='ignore'), hide_index=True)
+            _dataframe(consolidated_records, hide_index=True)
 
     st.stop()
 
@@ -8628,6 +8794,488 @@ def _render_ponderosa_apogee_mci_wiga_dashboard(df_variables_all, df_cortinas_al
         _dataframe(filtered_df.drop(columns=['Fecha_Filtro'], errors='ignore'), hide_index=True)
 
     st.stop()
+
+
+def _build_ponderosa_ecowitt_comparison(filtered_df, variable_name, selected_range, resolution_label):
+    if resolution_label == COMPARISON_RESOLUTION_OPTIONS[1]:
+        return _build_point_comparison(filtered_df, variable_name, PONDEROSA_SENSOR_NAMES)
+    if resolution_label == COMPARISON_RESOLUTION_OPTIONS[2]:
+        return _build_wiga_anchor_nearest_comparison(
+            filtered_df,
+            variable_name,
+            PONDEROSA_SENSOR_NAMES,
+            selected_range,
+            _build_ponderosa_hourly_series
+        )
+    return _build_ponderosa_hourly_comparison(filtered_df, variable_name, selected_range)
+
+
+def _build_ponderosa_ecowitt_period_summary(filtered_df, variables, selected_range, resolution_label, metric_name='Promedio'):
+    rows = []
+    metric_lookup = {
+        'Promedio': 'mean',
+        'Desviacion estandar': 'std',
+        'Varianza': 'var',
+    }
+    aggregation = metric_lookup.get(metric_name, 'mean')
+    multi_day = selected_range[0] != selected_range[1]
+
+    for variable_name in variables:
+        comparison = _build_ponderosa_ecowitt_comparison(
+            filtered_df,
+            variable_name,
+            selected_range,
+            resolution_label
+        )
+        if comparison.empty or not all(sensor_name in comparison.columns for sensor_name in PONDEROSA_SENSOR_NAMES):
+            continue
+
+        comparison = comparison.dropna(subset=list(PONDEROSA_SENSOR_NAMES)).copy()
+        if comparison.empty:
+            continue
+
+        comparison['Fecha'] = pd.to_datetime(comparison['FechaHora'], errors='coerce').dt.date
+        config = PONDEROSA_COMPARISON_VARIABLES.get(variable_name, {})
+        variable_label = _format_variable_display_title(config.get('title', variable_name))
+
+        grouped = comparison.groupby(['Fecha'], dropna=False) if multi_day else [(None, comparison)]
+        for group_key, group_df in grouped:
+            wiga_value = getattr(group_df['WIGA'], aggregation)()
+            ecowitt_value = getattr(group_df['ECOWITT'], aggregation)()
+            signed_diff_value = getattr(group_df['SignedDiff'], aggregation)() if 'SignedDiff' in group_df.columns else pd.NA
+            diff_value = getattr(group_df['DiffValue'], aggregation)() if 'DiffValue' in group_df.columns else pd.NA
+
+            if metric_name != 'Promedio':
+                wiga_value = 0.0 if pd.isna(wiga_value) else wiga_value
+                ecowitt_value = 0.0 if pd.isna(ecowitt_value) else ecowitt_value
+                signed_diff_value = 0.0 if pd.isna(signed_diff_value) else signed_diff_value
+                diff_value = 0.0 if pd.isna(diff_value) else diff_value
+
+            rows.append({
+                'Fecha': group_key if multi_day else f"{selected_range[0]}",
+                'Variable': variable_label,
+                'Unidad': config.get('unit', VARIABLE_UNITS.get(variable_name, '')),
+                'Metrica': metric_name,
+                'WIGA': round(float(wiga_value), 2) if pd.notna(wiga_value) else pd.NA,
+                'ECOWITT': round(float(ecowitt_value), 2) if pd.notna(ecowitt_value) else pd.NA,
+                'WIGA - ECOWITT': round(float(signed_diff_value), 2) if pd.notna(signed_diff_value) else pd.NA,
+                'Diferencia absoluta': round(float(diff_value), 2) if pd.notna(diff_value) else pd.NA,
+                'Registros comparables': len(group_df),
+            })
+
+    if not rows:
+        return pd.DataFrame()
+    return pd.DataFrame(rows).sort_values(['Fecha', 'Variable']).reset_index(drop=True)
+
+
+def _build_ponderosa_ecowitt_stats_source(filtered_df, variables):
+    if filtered_df.empty or 'FechaHora' not in filtered_df.columns:
+        return pd.DataFrame()
+
+    frames = []
+    for source_name in PONDEROSA_SENSOR_NAMES:
+        rename_map = {}
+        source_columns = ['FechaHora']
+        for variable_name in variables:
+            column_name = f"{variable_name} - {source_name}"
+            if column_name in filtered_df.columns:
+                source_columns.append(column_name)
+                rename_map[column_name] = variable_name
+        if len(source_columns) == 1:
+            continue
+
+        source_df = filtered_df[source_columns].copy().rename(columns=rename_map)
+        source_df['DateTime'] = pd.to_datetime(source_df['FechaHora'], errors='coerce')
+        source_df = source_df.dropna(subset=['DateTime'])
+        source_df['Fecha_Filtro'] = source_df['DateTime'].dt.date
+        source_df['Bloque'] = source_name
+        for variable_name in variables:
+            if variable_name in source_df.columns:
+                source_df[variable_name] = pd.to_numeric(source_df[variable_name], errors='coerce')
+        frames.append(source_df[['DateTime', 'Fecha_Filtro', 'Bloque', *[var for var in variables if var in source_df.columns]]])
+
+    return pd.concat(frames, ignore_index=True, sort=False) if frames else pd.DataFrame()
+
+
+def _build_ponderosa_light_stats_source(filtered_df, variables):
+    if filtered_df.empty or 'FechaHora' not in filtered_df.columns:
+        return pd.DataFrame()
+
+    frames = []
+    for source_name in PONDEROSA_LIGHT_SENSOR_NAMES:
+        rename_map = {}
+        source_columns = ['FechaHora']
+        for variable_name in variables:
+            column_name = f"{variable_name} - {source_name}"
+            if column_name in filtered_df.columns:
+                source_columns.append(column_name)
+                rename_map[column_name] = variable_name
+        if len(source_columns) == 1:
+            continue
+
+        source_df = filtered_df[source_columns].copy().rename(columns=rename_map)
+        source_df['DateTime'] = pd.to_datetime(source_df['FechaHora'], errors='coerce')
+        source_df = source_df.dropna(subset=['DateTime'])
+        source_df['Fecha_Filtro'] = source_df['DateTime'].dt.date
+        source_df['Bloque'] = source_name
+        for variable_name in variables:
+            if variable_name in source_df.columns:
+                source_df[variable_name] = pd.to_numeric(source_df[variable_name], errors='coerce')
+        frames.append(source_df[['DateTime', 'Fecha_Filtro', 'Bloque', *[var for var in variables if var in source_df.columns]]])
+
+    return pd.concat(frames, ignore_index=True, sort=False) if frames else pd.DataFrame()
+
+
+def _render_ponderosa_light_difference_heatmap(grouped_df, selected_variable, metric_column, metric_label, unit_text):
+    if grouped_df.empty or metric_column not in grouped_df.columns:
+        return
+
+    available_sensors = [
+        sensor_name for sensor_name in PONDEROSA_LIGHT_SENSOR_NAMES
+        if sensor_name in grouped_df['Bloque'].dropna().unique().tolist()
+    ]
+    if len(available_sensors) < 2:
+        return
+
+    pair_options = []
+    for idx, first_sensor in enumerate(available_sensors):
+        for second_sensor in available_sensors[idx + 1:]:
+            pair_options.append(f"{first_sensor} - {second_sensor}")
+    if not pair_options:
+        return
+
+    selected_pairs = st.segmented_control(
+        "Diferencias visibles:",
+        options=pair_options,
+        selection_mode="multi",
+        default=[
+            pair for pair in st.session_state.get("ponderosa_light_difference_pairs", pair_options)
+            if pair in pair_options
+        ] or pair_options,
+        key="ponderosa_light_difference_pairs",
+        help="Elige qué pares de sensores quieres comparar. La diferencia se calcula como primer sensor menos segundo sensor.",
+        width="stretch"
+    )
+    if not selected_pairs:
+        selected_pairs = pair_options
+
+    pivot_df = (
+        grouped_df
+        .pivot_table(index=['FranjaMinutos', 'Franja'], columns='Bloque', values=metric_column, aggfunc='mean')
+        .reset_index()
+        .sort_values('FranjaMinutos')
+    )
+    if pivot_df.empty:
+        return
+
+    display_slots = [
+        f'{hour:02d}:{minute:02d}'
+        for hour in range(24)
+        for minute in (0, 30)
+    ]
+    x_values = pivot_df['Franja'].tolist()
+    z_values = []
+    custom_data = []
+    y_values = []
+
+    for pair_label in selected_pairs:
+        first_sensor, second_sensor = [part.strip() for part in pair_label.split(' - ', 1)]
+        if first_sensor not in pivot_df.columns or second_sensor not in pivot_df.columns:
+            continue
+
+        first_values = pd.to_numeric(pivot_df[first_sensor], errors='coerce')
+        second_values = pd.to_numeric(pivot_df[second_sensor], errors='coerce')
+        signed_diff = first_values - second_values
+        y_values.append(pair_label)
+        z_values.append([float(value) if pd.notna(value) else None for value in signed_diff])
+        custom_data.append([
+            [
+                float(first_value) if pd.notna(first_value) else None,
+                float(second_value) if pd.notna(second_value) else None,
+                abs(float(diff_value)) if pd.notna(diff_value) else None,
+            ]
+            for first_value, second_value, diff_value in zip(first_values, second_values, signed_diff)
+        ])
+
+    if not y_values:
+        st.info("No hay pares de sensores suficientes para construir el mapa de diferencias.")
+        return
+
+    valid_diffs = [
+        abs(value)
+        for row in z_values
+        for value in row
+        if value is not None
+    ]
+    color_limit = max(valid_diffs) if valid_diffs else 1
+    color_limit = max(color_limit, 1)
+    config = PONDEROSA_LIGHT_VARIABLES.get(selected_variable, {})
+
+    fig = go.Figure(
+        data=go.Heatmap(
+            x=x_values,
+            y=y_values,
+            z=z_values,
+            customdata=custom_data,
+            zmid=0,
+            zmin=-color_limit,
+            zmax=color_limit,
+            colorscale=[
+                [0.0, '#5E5AAE'],
+                [0.5, '#F7F4EE'],
+                [1.0, '#E07A2F'],
+            ],
+            colorbar=dict(title=f"Dif. ({unit_text})" if unit_text else "Diferencia"),
+            hovertemplate=(
+                "<b>%{y}</b><br>"
+                "Franja: %{x}<br>"
+                f"{metric_label} diferencia: %{{z:+.2f}} {unit_text}<br>"
+                f"Primer sensor: %{{customdata[0]:.2f}} {unit_text}<br>"
+                f"Segundo sensor: %{{customdata[1]:.2f}} {unit_text}<br>"
+                f"Diferencia absoluta: %{{customdata[2]:.2f}} {unit_text}"
+                "<extra></extra>"
+            )
+        )
+    )
+    fig.update_layout(
+        title=dict(
+            text=f"Diferencia real por franja - {_format_variable_display_title(config.get('title', selected_variable))}",
+            x=0,
+            xanchor='left',
+            font=dict(size=19, color=BRAND_COLORS['graphite'], family='Montserrat, sans-serif')
+        ),
+        height=330 + max(0, len(y_values) - 2) * 54,
+        margin=dict(l=118, r=28, t=82, b=88),
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor='rgba(250,248,243,0.68)',
+        template='plotly_white',
+        font=dict(family='Montserrat, sans-serif', color=BRAND_COLORS['graphite']),
+        xaxis=dict(
+            title='<b>Franja horaria</b>',
+            type='category',
+            categoryorder='array',
+            categoryarray=display_slots,
+            tickmode='array',
+            tickvals=display_slots,
+            ticktext=display_slots,
+            tickangle=-90,
+            tickfont=dict(size=10, family='Montserrat, sans-serif', color=BRAND_COLORS['graphite']),
+            side='bottom',
+        ),
+        yaxis=dict(
+            title='',
+            automargin=True,
+        ),
+    )
+    _plotly_chart(
+        fig,
+        config={
+            'displaylogo': False,
+            'responsive': True,
+            'modeBarButtonsToRemove': ['lasso2d', 'select2d']
+        }
+    )
+    _render_chart_explanation(
+        "Mapa de diferencias",
+        (
+            "Cada celda muestra la diferencia real entre dos sensores en una franja de 30 minutos. "
+            "Valores positivos significan que el primer sensor del par midió más alto; valores negativos indican que el segundo sensor quedó por encima."
+        ),
+        accent=config.get('accent', BRAND_COLORS['hero']),
+        kicker='Comparación entre sensores'
+    )
+
+
+def _render_ponderosa_light_combined_metric_analysis(light_stats_source, selected_range, light_variables):
+    if light_stats_source.empty:
+        st.info("No hay datos suficientes para construir la gráfica estadística APOGEE / MCI / WIGA.")
+        return
+
+    fecha_inicio, fecha_fin = selected_range
+    single_day = fecha_inicio == fecha_fin
+    metric_options = ["Promedio"]
+    if not single_day:
+        metric_options.extend(["Desviacion estandar", "Varianza"])
+
+    if st.session_state.get("ponderosa_light_stats_graph_variable") not in light_variables:
+        st.session_state["ponderosa_light_stats_graph_variable"] = light_variables[0]
+    selected_variable = st.segmented_control(
+        "Variable del análisis:",
+        options=light_variables,
+        format_func=lambda value: _format_variable_display_title(PONDEROSA_LIGHT_VARIABLES.get(value, {}).get('title', value)),
+        key="ponderosa_light_stats_graph_variable",
+        help="Calcula solo la variable seleccionada para mantener esta vista clara y rápida.",
+        width="stretch"
+    )
+    if selected_variable not in light_variables:
+        selected_variable = light_variables[0]
+
+    metric_state_key = "ponderosa_light_stats_metric_single"
+    if st.session_state.get(metric_state_key) not in metric_options:
+        st.session_state[metric_state_key] = metric_options[0]
+    selected_metric = st.segmented_control(
+        "Métrica visible:",
+        options=metric_options,
+        key=metric_state_key,
+        help="Elige la métrica que quieres graficar para WIGA, MCI y APOGEE.",
+        width="stretch"
+    )
+    if selected_metric not in metric_options:
+        selected_metric = metric_options[0]
+    st.session_state["ponderosa_light_stats_metric"] = selected_metric
+
+    if single_day:
+        st.caption("Con un solo día se grafica el promedio por franja de 30 minutos. La desviación estándar y la varianza se habilitan al seleccionar varios días.")
+
+    grouped_df, _, _, _ = _build_hourly_block_analysis(light_stats_source, selected_variable)
+    if grouped_df.empty:
+        st.info(f"No se encontraron datos para {selected_variable} en el rango seleccionado.")
+        return
+
+    metric_columns = {
+        "Promedio": "Promedio",
+        "Desviacion estandar": "DesviacionEstandar",
+        "Varianza": "Varianza",
+    }
+    metric_labels = {
+        "Promedio": "Promedio",
+        "Desviacion estandar": "Desviación estándar",
+        "Varianza": "Varianza",
+    }
+    ordered_sensors = [
+        sensor_name for sensor_name in PONDEROSA_LIGHT_SENSOR_NAMES
+        if sensor_name in grouped_df['Bloque'].dropna().unique().tolist()
+    ]
+    display_slots = [
+        f'{hour:02d}:{minute:02d}'
+        for hour in range(24)
+        for minute in (0, 30)
+    ]
+    config = PONDEROSA_LIGHT_VARIABLES.get(selected_variable, {})
+    unit_text = config.get('unit', VARIABLE_UNITS.get(selected_variable, ''))
+    metric_column = metric_columns[selected_metric]
+    metric_label = metric_labels[selected_metric]
+
+    fig = go.Figure()
+    for sensor_name in ordered_sensors:
+        sensor_df = grouped_df[grouped_df['Bloque'] == sensor_name].sort_values('FranjaMinutos')
+        if sensor_df.empty:
+            continue
+        color = _get_block_analysis_color(sensor_name, selected_variable)
+        if metric_column not in sensor_df.columns:
+            continue
+        metric_df = sensor_df.dropna(subset=[metric_column])
+        if metric_df.empty:
+            continue
+        fig.add_trace(go.Scatter(
+            x=metric_df['Franja'],
+            y=metric_df[metric_column],
+            mode='lines+markers',
+            name=f"{sensor_name} · {metric_label}",
+            line=dict(color=color, width=3, dash='solid'),
+            marker=dict(size=6, color=color, line=dict(color='rgba(255,255,255,0.82)', width=1)),
+            customdata=metric_df[['Registros']],
+            hovertemplate=(
+                '<b>%{x}</b><br>'
+                f'{sensor_name}<br>'
+                f'{metric_label}: %{{y:.2f}} {unit_text}<br>'
+                'Registros: %{customdata[0]}'
+                '<extra></extra>'
+            ),
+        ))
+
+    if not fig.data:
+        st.info("No hay datos suficientes para construir la gráfica con las métricas seleccionadas.")
+        return
+
+    yaxis_title = f"{metric_label} ({unit_text})" if unit_text else metric_label
+
+    fig.update_layout(
+        title=dict(
+            text=f"{metric_label} por franja - {_format_variable_display_title(config.get('title', selected_variable))}",
+            x=0,
+            xanchor='left',
+            font=dict(size=19, color=BRAND_COLORS['graphite'], family='Montserrat, sans-serif')
+        ),
+        height=540,
+        margin=dict(l=44, r=28, t=86, b=92),
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor='rgba(250,248,243,0.68)',
+        hovermode='x unified',
+        template='plotly_white',
+        font=dict(family='Montserrat, sans-serif', color=BRAND_COLORS['graphite']),
+        legend=dict(
+            orientation='h',
+            yanchor='bottom',
+            y=1.04,
+            xanchor='left',
+            x=0,
+            traceorder='normal',
+            bgcolor='rgba(255,255,255,0.76)',
+            bordercolor='rgba(76, 70, 120, 0.08)',
+            borderwidth=1,
+        ),
+        xaxis=dict(
+            title='<b>Franja horaria</b>',
+            type='category',
+            categoryorder='array',
+            categoryarray=display_slots,
+            tickmode='array',
+            tickvals=display_slots,
+            ticktext=display_slots,
+            tickangle=-90,
+            tickfont=dict(size=10, family='Montserrat, sans-serif', color=BRAND_COLORS['graphite']),
+            gridcolor='rgba(76, 70, 120, 0.07)',
+            zeroline=False,
+            automargin=True,
+        ),
+        yaxis=dict(
+            title=f'<b>{yaxis_title}</b>',
+            tickfont=dict(size=11, family='Montserrat, sans-serif', color=BRAND_COLORS['graphite']),
+            gridcolor='rgba(76, 70, 120, 0.08)',
+            zeroline=False,
+        )
+    )
+    _plotly_chart(
+        fig,
+        config={
+            'displaylogo': False,
+            'responsive': True,
+            'modeBarButtonsToRemove': ['lasso2d', 'select2d']
+        }
+    )
+    _render_chart_explanation(
+        f"{metric_label} por franja",
+        (
+            "La gráfica compara WIGA, MCI y APOGEE para la métrica seleccionada. "
+            "Promedio resume el comportamiento típico por cada media hora; al seleccionar varios días, desviación estándar y varianza muestran estabilidad o variabilidad entre jornadas. "
+            "Puedes ocultar o mostrar sensores desde la leyenda."
+        ),
+        accent=config.get('accent', BRAND_COLORS['hero']),
+        kicker='Cómo leer esta gráfica'
+    )
+    _render_ponderosa_light_difference_heatmap(
+        grouped_df,
+        selected_variable,
+        metric_column,
+        metric_label,
+        unit_text
+    )
+
+    selected_stats = _build_analysis_distribution_table(
+        light_stats_source,
+        selected_variable,
+        group_col='Bloque',
+        group_label='Sensor'
+    )
+    _render_analysis_distribution_cards(
+        selected_stats,
+        _format_variable_display_title(config.get('title', selected_variable)),
+        unit=unit_text,
+        title=f"Resumen por sensor - {_format_variable_display_title(config.get('title', selected_variable))}",
+        group_column='Sensor',
+        accent_getter=lambda group_name: _get_block_analysis_color(group_name, selected_variable)
+    )
 
 
 def _render_ponderosa_comparison_metric_cards(overlap, selected_variable):
@@ -8924,15 +9572,7 @@ def _render_ponderosa_ecowitt_dashboard(df_variables_all, df_cortinas_all, selec
     if filtered_df.empty:
         st.warning("No hay datos disponibles en el periodo seleccionado.")
         st.stop()
-
-    _render_selected_period_banner(
-        selected_range,
-        min_fecha=min_date,
-        max_fecha=max_date,
-        navigation_state_key=navigation_state_key,
-        title_text='Periodo Ponderosa WIGA / ECOWITT',
-        available_dates=available_dates
-    )
+    single_day = selected_range[0] == selected_range[1]
 
     block_label = _format_block_display_name(selected_source_code)
     st.markdown("## La Ponderosa - Comparativa WIGA / ECOWITT")
@@ -8964,44 +9604,82 @@ def _render_ponderosa_ecowitt_dashboard(df_variables_all, df_cortinas_all, selec
 
     if st.session_state.get("ponderosa_ecowitt_stats_variable") not in compared_variables:
         st.session_state["ponderosa_ecowitt_stats_variable"] = compared_variables[0]
+    if st.session_state.get("ponderosa_ecowitt_chart_variable") not in compared_variables:
+        st.session_state["ponderosa_ecowitt_chart_variable"] = compared_variables[0]
 
-    tab_compare, tab_stats, tab_tables, tab_detail, tab_records = st.tabs([
+    tab_compare, tab_stats, tab_detail, tab_records = st.tabs([
         "Gráfica",
-        "Resumen estadístico",
-        "Tabla",
+        "Análisis estadístico",
         "Gráficas individuales",
         "Registros"
     ])
 
     with tab_compare:
-        for variable_name in compared_variables:
-            comparison = (
-                _build_point_comparison(filtered_df, variable_name, PONDEROSA_SENSOR_NAMES)
-                if point_mode else
-                _build_wiga_anchor_nearest_comparison(
-                    filtered_df,
-                    variable_name,
-                    PONDEROSA_SENSOR_NAMES,
-                    selected_range,
-                    _build_ponderosa_hourly_series
-                )
-                if nearest_wiga_mode else
-                _build_ponderosa_hourly_comparison(filtered_df, variable_name, selected_range)
-            )
-            if comparison.empty or comparison.dropna(how='all', subset=list(PONDEROSA_SENSOR_NAMES)).empty:
-                variable_title = PONDEROSA_COMPARISON_VARIABLES.get(variable_name, {}).get('title', variable_name)
-                st.info(f"No hay datos suficientes para graficar {_format_variable_display_title(variable_title)}.")
-                continue
-            comparison_chart = _make_ponderosa_comparison_chart(comparison, variable_name, selected_range, comparison_resolution)
+        _render_chart_explanation(
+            "Comparación directa WIGA / ECOWITT",
+            "Elige una variable para comparar ambos sensores sobre la misma línea de tiempo. La diferencia y el detalle estadístico quedan reunidos en la pestaña de análisis.",
+            accent=BRAND_COLORS['hero'],
+            kicker='Vista principal'
+        )
+        _render_selected_period_banner(
+            selected_range,
+            min_fecha=min_date,
+            max_fecha=max_date,
+            navigation_state_key=navigation_state_key,
+            title_text='Periodo WIGA / ECOWITT',
+            available_dates=available_dates,
+            context_text=f'Estás viendo {block_label} frente a ECOWITT Ponderosa.'
+        )
+        selected_chart_variable = st.segmented_control(
+            "Variable en gráfica:",
+            options=compared_variables,
+            format_func=lambda value: _format_variable_display_title(PONDEROSA_COMPARISON_VARIABLES.get(value, {}).get('title', value)),
+            key="ponderosa_ecowitt_chart_variable",
+            width="stretch"
+        )
+        if selected_chart_variable not in compared_variables:
+            selected_chart_variable = compared_variables[0]
+        comparison = _build_ponderosa_ecowitt_comparison(
+            filtered_df,
+            selected_chart_variable,
+            selected_range,
+            comparison_resolution
+        )
+        if comparison.empty or comparison.dropna(how='all', subset=list(PONDEROSA_SENSOR_NAMES)).empty:
+            variable_title = PONDEROSA_COMPARISON_VARIABLES.get(selected_chart_variable, {}).get('title', selected_chart_variable)
+            st.info(f"No hay datos suficientes para graficar {_format_variable_display_title(variable_title)}.")
+        else:
+            comparison_chart = _make_ponderosa_comparison_chart(comparison, selected_chart_variable, selected_range, comparison_resolution)
             if comparison_chart is not None:
                 _plotly_chart(comparison_chart)
-            difference_chart = _make_ponderosa_difference_chart(comparison, variable_name, selected_range, comparison_resolution)
-            if difference_chart is not None:
-                _plotly_chart(difference_chart)
 
     with tab_stats:
+        _render_chart_explanation(
+            "Análisis de relación WIGA / ECOWITT",
+            (
+                "Esta sección muestra la lectura visual de la relación entre sensores: comportamiento por franja, "
+                "tarjetas de diferencia, dispersión y estabilidad. Las tablas y descargas están reunidas en Registros."
+            ),
+            accent=BRAND_COLORS['rose'],
+            kicker='Lectura estadística'
+        )
+        stats_source_df = _build_ponderosa_ecowitt_stats_source(filtered_df, compared_variables)
+        if stats_source_df.empty:
+            st.info("No hay datos suficientes para construir la gráfica estadística WIGA / ECOWITT.")
+        else:
+            _render_hourly_analysis_view_organized(
+                stats_source_df,
+                selected_range,
+                list(PONDEROSA_SENSOR_NAMES),
+                variable_options=compared_variables,
+                variable_state_key="ponderosa_ecowitt_stats_graph_variable",
+                metric_state_key="ponderosa_ecowitt_stats_metric",
+                show_table_tab=False,
+                show_inline_tables=False
+            )
+
         selected_variable_stats = st.segmented_control(
-            "Variable para resumen:",
+            "Variable para detalle estadístico:",
             options=compared_variables,
             format_func=lambda value: _format_variable_display_title(PONDEROSA_COMPARISON_VARIABLES.get(value, {}).get('title', value)),
             key="ponderosa_ecowitt_stats_variable",
@@ -9009,24 +9687,26 @@ def _render_ponderosa_ecowitt_dashboard(df_variables_all, df_cortinas_all, selec
         )
         if selected_variable_stats not in compared_variables:
             selected_variable_stats = compared_variables[0]
-        comparison_stats = (
-            _build_point_comparison(filtered_df, selected_variable_stats, PONDEROSA_SENSOR_NAMES)
-            if point_mode else
-            _build_wiga_anchor_nearest_comparison(
-                filtered_df,
-                selected_variable_stats,
-                PONDEROSA_SENSOR_NAMES,
-                selected_range,
-                _build_ponderosa_hourly_series
-            )
-            if nearest_wiga_mode else
-            _build_ponderosa_hourly_comparison(filtered_df, selected_variable_stats, selected_range)
+        comparison_stats = _build_ponderosa_ecowitt_comparison(
+            filtered_df,
+            selected_variable_stats,
+            selected_range,
+            comparison_resolution
         )
         if not all(sensor_name in comparison_stats.columns for sensor_name in PONDEROSA_SENSOR_NAMES):
             st.info("No hay columnas suficientes para construir el resumen estadístico de esta variable.")
         else:
             overlap = comparison_stats.dropna(subset=list(PONDEROSA_SENSOR_NAMES)).copy()
             _render_ponderosa_comparison_metric_cards(overlap, selected_variable_stats)
+            difference_chart = _make_ponderosa_difference_chart(comparison_stats, selected_variable_stats, selected_range, comparison_resolution)
+            if difference_chart is not None:
+                selected_config = PONDEROSA_COMPARISON_VARIABLES.get(selected_variable_stats, {})
+                _render_chart_explanation(
+                    'Diferencia WIGA - ECOWITT',
+                    'Valores sobre cero significan que WIGA midió más alto; valores bajo cero significan que ECOWITT midió más alto.',
+                    accent=selected_config.get('colors', {}).get('ECOWITT', BRAND_COLORS['hero'])
+                )
+                _plotly_chart(difference_chart)
             scatter_chart = _make_ponderosa_scatter_chart(comparison_stats, selected_variable_stats)
             if scatter_chart is not None:
                 selected_config = PONDEROSA_COMPARISON_VARIABLES.get(selected_variable_stats, {})
@@ -9038,19 +9718,6 @@ def _render_ponderosa_ecowitt_dashboard(df_variables_all, df_cortinas_all, selec
                 _plotly_chart(scatter_chart)
             else:
                 st.info("No hay suficientes datos simultáneos para construir la dispersión entre sensores.")
-
-    with tab_tables:
-        _render_difference_table_30min(
-            filtered_df,
-            compared_variables,
-            PONDEROSA_SENSOR_NAMES,
-            selected_range,
-            comparison_resolution,
-            _build_ponderosa_hourly_comparison,
-            _build_ponderosa_hourly_series,
-            PONDEROSA_COMPARISON_VARIABLES,
-            "mostrar_ponderosa_tabla_diferencias_30min"
-        )
 
     with tab_detail:
         _render_ponderosa_source_individual_charts(
@@ -9066,7 +9733,7 @@ def _render_ponderosa_ecowitt_dashboard(df_variables_all, df_cortinas_all, selec
     with tab_records:
         _render_chart_explanation(
             "Registros consolidados WIGA / ECOWITT",
-            "Esta tabla conserva los datos base usados para las gráficas y el resumen del periodo por equipo.",
+            "Aquí quedan reunidas las tablas que soportan la comparación: conteo por equipo, consolidado base, resumen estadístico y diferencias por franja.",
             accent=BRAND_COLORS['hero'],
             kicker='Datos fuente'
         )
@@ -9079,15 +9746,135 @@ def _render_ponderosa_ecowitt_dashboard(df_variables_all, df_cortinas_all, selec
                 'Inicio': current['FechaHora'].min().strftime('%Y-%m-%d %H:%M') if not current.empty else '-',
                 'Fin': current['FechaHora'].max().strftime('%Y-%m-%d %H:%M') if not current.empty else '-',
             })
-        _render_table_download_button(
-            filtered_df.drop(columns=['Fecha_Filtro'], errors='ignore'),
-            "Descargar registros consolidados",
-            f"registros_wiga_ecowitt_{_build_report_slug(block_label, comparison_resolution)}.xlsx",
-            "download_ponderosa_ecowitt_registros",
-            variable_column='__consolidado__'
+        source_summary_table = pd.DataFrame(summary_rows)
+        consolidated_records = filtered_df.drop(columns=['Fecha_Filtro'], errors='ignore')
+
+        record_report_options = [
+            "Resumen por equipo",
+            "Resumen estadístico",
+            "Tabla por franja",
+            "Diferencias WIGA - ECOWITT",
+            "Registros consolidados",
+        ]
+        if st.session_state.get("ponderosa_ecowitt_records_report") not in record_report_options:
+            st.session_state["ponderosa_ecowitt_records_report"] = record_report_options[0]
+        selected_records_report = st.segmented_control(
+            "Reporte",
+            options=record_report_options,
+            key="ponderosa_ecowitt_records_report",
+            help="Selecciona qué tabla quieres revisar o descargar.",
+            width="stretch"
         )
-        _dataframe(pd.DataFrame(summary_rows), hide_index=True)
-        _dataframe(filtered_df.drop(columns=['Fecha_Filtro'], errors='ignore'), hide_index=True)
+
+        if selected_records_report == "Resumen por equipo":
+            st.caption("Conteo y ventana temporal disponible por fuente dentro del periodo seleccionado.")
+            _dataframe(source_summary_table, hide_index=True)
+
+        elif selected_records_report == "Resumen estadístico":
+            summary_metric_options = ["Promedio"] if single_day else ["Promedio", "Desviacion estandar", "Varianza"]
+            if st.session_state.get("ponderosa_ecowitt_summary_metric") not in summary_metric_options:
+                st.session_state["ponderosa_ecowitt_summary_metric"] = summary_metric_options[0]
+            records_summary_metric = st.segmented_control(
+                "Métrica del resumen:",
+                options=summary_metric_options,
+                key="ponderosa_ecowitt_summary_metric",
+                width="stretch"
+            )
+            if records_summary_metric not in summary_metric_options:
+                records_summary_metric = summary_metric_options[0]
+            records_summary_table = _build_ponderosa_ecowitt_period_summary(
+                filtered_df,
+                compared_variables,
+                selected_range,
+                comparison_resolution,
+                records_summary_metric
+            )
+            if records_summary_table.empty:
+                st.info("No hay suficientes lecturas comparables para construir el resumen estadístico.")
+            else:
+                st.caption("Resumen generado con los mismos datos de la comparación visible.")
+                _render_table_download_button(
+                    records_summary_table,
+                    "Descargar resumen estadístico",
+                    f"resumen_wiga_ecowitt_{_build_report_slug(block_label, records_summary_metric, comparison_resolution)}.xlsx",
+                    "download_ponderosa_ecowitt_registros_resumen"
+                )
+                _dataframe(records_summary_table, hide_index=True)
+
+        elif selected_records_report == "Tabla por franja":
+            stats_source_records = _build_ponderosa_ecowitt_stats_source(filtered_df, compared_variables)
+            if stats_source_records.empty:
+                st.info("No hay datos suficientes para construir la tabla por franja.")
+            else:
+                selected_metric_label = st.session_state.get("ponderosa_ecowitt_stats_metric", "Promedio")
+                metric_column = {
+                    "Promedio": "Promedio",
+                    "Desviacion estandar": "DesviacionEstandar",
+                    "Varianza": "Varianza",
+                }.get(selected_metric_label, "Promedio")
+                selected_variable_table = st.session_state.get("ponderosa_ecowitt_stats_graph_variable", compared_variables[0])
+                if selected_variable_table not in compared_variables:
+                    selected_variable_table = compared_variables[0]
+                grouped_df, pivot_promedio, pivot_varianza, pivot_desviacion = _build_hourly_block_analysis(
+                    stats_source_records,
+                    selected_variable_table
+                )
+                pivot_map = {
+                    "Promedio": pivot_promedio,
+                    "DesviacionEstandar": pivot_desviacion,
+                    "Varianza": pivot_varianza,
+                }
+                table = _prepare_hourly_pivot_display(pivot_map.get(metric_column, pivot_promedio))
+                if table.empty:
+                    st.info("No hay tabla disponible para la métrica y variable seleccionadas en análisis.")
+                else:
+                    st.caption(
+                        "Tabla calculada con la métrica y variable seleccionadas en Análisis estadístico. "
+                        "Cambia la gráfica allí para actualizar esta salida."
+                    )
+                    report_slug = _build_report_slug(block_label, selected_variable_table, selected_metric_label, comparison_resolution)
+                    _render_table_download_button(
+                        table,
+                        f"Descargar tabla de {selected_metric_label.lower()}",
+                        f"wiga_ecowitt_franja_{report_slug}.xlsx",
+                        "download_ponderosa_ecowitt_tabla_franja"
+                    )
+                    _dataframe(table, hide_index=True)
+
+        elif selected_records_report == "Diferencias WIGA - ECOWITT":
+            difference_table, difference_table_mode = _build_difference_table_30min(
+                filtered_df,
+                compared_variables,
+                PONDEROSA_SENSOR_NAMES,
+                selected_range,
+                comparison_resolution,
+                _build_ponderosa_hourly_comparison,
+                _build_ponderosa_hourly_series,
+                PONDEROSA_COMPARISON_VARIABLES
+            )
+            if difference_table.empty:
+                st.info("No hay datos suficientes para construir la tabla de diferencias.")
+            else:
+                st.caption(f"Tabla calculada con: {difference_table_mode}. La diferencia se calcula como WIGA - ECOWITT.")
+                _render_comparison_table_summary(difference_table, title="Resumen ejecutivo de diferencias")
+                _render_variable_split_tables(
+                    difference_table,
+                    default_expanded=True,
+                    download_label="Descargar reporte WIGA vs ECOWITT",
+                    download_file_name=f"reporte_wiga_ecowitt_{_build_report_slug(block_label, difference_table_mode)}.xlsx",
+                    download_key="download_ponderosa_ecowitt_registros_diferencias"
+                )
+
+        elif selected_records_report == "Registros consolidados":
+            st.caption("Datos base consolidados que alimentan las gráficas y cálculos de WIGA / ECOWITT.")
+            _render_table_download_button(
+                consolidated_records,
+                "Descargar registros consolidados",
+                f"registros_wiga_ecowitt_{_build_report_slug(block_label, comparison_resolution)}.xlsx",
+                "download_ponderosa_ecowitt_registros",
+                variable_column='__consolidado__'
+            )
+            _dataframe(consolidated_records, hide_index=True)
 
     st.stop()
 
@@ -9499,7 +10286,7 @@ def cargar_cortinas(ruta_bytes, cache_version=DATA_CACHE_VERSION):
 def cargar_dashboard_completo(cache_version=DATA_CACHE_VERSION):
     _ = cache_version
     archivo_variables_bytes = descargar_desde_github(URL_VARIABLES_FALLBACKS)
-    archivo_cortinas_bytes = descargar_desde_github(URL_CORTINAS)
+    archivo_cortinas_bytes = descargar_desde_github(URL_CORTINAS_FALLBACKS)
 
     if archivo_variables_bytes is None:
         archivo_variables_bytes = _read_first_local_file_bytes(LOCAL_VARIABLES_PATHS)
@@ -12439,6 +13226,16 @@ def _sort_block_names(block_names):
 
 
 def _get_block_analysis_color(block_name, variable_name=None):
+    if str(block_name).upper() in PONDEROSA_SENSOR_NAMES and variable_name in PONDEROSA_COMPARISON_VARIABLES:
+        return PONDEROSA_COMPARISON_VARIABLES[variable_name].get('colors', {}).get(
+            str(block_name).upper(),
+            VARIABLE_COLORS.get(variable_name, BRAND_COLORS['hero'])
+        )
+    if str(block_name).upper() in PONDEROSA_LIGHT_SENSOR_NAMES and variable_name in PONDEROSA_LIGHT_VARIABLES:
+        return PONDEROSA_LIGHT_VARIABLES[variable_name].get('colors', {}).get(
+            str(block_name).upper(),
+            VARIABLE_COLORS.get(variable_name, BRAND_COLORS['hero'])
+        )
     block_identifier = _extract_block_identifier(block_name)
     return BLOCK_ANALYSIS_COLORS.get(block_identifier, VARIABLE_COLORS.get(variable_name, BRAND_COLORS['hero']))
 
@@ -12475,8 +13272,8 @@ def _build_hourly_block_analysis(df_variables, variable_name):
         data.groupby(['FranjaMinutos', 'Franja', 'Bloque'], as_index=False)
         .agg(
             Promedio=(variable_name, 'mean'),
-            DesviacionEstandar=(variable_name, lambda serie: serie.std(ddof=1) if len(serie) > 1 else 0.0),
-            Varianza=(variable_name, lambda serie: serie.var(ddof=1) if len(serie) > 1 else 0.0),
+            DesviacionEstandar=(variable_name, 'std'),
+            Varianza=(variable_name, 'var'),
             Registros=(variable_name, 'count')
         )
         .sort_values(['FranjaMinutos', 'Bloque'])
@@ -13072,13 +13869,15 @@ def _build_correlacion_30min_stats(df_variables, variables):
             data.groupby(['FranjaMinutos', 'Franja'], as_index=False)
             .agg(
                 Promedio=(variable_name, 'mean'),
-                DesviacionEstandar=(variable_name, lambda serie: serie.std(ddof=1) if len(serie) > 1 else 0.0),
-                Varianza=(variable_name, lambda serie: serie.var(ddof=1) if len(serie) > 1 else 0.0),
+                DesviacionEstandar=(variable_name, 'std'),
+                Varianza=(variable_name, 'var'),
                 Registros=(variable_name, 'count'),
                 Dias=('Fecha', 'nunique'),
             )
             .sort_values('FranjaMinutos')
         )
+        grouped['DesviacionEstandar'] = grouped['DesviacionEstandar'].fillna(0.0)
+        grouped['Varianza'] = grouped['Varianza'].fillna(0.0)
         grouped['Variable'] = variable_name
         records.append(grouped)
 
@@ -14021,7 +14820,10 @@ def _render_hourly_analysis_view(
     df_external_station=None,
     forced_metric=None,
     variable_options=None,
-    variable_state_key="analisis_variable_option"
+    variable_state_key="analisis_variable_option",
+    metric_state_key="analisis_metric_option",
+    show_table_tab=True,
+    show_inline_tables=True
 ):
     if df_variables.empty:
         fecha_inicio, fecha_fin = fecha_variables
@@ -14049,12 +14851,12 @@ def _render_hourly_analysis_view(
     if forced_metric in metric_options:
         tab_label = forced_metric
     else:
-        if st.session_state.get("analisis_metric_option") not in metric_options:
-            st.session_state["analisis_metric_option"] = metric_options[0]
+        if st.session_state.get(metric_state_key) not in metric_options:
+            st.session_state[metric_state_key] = metric_options[0]
         tab_label = st.segmented_control(
             "Métrica del análisis",
             options=metric_options,
-            key="analisis_metric_option",
+            key=metric_state_key,
             help="Calcula solo la métrica visible para mantener esta vista más rápida.",
             width="stretch"
         )
@@ -14199,7 +15001,10 @@ def _render_hourly_analysis_view_organized(
     df_external_station=None,
     forced_metric=None,
     variable_options=None,
-    variable_state_key="analisis_variable_option"
+    variable_state_key="analisis_variable_option",
+    metric_state_key="analisis_metric_option",
+    show_table_tab=True,
+    show_inline_tables=True
 ):
     if df_variables.empty:
         fecha_inicio, fecha_fin = fecha_variables
@@ -14250,7 +15055,9 @@ def _render_hourly_analysis_view_organized(
         st.info(f'No se encontraron datos para {variable_name} en el rango seleccionado.')
         return
 
-    tab_grafica, tab_resumen, tab_tabla = st.tabs(["Gráfica", "Resumen estadístico", "Tabla"])
+    analysis_tabs = st.tabs(["Gráfica", "Resumen estadístico", "Tabla"] if show_table_tab else ["Gráfica", "Resumen estadístico"])
+    tab_grafica = analysis_tabs[0]
+    tab_resumen = analysis_tabs[1]
     with tab_grafica:
         _render_hourly_metric_visual(grouped_df, variable_name, tab_label, single_day_analysis)
 
@@ -14269,7 +15076,7 @@ def _render_hourly_analysis_view_organized(
             group_column='Bloque',
             accent_getter=lambda group_name: _get_block_analysis_color(group_name, variable_name)
         )
-        if not selected_stats.empty:
+        if show_inline_tables and not selected_stats.empty:
             with st.expander("Ver resumen estadístico en tabla", expanded=False):
                 _dataframe(selected_stats.round(2), hide_index=True)
 
@@ -14291,16 +15098,18 @@ def _render_hourly_analysis_view_organized(
             variable_options=variable_options
         )
 
-    with tab_tabla:
-        _render_hourly_metric_table(
-            tab_label,
-            pivot_promedio,
-            pivot_varianza,
-            pivot_desviacion,
-            variable_name,
-            period_text,
-            variable_state_key
-        )
+    if show_table_tab:
+        tab_tabla = analysis_tabs[2]
+        with tab_tabla:
+            _render_hourly_metric_table(
+                tab_label,
+                pivot_promedio,
+                pivot_varianza,
+                pivot_desviacion,
+                variable_name,
+                period_text,
+                variable_state_key
+            )
 
 
 def _build_marley_metric_stats_source(df, variable):
