@@ -9536,6 +9536,71 @@ def _render_greenhouse_styles():
             font-weight: 900;
             letter-spacing: 0;
         }
+        .greenhouse-flow-grid {
+            display: grid;
+            grid-template-columns: repeat(5, minmax(0, 1fr));
+            gap: 0.72rem;
+            margin: 0.62rem 0 1.05rem 0;
+        }
+        .greenhouse-flow-card {
+            position: relative;
+            min-height: 138px;
+            padding: 0.92rem 0.86rem 0.84rem 0.9rem;
+            border-radius: 8px;
+            border: 1px solid rgba(84,83,134,0.12);
+            background:
+                radial-gradient(circle at 92% 10%, rgba(255,255,255,0.95), transparent 32%),
+                linear-gradient(180deg, rgba(255,255,255,0.96), rgba(247,244,238,0.88));
+            box-shadow: 0 12px 26px rgba(56,58,53,0.075);
+            overflow: hidden;
+        }
+        .greenhouse-flow-card::before {
+            content: '';
+            position: absolute;
+            inset: 0 0 auto 0;
+            height: 5px;
+            background: var(--greenhouse-accent);
+        }
+        .greenhouse-flow-step {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 1.86rem;
+            height: 1.86rem;
+            border-radius: 8px;
+            background: color-mix(in srgb, var(--greenhouse-accent) 18%, #ffffff 82%);
+            color: var(--elite-graphite);
+            font-size: 0.74rem;
+            font-weight: 900;
+            letter-spacing: 0.04em;
+        }
+        .greenhouse-flow-title {
+            display: block;
+            margin-top: 0.58rem;
+            color: var(--elite-graphite);
+            font-size: 0.86rem;
+            font-weight: 900;
+            line-height: 1.18;
+            text-transform: uppercase;
+            letter-spacing: 0.035em;
+        }
+        .greenhouse-flow-copy {
+            display: block;
+            margin-top: 0.42rem;
+            color: rgba(56,58,53,0.72);
+            font-size: 0.79rem;
+            line-height: 1.42;
+        }
+        .greenhouse-divider-note {
+            margin: 0.2rem 0 0.9rem 0;
+            padding: 0.78rem 0.92rem;
+            border-radius: 8px;
+            border: 1px dashed rgba(84,83,134,0.22);
+            background: rgba(255,255,255,0.64);
+            color: rgba(56,58,53,0.74);
+            font-size: 0.86rem;
+            line-height: 1.48;
+        }
         .greenhouse-metric-grid {
             display: grid;
             grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -9699,6 +9764,9 @@ def _render_greenhouse_styles():
             .greenhouse-hero-badge {
                 max-width: 220px;
             }
+            .greenhouse-flow-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
             .greenhouse-metric-grid,
             .greenhouse-insight-grid,
             .greenhouse-reading-grid,
@@ -9707,6 +9775,7 @@ def _render_greenhouse_styles():
             }
         }
         @media (max-width: 640px) {
+            .greenhouse-flow-grid,
             .greenhouse-metric-grid,
             .greenhouse-insight-grid,
             .greenhouse-reading-grid,
@@ -9762,6 +9831,32 @@ def _render_greenhouse_metric_grid(title, metrics):
         f"""
         <div class="greenhouse-section-title">{html.escape(title)}</div>
         <div class="greenhouse-metric-grid">{''.join(card_html)}</div>
+        """,
+        unsafe_allow_html=True
+    )
+
+
+def _render_greenhouse_flow_cards(title, cards):
+    if not cards:
+        return
+
+    card_html = []
+    for idx, card in enumerate(cards, start=1):
+        accent = card.get("accent", BRAND_COLORS["hero"])
+        card_html.append(
+            (
+                f'<div class="greenhouse-flow-card" style="--greenhouse-accent: {accent};">'
+                f'<span class="greenhouse-flow-step">{idx:02d}</span>'
+                f'<span class="greenhouse-flow-title">{html.escape(card.get("title", ""))}</span>'
+                f'<span class="greenhouse-flow-copy">{html.escape(card.get("body", ""))}</span>'
+                '</div>'
+            )
+        )
+
+    st.markdown(
+        f"""
+        <div class="greenhouse-section-title">{html.escape(title)}</div>
+        <div class="greenhouse-flow-grid">{''.join(card_html)}</div>
         """,
         unsafe_allow_html=True
     )
@@ -10864,6 +10959,180 @@ def _render_greenhouse_analysis_dashboard():
         _render_greenhouse_report_download(analysis_data, selected_block_label, key_suffix="ficha_tecnica")
     with download_note_col:
         st.caption("Reporte listo para auditoría: datos generales, áreas calculadas, indicadores, lectura técnica, guía rápida y diccionario.")
+
+    _render_greenhouse_flow_cards(
+        "Ruta de lectura del contexto técnico",
+        [
+            {
+                "title": "Resumen ejecutivo",
+                "body": "Decisión rápida: capacidad, brecha, eficiencia y lectura principal del bloque.",
+                "accent": BRAND_COLORS["hero"],
+            },
+            {
+                "title": "Componentes",
+                "body": "Detalle de geometría, laterales, frontales y culatas para explicar el resultado.",
+                "accent": GREENHOUSE_COLORS["real"],
+            },
+            {
+                "title": "Comparativo",
+                "body": "Benchmark entre bloques para priorizar dónde revisar primero.",
+                "accent": GREENHOUSE_COLORS["gap"],
+            },
+            {
+                "title": "Cruce ambiental",
+                "body": "Relación entre estructura de ventilación y comportamiento climático observado.",
+                "accent": BRAND_COLORS["sky"],
+            },
+            {
+                "title": "Datos y diccionario",
+                "body": "Trazabilidad completa del Excel: tablas fuente, cálculos y definiciones.",
+                "accent": BRAND_COLORS["graphite"],
+            },
+        ]
+    )
+
+    tab_exec, tab_components, tab_compare, tab_environment_new, tab_data = st.tabs([
+        "1. Resumen ejecutivo",
+        "2. Componentes",
+        "3. Comparativo",
+        "4. Cruce ambiental",
+        "5. Datos y diccionario",
+    ])
+
+    with tab_exec:
+        _render_chart_explanation(
+            "Lectura ejecutiva del bloque",
+            "Concentra capacidad instalada, uso real y brecha operativa para tomar una decisión rápida antes de entrar al detalle técnico.",
+            accent=BRAND_COLORS['hero'],
+            kicker='Contexto técnico'
+        )
+
+        if not selected_summary_df.empty:
+            summary_row = selected_summary_df.iloc[0]
+            real_max_ratio = _safe_float(summary_row.get("% Real / Máx. Perm."))
+            loss_ratio = max(0.0, 1 - real_max_ratio) if real_max_ratio is not None else None
+            _render_greenhouse_metric_grid(
+                "Capacidad de ventilación",
+                [
+                    {"label": "Total teórica", "value": _format_greenhouse_value(summary_row.get("Total Teórica (m²)"), 2, " m²"), "note": "Potencial geométrico calculado", "accent": GREENHOUSE_COLORS["theoretical"]},
+                    {"label": "Máx. permitida", "value": _format_greenhouse_value(summary_row.get("Total Máx. Perm. (m²)"), 2, " m²"), "note": "Límite operativo instalado", "accent": GREENHOUSE_COLORS["allowed"]},
+                    {"label": "Total real", "value": _format_greenhouse_value(summary_row.get("Total Real (m²)"), 2, " m²"), "note": "Ventilación efectiva disponible", "accent": GREENHOUSE_COLORS["real"]},
+                    {"label": "Brecha máx-real", "value": _format_greenhouse_value(summary_row.get("Brecha Máx-Real (m²)"), 2, " m²"), "note": "Oportunidad frente al máximo", "accent": GREENHOUSE_COLORS["gap"]},
+                ]
+            )
+            _render_greenhouse_metric_grid(
+                "Indicadores de cumplimiento",
+                [
+                    {"label": "Real / teórica", "value": _format_greenhouse_percent(summary_row.get("% Real / Teórica")), "note": "Uso del potencial geométrico", "accent": BRAND_COLORS["sky"]},
+                    {"label": "Real / máx. permitida", "value": _format_greenhouse_percent(summary_row.get("% Real / Máx. Perm.")), "note": "Uso de la capacidad instalada", "accent": BRAND_COLORS["hero"]},
+                    {"label": "Pérdida operativa", "value": _format_greenhouse_percent(loss_ratio), "note": "Brecha relativa al máximo", "accent": BRAND_COLORS["rose"]},
+                    {"label": "Bloque evaluado", "value": selected_block_label, "note": "Fuente: Datos por Bloque", "accent": BRAND_COLORS["graphite"]},
+                ]
+            )
+
+        _render_greenhouse_insight_cards(_build_greenhouse_insights(selected_general_df, selected_areas_df, selected_summary_df))
+        exec_left, exec_right = st.columns(2)
+        with exec_left:
+            _render_greenhouse_chart_panel(_build_greenhouse_efficiency_donut(selected_summary_df, selected_block_label), "Eficiencia operativa", "ejecutivo_eficiencia_operativa", selected_block_label, large_height=620)
+        with exec_right:
+            _render_greenhouse_chart_panel(_build_greenhouse_composition_donut(selected_areas_df, selected_block_label), "Composición de la ventilación real", "ejecutivo_composicion_ventilacion_real", selected_block_label, large_height=620)
+
+    with tab_components:
+        _render_chart_explanation(
+            "Componentes estructurales",
+            "Separa geometría, ventilación lateral, frontal y culatas para entender de dónde viene la capacidad real del bloque.",
+            accent=GREENHOUSE_COLORS["real"],
+            kicker='Detalle técnico'
+        )
+        if not selected_general_df.empty:
+            general_row = selected_general_df.iloc[0]
+            _render_greenhouse_metric_grid(
+                "Geometría del invernadero",
+                [
+                    {"label": "Cuadros", "value": _format_greenhouse_value(general_row.get("N° Cuadros"), 0), "note": "Módulos estructurales", "accent": GREENHOUSE_COLORS["lateral"]},
+                    {"label": "Naves", "value": _format_greenhouse_value(general_row.get("N° Naves"), 0), "note": "Configuración del bloque", "accent": GREENHOUSE_COLORS["frontal"]},
+                    {"label": "Culatas", "value": _format_greenhouse_value(general_row.get("N° Culatas"), 0), "note": "Aperturas consideradas", "accent": GREENHOUSE_COLORS["culatas"]},
+                    {"label": "Tamaño nave", "value": _format_greenhouse_value(general_row.get("Tamaño de la nave (m)"), 1, " m"), "note": "Medida base de cálculo", "accent": BRAND_COLORS["beige"]},
+                ]
+            )
+        comp_left, comp_right = st.columns(2)
+        with comp_left:
+            _render_greenhouse_chart_panel(_build_greenhouse_component_chart(selected_areas_df, selected_block_label), "Ventilación por componente", "componentes_ventilacion_por_componente", selected_block_label, large_height=680)
+        with comp_right:
+            _render_greenhouse_chart_panel(_build_greenhouse_component_progress_chart(selected_areas_df, selected_block_label), "Uso del máximo permitido por componente", "componentes_uso_maximo_por_componente", selected_block_label, large_height=680)
+        _render_greenhouse_reading_cards("Guía rápida de lectura", guide_df, title_col="Concepto", body_col="Descripcion")
+        detail_left, detail_right = st.columns(2)
+        with detail_left:
+            with st.expander("Datos generales y aperturas lineales", expanded=False):
+                _dataframe(_format_single_block_detail_table(selected_general_df), hide_index=True)
+        with detail_right:
+            with st.expander("Áreas de ventilación calculadas", expanded=False):
+                _dataframe(_format_single_block_detail_table(selected_areas_df), hide_index=True)
+
+    with tab_compare:
+        _render_chart_explanation(
+            "Comparativo entre bloques",
+            "Ubica el bloque seleccionado frente al resto para priorizar brechas, eficiencia relativa y posición técnica.",
+            accent=GREENHOUSE_COLORS["gap"],
+            kicker='Benchmark técnico'
+        )
+        diagnostic_left, diagnostic_right = st.columns(2)
+        with diagnostic_left:
+            _render_greenhouse_chart_panel(_build_greenhouse_performance_heatmap(summary_df, selected_block_label), "Heatmap de desempeño técnico", "comparativo_heatmap_desempeno_tecnico", selected_block_label, large_height=650)
+        with diagnostic_right:
+            _render_greenhouse_chart_panel(_build_greenhouse_gap_ranking_chart(summary_df, selected_block_label), "Ranking de brecha operativa", "comparativo_ranking_brecha_operativa", selected_block_label, large_height=650)
+        _render_greenhouse_chart_panel(_build_greenhouse_capacity_slope_chart(summary_df, selected_block_label), "Trayectoria de capacidad", "comparativo_trayectoria_capacidad", selected_block_label, large_height=680)
+        _render_greenhouse_chart_panel(_build_greenhouse_block_ranking_chart(summary_df, selected_block_label), "Comparación de ventilación real entre bloques", "comparativo_ranking_ventilacion_real", selected_block_label, large_height=650)
+        with st.expander("Tabla comparativa por bloque", expanded=True):
+            _dataframe(_format_analysis_block_table(summary_df), hide_index=True)
+        _render_greenhouse_reading_cards("Lectura técnica del archivo", interpretations_df)
+
+    with tab_environment_new:
+        _render_greenhouse_environment_tab(summary_df, analysis_data, selected_block_label)
+
+    with tab_data:
+        _render_chart_explanation(
+            "Base técnica y trazabilidad",
+            "Esta pestaña conserva las tablas originales, las bases de gráficas y el diccionario para auditar de dónde sale cada indicador del contexto técnico.",
+            accent=BRAND_COLORS["graphite"],
+            kicker="Soporte de datos"
+        )
+        _render_greenhouse_metric_grid(
+            "Trazabilidad del archivo",
+            [
+                {"label": "Bloques técnicos", "value": f"{len(available_blocks):,}", "note": "Bloques detectados en el Excel", "accent": BRAND_COLORS["hero"]},
+                {"label": "Datos generales", "value": f"{len(general_df):,}", "note": "Filas de geometría y aperturas", "accent": GREENHOUSE_COLORS["lateral"]},
+                {"label": "Áreas calculadas", "value": f"{len(areas_df):,}", "note": "Filas de ventilación en m²", "accent": GREENHOUSE_COLORS["real"]},
+                {"label": "Variables definidas", "value": f"{len(dictionary_df):,}", "note": "Conceptos documentados", "accent": GREENHOUSE_COLORS["gap"]},
+            ]
+        )
+        st.markdown(
+            """
+            <div class="greenhouse-divider-note">
+                Usa esta zona como respaldo técnico: primero están las tablas fuente, luego las bases usadas para gráficas comparativas
+                y al final el diccionario con el significado operativo de cada variable.
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+        st.markdown("### Tablas fuente del Excel")
+        with st.expander("Datos generales de todos los bloques", expanded=False):
+            _dataframe(general_df, hide_index=True, height=260)
+        with st.expander("Apertura calculada en m² de todos los bloques", expanded=False):
+            _dataframe(_format_analysis_block_table(areas_df), hide_index=True, height=280)
+        with st.expander("Datos base de gráficas comparativas", expanded=False):
+            if not chart_totals_df.empty:
+                st.markdown("#### Ventilación por bloque")
+                _dataframe(chart_totals_df, hide_index=True)
+            if not chart_ratios_df.empty:
+                st.markdown("#### Indicadores porcentuales")
+                _dataframe(_format_analysis_block_table(chart_ratios_df), hide_index=True)
+        st.markdown("### Diccionario de variables")
+        _render_greenhouse_dictionary_cards(dictionary_df)
+        with st.expander("Ver diccionario en tabla completa", expanded=False):
+            _dataframe(dictionary_df, hide_index=True, height=360)
+
+    return
 
     tab_block, tab_summary, tab_environment, tab_dictionary = st.tabs([
         "Datos por bloque",
@@ -13259,8 +13528,6 @@ if 'mostrar_aperturas_ideales' not in st.session_state:
     st.session_state.mostrar_aperturas_ideales = False
 if 'comparar_con_almacen' not in st.session_state:
     st.session_state.comparar_con_almacen = False
-if 'mostrar_graficas_detalladas' not in st.session_state:
-    st.session_state.mostrar_graficas_detalladas = DETAIL_CHARTS_DEFAULT
 if 'mostrar_marley_detalles' not in st.session_state:
     st.session_state.mostrar_marley_detalles = MARLEY_DETAIL_CHARTS_DEFAULT
 if 'mostrar_marley_registros' not in st.session_state:
@@ -13781,11 +14048,6 @@ with st.sidebar.expander("Series visibles", expanded=True):
             key="mostrar_aperturas_ideales",
             help=FILTER_HELP_TEXTS['aperturas_ideales']
         )
-        st.checkbox(
-            "Gráficas detalladas",
-            key="mostrar_graficas_detalladas",
-            help=FILTER_HELP_TEXTS['graficas_detalladas']
-        )
 
 # Vista principal
 tab_correlacion = st.container()
@@ -13833,7 +14095,7 @@ with tab_correlacion:
         elif datos_cortinas_sel.empty:
             st.info("No hay información de motores para este periodo. Se mostrarán las variables ambientales disponibles.")
 
-        tab_chart, tab_summary, tab_detail, tab_records = st.tabs(["Gráfica", "Resumen", "Detalle", "Registros"])
+        tab_chart, tab_summary, tab_detail, tab_records = st.tabs(["Gráfica", "Resumen", "Gráficas individuales", "Registros"])
         with tab_chart:
             if not df_variables_corr.empty and available_correlacion_vars:
                 if not selected_vars:
@@ -13881,16 +14143,13 @@ with tab_correlacion:
             )
 
         with tab_detail:
-            if st.session_state.get("mostrar_graficas_detalladas", DETAIL_CHARTS_DEFAULT):
-                _render_temperature_focus_chart(
-                    df_variables_corr,
-                    fecha_variables,
-                    block_label=block_label,
-                    df_external=df_variables_almacen_corr,
-                    datos_cortinas_sel=datos_cortinas_sel
-                )
-            else:
-                st.info("Activa 'Gráficas detalladas' en la barra lateral para cargar esta lectura.")
+            _render_temperature_focus_chart(
+                df_variables_corr,
+                fecha_variables,
+                block_label=block_label,
+                df_external=df_variables_almacen_corr,
+                datos_cortinas_sel=datos_cortinas_sel
+            )
 
         with tab_records:
             record_content_options = ["Ocultar registros", "Sensores", "Cortinas"]
@@ -13961,14 +14220,13 @@ with tab_correlacion:
             base_label=block_label
         )
 
-        if st.session_state.get("mostrar_graficas_detalladas", DETAIL_CHARTS_DEFAULT):
-            _render_temperature_focus_chart(
-                df_variables_corr,
-                fecha_variables,
-                block_label=block_label,
-                df_external=df_variables_almacen_corr,
-                datos_cortinas_sel=datos_cortinas_sel
-            )
+        _render_temperature_focus_chart(
+            df_variables_corr,
+            fecha_variables,
+            block_label=block_label,
+            df_external=df_variables_almacen_corr,
+            datos_cortinas_sel=datos_cortinas_sel
+        )
 
         record_content_options = ["Ocultar registros", "Sensores", "Cortinas"]
         if st.session_state.get("vista_registros_correlacion") not in record_content_options:
