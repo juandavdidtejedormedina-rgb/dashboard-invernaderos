@@ -11897,6 +11897,7 @@ def _render_correlacion(
     if explanation_text is None:
         ppfd_help = f" {PPFD_HELP_TEXT}" if 'Radiación PAR' in variables_seleccionadas else ''
         explanation_text = 'Esta gráfica pone todas las variables seleccionadas sobre la misma línea de tiempo. Cada color tiene su propia escala a la derecha; pasa el cursor por la gráfica para ver la hora exacta y el valor de cada serie.' + ppfd_help + cortina_help
+    _plotly_chart(fig_corr)
     _render_chart_explanation(
         explanation_title,
         explanation_text,
@@ -11904,7 +11905,6 @@ def _render_correlacion(
     )
     if plot_compaction_messages:
         st.caption("Para mantener fluida la página, las series largas se muestran resumidas automáticamente por franjas de tiempo.")
-    _plotly_chart(fig_corr)
 
     if selected_cortinas and not cortina_traces and selected_sensors:
         st.info('No hay información de motores para el periodo seleccionado. Se muestran únicamente las variables ambientales.')
