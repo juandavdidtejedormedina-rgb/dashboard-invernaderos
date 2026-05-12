@@ -3,6 +3,7 @@ import pandas as pd
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import io
+import math
 import warnings
 import requests
 import re
@@ -14750,4 +14751,3 @@ with tab_correlacion:
                 st.info("No hay registros de cortinas para los filtros seleccionados.")
             else:
                 _dataframe(datos_cortinas_sel)
-
