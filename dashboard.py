@@ -3140,6 +3140,47 @@ def _get_selected_correlacion_vars(options):
     return selected_vars
 
 
+def _render_correlacion_series_panel(available_vars, selected_block_code, df_variables_almacen):
+    st.markdown("#### Series visibles")
+    if not available_vars:
+        st.info("No hay series disponibles para el rango seleccionado.")
+        return []
+
+    action_col, clear_col = st.columns(2)
+    with action_col:
+        if st.button("Todas", key="correlacion_select_all", width="stretch"):
+            _reset_correlacion_selector(available_vars)
+    with clear_col:
+        if st.button("Limpiar", key="correlacion_clear_all", width="stretch"):
+            for option in available_vars:
+                st.session_state[_selector_state_key(option)] = False
+            st.session_state['variables_correlacion'] = []
+
+    for option in available_vars:
+        state_key = _selector_state_key(option)
+        if state_key not in st.session_state:
+            st.session_state[state_key] = True
+        st.checkbox(
+            VARIABLE_SELECTOR_LABELS.get(option, VARIABLE_LABELS.get(option, option)),
+            key=state_key,
+            help=VARIABLE_FILTER_HELP.get(option, FILTER_HELP_TEXTS['series_visibles'])
+        )
+
+    st.divider()
+    st.checkbox(
+        "Comparar con Estación externa",
+        key="comparar_con_almacen",
+        disabled=selected_block_code == 'ALMACEN' or df_variables_almacen.empty,
+        help=FILTER_HELP_TEXTS['comparar_almacen']
+    )
+    st.checkbox(
+        "Aperturas ideales",
+        key="mostrar_aperturas_ideales",
+        help=FILTER_HELP_TEXTS['aperturas_ideales']
+    )
+    return _get_selected_correlacion_vars(available_vars)
+
+
 def _analysis_block_state_key(block_code):
     safe_code = re.sub(r'[^a-z0-9]+', '_', str(block_code).lower()).strip('_')
     return f'bloques_analisis_{safe_code}'
@@ -12692,6 +12733,122 @@ def _render_variable_distribution_cards(stats_df, variable_configs=None, title='
     st.markdown('<div class="analysis-stat-grid">' + ''.join(cards_html) + '</div>', unsafe_allow_html=True)
 
 
+def _build_variables_30min_report(df_variables, variables):
+    if (
+        not isinstance(df_variables, pd.DataFrame) or
+        df_variables.empty or
+        'DateTime' not in df_variables.columns
+    ):
+        return pd.DataFrame()
+
+    available_variables = [var for var in variables if var in df_variables.columns]
+    if not available_variables:
+        return pd.DataFrame()
+
+    working = df_variables[['DateTime', *available_variables]].copy()
+    working['DateTime'] = pd.to_datetime(working['DateTime'], errors='coerce')
+    working = working.dropna(subset=['DateTime'])
+    if working.empty:
+        return pd.DataFrame()
+
+    for variable_name in available_variables:
+        working[variable_name] = pd.to_numeric(working[variable_name], errors='coerce')
+
+    working['FechaHora'] = working['DateTime'].dt.floor(MARLEY_TIME_BUCKET)
+    average_table = working.groupby('FechaHora', as_index=False)[available_variables].mean()
+    count_table = (
+        working.groupby('FechaHora')[available_variables]
+        .count()
+        .add_suffix(' registros')
+        .reset_index()
+    )
+    report = average_table.merge(count_table, on='FechaHora', how='left')
+    report.insert(1, 'Fecha', report['FechaHora'].dt.date)
+    report.insert(2, 'Hora', report['FechaHora'].dt.strftime('%H:%M'))
+    return report
+
+
+def _build_cortinas_30min_report(datos_cortinas, selected_range, block_label=None):
+    if not isinstance(datos_cortinas, pd.DataFrame) or datos_cortinas.empty:
+        return pd.DataFrame()
+
+    motores = _get_available_cortina_vars(datos_cortinas)
+    if not motores:
+        return pd.DataFrame()
+
+    start_date, end_date = selected_range
+    full_index = pd.date_range(
+        start=pd.Timestamp(start_date),
+        end=pd.Timestamp(end_date) + MARLEY_SERIES_END_OFFSET,
+        freq=MARLEY_TIME_BUCKET
+    )
+    report_rows = []
+
+    for motor_name in motores:
+        motor_profiles = []
+        for config in SIDE_CONFIGS.values():
+            profile = _build_cortina_apertura_profile(datos_cortinas, motor_name, config)
+            if not profile.empty and {'Hora', 'Apertura'}.issubset(profile.columns):
+                motor_profiles.append(profile[['Hora', 'Apertura', 'Evento']].copy())
+
+        if not motor_profiles:
+            continue
+
+        profile = pd.concat(motor_profiles, ignore_index=True)
+        profile['Hora'] = pd.to_datetime(profile['Hora'], errors='coerce')
+        profile['Apertura'] = pd.to_numeric(profile['Apertura'], errors='coerce')
+        profile = profile.dropna(subset=['Hora']).sort_values('Hora')
+        if profile.empty:
+            continue
+
+        timeline_index = pd.DatetimeIndex(profile['Hora'].drop_duplicates()).union(full_index).sort_values()
+        timeline = (
+            profile.drop_duplicates(subset=['Hora'], keep='last')
+            .set_index('Hora')
+            .reindex(timeline_index)
+            .ffill()
+            .reindex(full_index)
+            .reset_index()
+            .rename(columns={'index': 'FechaHora'})
+        )
+        timeline['Bloque'] = block_label or 'Bloque seleccionado'
+        timeline['Motor'] = motor_name
+        timeline['Fecha'] = timeline['FechaHora'].dt.date
+        timeline['Hora'] = timeline['FechaHora'].dt.strftime('%H:%M')
+        timeline.rename(columns={'Apertura': 'Apertura estimada (%)', 'Evento': 'Ultimo evento'}, inplace=True)
+        report_rows.append(timeline[['FechaHora', 'Fecha', 'Hora', 'Bloque', 'Motor', 'Apertura estimada (%)', 'Ultimo evento']])
+
+    return pd.concat(report_rows, ignore_index=True) if report_rows else pd.DataFrame()
+
+
+def _build_cortinas_event_report(datos_cortinas):
+    if not isinstance(datos_cortinas, pd.DataFrame) or datos_cortinas.empty:
+        return pd.DataFrame()
+
+    preferred_columns = [
+        'Fecha',
+        'Frente A',
+        'Hora Apertura A',
+        '% Apertura A',
+        'Duracion Apertura A',
+        'Hora Cierre A',
+        '% Cierre A',
+        'Duracion Cierre A',
+        'Anotacion A',
+        'Frente B',
+        'Hora Apertura B',
+        '% Apertura B',
+        'Duracion Apertura B',
+        'Hora Cierre B',
+        '% Cierre B',
+        'Duracion Cierre B',
+        'Anotacion B',
+        'Culatas %',
+    ]
+    available_columns = [column for column in preferred_columns if column in datos_cortinas.columns]
+    return datos_cortinas[available_columns].copy() if available_columns else datos_cortinas.copy()
+
+
 def _render_analysis_metric_cards_row(metrics_data, tab_label, single_day_analysis, heading=None, variable_options=None):
     if not metrics_data:
         return
@@ -14017,46 +14174,17 @@ if fecha_cortinas is not None:
 
 available_correlacion_vars = _get_available_correlacion_vars(df_variables_corr, datos_cortinas_sel)
 
-selected_vars_sidebar = []
-with st.sidebar.expander("Series visibles", expanded=True):
-    if bloque_variables is None or fecha_variables is None:
-        st.write("Selecciona bloque y fechas para elegir qué series mostrar.")
-    elif not available_correlacion_vars:
-        st.write("No se encontraron variables con datos para el rango seleccionado.")
-    else:
-        current_context = (
-            str(bloque_variables),
-            str(fecha_variables[0]),
-            str(fecha_variables[1]),
-            tuple(available_correlacion_vars)
-        )
-        previous_context = st.session_state.get('variables_correlacion_context')
-        if previous_context != current_context or force_all_correlacion_series:
-            _reset_correlacion_selector(available_correlacion_vars)
-            st.session_state['variables_correlacion_context'] = current_context
-
-        for option in available_correlacion_vars:
-            state_key = _selector_state_key(option)
-            if state_key not in st.session_state:
-                st.session_state[state_key] = option in available_correlacion_vars
-            st.checkbox(
-                VARIABLE_SELECTOR_LABELS.get(option, VARIABLE_LABELS.get(option, option)),
-                key=state_key,
-                help=VARIABLE_FILTER_HELP.get(option, FILTER_HELP_TEXTS['series_visibles'])
-            )
-
-        selected_vars_sidebar = _get_selected_correlacion_vars(available_correlacion_vars)
-        st.checkbox(
-            "Comparar con Estación externa",
-            key="comparar_con_almacen",
-            disabled=selected_block_code == 'ALMACEN' or df_variables_almacen_corr.empty,
-            help=FILTER_HELP_TEXTS['comparar_almacen']
-        )
-        st.checkbox(
-            "Aperturas ideales",
-            key="mostrar_aperturas_ideales",
-            help=FILTER_HELP_TEXTS['aperturas_ideales']
-        )
+if bloque_variables is not None and fecha_variables is not None and available_correlacion_vars:
+    current_context = (
+        str(bloque_variables),
+        str(fecha_variables[0]),
+        str(fecha_variables[1]),
+        tuple(available_correlacion_vars)
+    )
+    previous_context = st.session_state.get('variables_correlacion_context')
+    if previous_context != current_context or force_all_correlacion_series:
+        _reset_correlacion_selector(available_correlacion_vars)
+        st.session_state['variables_correlacion_context'] = current_context
 
 # Vista principal
 tab_correlacion = st.container()
@@ -14094,7 +14222,7 @@ with tab_correlacion:
         daily_annotations = _get_daily_annotations(datos_cortinas_sel)
         annotations_by_day = _get_annotations_by_day(datos_cortinas_sel)
 
-        selected_vars = selected_vars_sidebar or st.session_state.get('variables_correlacion', available_correlacion_vars.copy())
+        selected_vars = st.session_state.get('variables_correlacion', available_correlacion_vars.copy())
 
         if df_variables_corr.empty:
             fecha_label = fecha_inicio.strftime('%Y-%m-%d') if not rango_multiple else f"{fecha_inicio.strftime('%Y-%m-%d')} a {fecha_fin.strftime('%Y-%m-%d')}"
@@ -14104,28 +14232,54 @@ with tab_correlacion:
         elif datos_cortinas_sel.empty:
             st.info("No hay información de motores para este periodo. Se mostrarán las variables ambientales disponibles.")
 
-        tab_chart, tab_summary, tab_detail, tab_records = st.tabs(["Gráfica", "Resumen", "Gráficas individuales", "Registros"])
+        tab_chart, tab_observations, tab_stats, tab_detail, tab_records = st.tabs([
+            "Gráfica",
+            "Observaciones del bloque",
+            "Análisis estadístico",
+            "Gráficas individuales",
+            "Registros"
+        ])
         with tab_chart:
-            if not df_variables_corr.empty and available_correlacion_vars:
-                if not selected_vars:
-                    st.warning('Selecciona al menos una variable para mostrar la correlación.')
-                else:
-                    with _loading_context(
-                        st.session_state.get("modo_fechas_compartidas") == "Varios días",
-                        "Cargando gráficas de correlación..."
-                    ):
-                        _render_correlacion(
-                            df_variables_corr,
-                            datos_cortinas_sel,
-                            fecha_variables,
-                            selected_vars,
-                            block_label=block_label,
-                            show_ideal_aperturas=st.session_state.get('mostrar_aperturas_ideales', False),
-                            df_variables_almacen=df_variables_almacen_corr,
-                            compare_with_almacen=st.session_state.get('comparar_con_almacen', False)
-                        )
+            chart_col, controls_col = st.columns([0.76, 0.24], gap="large")
+            with controls_col:
+                selected_vars = _render_correlacion_series_panel(
+                    available_correlacion_vars,
+                    selected_block_code,
+                    df_variables_almacen_corr
+                )
+            with chart_col:
+                _render_chart_explanation(
+                    f"Bloque en visualización: {block_label}",
+                    "La gráfica cruza las variables ambientales seleccionadas con el comportamiento disponible de cortinas para el periodo filtrado.",
+                    accent=BRAND_COLORS['hero'],
+                    kicker='Vista activa'
+                )
+                if not df_variables_corr.empty and available_correlacion_vars:
+                    if not selected_vars:
+                        st.warning('Selecciona al menos una variable para mostrar la correlación.')
+                    else:
+                        with _loading_context(
+                            st.session_state.get("modo_fechas_compartidas") == "Varios días",
+                            "Cargando gráficas de correlación..."
+                        ):
+                            _render_correlacion(
+                                df_variables_corr,
+                                datos_cortinas_sel,
+                                fecha_variables,
+                                selected_vars,
+                                block_label=block_label,
+                                show_ideal_aperturas=st.session_state.get('mostrar_aperturas_ideales', False),
+                                df_variables_almacen=df_variables_almacen_corr,
+                                compare_with_almacen=st.session_state.get('comparar_con_almacen', False)
+                            )
 
-        with tab_summary:
+        with tab_observations:
+            _render_chart_explanation(
+                "Observaciones, modificación y estado de culatas",
+                "Esta lectura consolida las anotaciones operativas del bloque, la modificación configurada y el estado de culatas del periodo seleccionado.",
+                accent=BRAND_COLORS['rose'],
+                kicker='Contexto del bloque'
+            )
             if (
                 block_label or
                 block_modification or
@@ -14143,6 +14297,8 @@ with tab_correlacion:
                     annotations_by_day=annotations_by_day,
                     culatas_by_day=culatas_by_day
                 )
+
+        with tab_stats:
             _render_summary_cards_selector(
                 df_variables_corr,
                 fecha_variables,
@@ -14150,6 +14306,23 @@ with tab_correlacion:
                 reference_label='Estación externa',
                 base_label=block_label
             )
+            stats_variables = [variable for variable in variables_sensor if variable in df_variables_corr.columns]
+            stats_df = _build_variable_distribution_table(df_variables_corr, stats_variables)
+            variable_stat_configs = {
+                variable_name: {
+                    'title': VARIABLE_SELECTOR_LABELS.get(variable_name, VARIABLE_LABELS.get(variable_name, variable_name)),
+                    'unit': VARIABLE_UNITS.get(variable_name, ''),
+                    'accent': VARIABLE_COLORS.get(variable_name, BRAND_COLORS['hero'])
+                }
+                for variable_name in stats_variables
+            }
+            _render_variable_distribution_cards(
+                stats_df,
+                variable_stat_configs,
+                title=f"Análisis estadístico de variables - {block_label}"
+            )
+            with st.expander("Ver estadística en tabla", expanded=False):
+                _dataframe(stats_df, hide_index=True)
 
         with tab_detail:
             _render_temperature_focus_chart(
@@ -14161,26 +14334,72 @@ with tab_correlacion:
             )
 
         with tab_records:
-            record_content_options = ["Ocultar registros", "Sensores", "Cortinas"]
+            sensor_30min_report = _build_variables_30min_report(df_variables_corr, variables_sensor)
+            cortinas_30min_report = _build_cortinas_30min_report(datos_cortinas_sel, fecha_variables, block_label)
+            cortinas_event_report = _build_cortinas_event_report(datos_cortinas_sel)
+            record_content_options = [
+                "Variables cada 30 min",
+                "Cortinas cada 30 min",
+                "Eventos de cortinas",
+                "Registros crudos"
+            ]
             if st.session_state.get("vista_registros_correlacion") not in record_content_options:
                 st.session_state["vista_registros_correlacion"] = record_content_options[0]
             selected_record_content = st.segmented_control(
-                "Registros",
+                "Reporte",
                 options=record_content_options,
                 key="vista_registros_correlacion",
                 help=FILTER_HELP_TEXTS['registros'],
                 width="stretch"
             )
-            if selected_record_content == "Sensores":
-                if datos_sensores_corr.empty:
-                    st.info("No hay registros de sensores para los filtros seleccionados.")
+            if selected_record_content == "Variables cada 30 min":
+                if sensor_30min_report.empty:
+                    st.info("No hay registros de variables para generar el reporte cada 30 minutos.")
                 else:
-                    _dataframe(datos_sensores_corr)
-            elif selected_record_content == "Cortinas":
-                if datos_cortinas_sel.empty:
-                    st.info("No hay registros de cortinas para los filtros seleccionados.")
+                    _render_table_download_button(
+                        sensor_30min_report,
+                        "Descargar reporte de variables",
+                        f"reporte_variables_30min_{_build_report_slug(block_label)}.xlsx",
+                        "download_correlacion_variables_30min",
+                        variable_column='Fecha'
+                    )
+                    _dataframe(sensor_30min_report, hide_index=True)
+            elif selected_record_content == "Cortinas cada 30 min":
+                if cortinas_30min_report.empty:
+                    st.info("No hay registros de cortinas para generar el reporte cada 30 minutos.")
                 else:
-                    _dataframe(datos_cortinas_sel)
+                    _render_table_download_button(
+                        cortinas_30min_report,
+                        "Descargar reporte de cortinas",
+                        f"reporte_cortinas_30min_{_build_report_slug(block_label)}.xlsx",
+                        "download_correlacion_cortinas_30min",
+                        variable_column='Motor'
+                    )
+                    _dataframe(cortinas_30min_report, hide_index=True)
+            elif selected_record_content == "Eventos de cortinas":
+                if cortinas_event_report.empty:
+                    st.info("No hay eventos de cortinas para los filtros seleccionados.")
+                else:
+                    _render_table_download_button(
+                        cortinas_event_report,
+                        "Descargar eventos de cortinas",
+                        f"eventos_cortinas_{_build_report_slug(block_label)}.xlsx",
+                        "download_correlacion_eventos_cortinas",
+                        variable_column='Fecha'
+                    )
+                    _dataframe(cortinas_event_report, hide_index=True)
+            elif selected_record_content == "Registros crudos":
+                raw_tab_sensors, raw_tab_cortinas = st.tabs(["Sensores", "Cortinas"])
+                with raw_tab_sensors:
+                    if datos_sensores_corr.empty:
+                        st.info("No hay registros de sensores para los filtros seleccionados.")
+                    else:
+                        _dataframe(datos_sensores_corr)
+                with raw_tab_cortinas:
+                    if datos_cortinas_sel.empty:
+                        st.info("No hay registros de cortinas para los filtros seleccionados.")
+                    else:
+                        _dataframe(datos_cortinas_sel)
 
         st.stop()
 
