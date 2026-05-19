@@ -437,6 +437,13 @@ PONDEROSA_ECOWITT_CANONICAL_COLUMNS = {
     "luz lux": "LUX",
     "lux": "LUX",
 }
+SUPABASE_TABLES = {
+    "variables": "variables_ambientales",
+    "cortinas": "registros_cortinas",
+    "analisis": "analisis_invernaderos_bloques",
+    "indicadores": "indicadores_ventilacion_bloques",
+}
+SUPABASE_PAGE_SIZE = 1000
 LOGO_URL_LARGE = "https://raw.githubusercontent.com/juandavdidtejedormedina-rgb/dashboard-invernaderos/main/logo%20elite.png"
 LOGO_URL_SMALL = LOGO_URL_LARGE
 DASHBOARD_MEDIA = {
@@ -2185,6 +2192,75 @@ def _read_first_local_file_bytes(paths):
             return file_bytes
     return None
 
+
+def _get_secret_value(*names):
+    for name in names:
+        try:
+            value = st.secrets.get(name)
+        except Exception:
+            value = None
+        if value:
+            return str(value).strip()
+    return None
+
+
+def _get_supabase_settings():
+    url = _get_secret_value("SUPABASE_URL", "supabase_url")
+    key = _get_secret_value("SUPABASE_KEY", "SUPABASE_ANON_KEY", "supabase_key")
+    if not url or not key:
+        return None, None
+    return url.rstrip("/"), key
+
+
+def _supabase_is_configured():
+    url, key = _get_supabase_settings()
+    return bool(url and key)
+
+
+@st.cache_data(ttl=300, show_spinner="Cargando datos desde Supabase...")
+def _load_supabase_table(table_name, cache_version=DATA_CACHE_VERSION):
+    _ = cache_version
+    url, key = _get_supabase_settings()
+    if not url or not key:
+        return pd.DataFrame()
+
+    headers = {
+        "apikey": key,
+        "Authorization": f"Bearer {key}",
+        "Accept": "application/json",
+    }
+    all_rows = []
+    offset = 0
+
+    while True:
+        response = requests.get(
+            f"{url}/rest/v1/{table_name}",
+            headers=headers,
+            params={
+                "select": "*",
+                "limit": SUPABASE_PAGE_SIZE,
+                "offset": offset,
+            },
+            timeout=45,
+        )
+        response.raise_for_status()
+        rows = response.json()
+        if not rows:
+            break
+        all_rows.extend(rows)
+        if len(rows) < SUPABASE_PAGE_SIZE:
+            break
+        offset += SUPABASE_PAGE_SIZE
+
+    return pd.DataFrame(all_rows)
+
+
+def _clean_supabase_text(value):
+    if pd.isna(value):
+        return value
+    text = str(value).strip()
+    return text.replace("MONTA?A", "MONTAÑA")
+
 # 3. Funciones de carga de datos con corrección de FECHAS
 
 def _limpiar_columnas(df):
@@ -2288,6 +2364,33 @@ def _prepare_variables_sheet(df_sheet):
     return df_sheet
 
 
+def _prepare_ponderosa_variables_from_supabase(df):
+    if df.empty:
+        return pd.DataFrame()
+
+    data = df.copy()
+    data["finca"] = data["finca"].apply(_clean_supabase_text)
+    data["bloque"] = data["bloque"].apply(_clean_supabase_text)
+    data["sensor"] = data["sensor"].apply(_clean_supabase_text)
+    data = data[
+        data["finca"].eq("Ponderosa") &
+        data["sensor"].str.upper().eq("WIGGA")
+    ].copy()
+    if data.empty:
+        return pd.DataFrame()
+
+    data["DateTime"] = pd.to_datetime(data["fecha"], errors="coerce", utc=True).dt.tz_convert(None)
+    data = data.dropna(subset=["DateTime"]).sort_values("DateTime")
+    data["Fecha_Filtro"] = data["DateTime"].dt.date
+    data["Bloque"] = data["bloque"]
+    data["Temperatura"] = pd.to_numeric(data["temperatura"], errors="coerce")
+    data["Humedad Relativa"] = pd.to_numeric(data["humedad_relativa"], errors="coerce")
+    data["Radiación PAR"] = pd.to_numeric(data["radiacion_par"], errors="coerce")
+    data["Gramos de agua"] = pd.to_numeric(data["gramos_agua"], errors="coerce")
+
+    return data[["DateTime", "Fecha_Filtro", "Bloque", *SENSOR_VARIABLES]].copy()
+
+
 @st.cache_data
 def cargar_datos(ruta_bytes, cache_version=DATA_CACHE_VERSION):
     _ = cache_version
@@ -2343,6 +2446,59 @@ def parse_time(value):
         return parsed.time() if not pd.isna(parsed) else None
     except Exception:
         return None
+
+
+def _prepare_cortinas_from_supabase(df):
+    if df.empty:
+        return pd.DataFrame()
+
+    data = df.copy()
+    rename_map = {
+        "fecha": "Fecha",
+        "bloque": "Bloque",
+        "lado_a_hora_apertura": "Hora Apertura A",
+        "lado_a_porcentaje_apertura": "% Apertura A",
+        "lado_a_duracion_apertura_min": "Duracion Apertura A",
+        "lado_a_hora_cierre": "Hora Cierre A",
+        "lado_a_porcentaje_cierre": "% Cierre A",
+        "lado_a_duracion_cierre_min": "Duracion Cierre A",
+        "lado_a_frente": "Frente A",
+        "lado_a_anotacion": "Anotacion A",
+        "lado_b_hora_apertura": "Hora Apertura B",
+        "lado_b_porcentaje_apertura": "% Apertura B",
+        "lado_b_duracion_apertura_min": "Duracion Apertura B",
+        "lado_b_hora_cierre": "Hora Cierre B",
+        "lado_b_porcentaje_cierre": "% Cierre B",
+        "lado_b_duracion_cierre_min": "Duracion Cierre B",
+        "lado_b_puerta": "Puerta B",
+        "lado_b_anotacion": "Anotacion B",
+        "culatas_porcentaje": "Culatas %",
+    }
+    data = data.rename(columns=rename_map)
+
+    required_columns = [column for column in CORTINAS_COLUMNAS if column in data.columns]
+    if "Bloque" in data.columns:
+        required_columns.append("Bloque")
+    data = data[required_columns].copy()
+
+    data["Bloque"] = data["Bloque"].apply(_clean_supabase_text)
+    data["Fecha"] = pd.to_datetime(data["Fecha"], errors="coerce").dt.date
+    data = data[data["Fecha"].notna()].copy()
+    data["Dia"] = pd.to_datetime(data["Fecha"], errors="coerce").dt.weekday.map(WEEKDAY_ES)
+
+    for col in CORTINAS_NUMERIC_COLUMNS:
+        if col in data.columns:
+            data[col] = pd.to_numeric(data[col], errors="coerce")
+            if col in ['% Apertura A', '% Cierre A', '% Apertura B', '% Cierre B', 'Culatas %']:
+                mask = data[col].notna() & (data[col] <= 1)
+                data.loc[mask, col] = data.loc[mask, col] * 100
+
+    for col in CORTINAS_TIME_COLUMNS:
+        if col in data.columns:
+            data[col] = data[col].apply(parse_time)
+
+    ordered_columns = [column for column in [*CORTINAS_COLUMNAS, "Bloque", "Dia"] if column in data.columns]
+    return data[ordered_columns].copy()
 
 
 def _coerce_sidebar_date(value, fallback):
@@ -4105,7 +4261,69 @@ def _load_marley_data_from_source(excel_source, source_signature):
     return merged, source_frames
 
 
+def _prepare_marley_source_frame_from_supabase(df, db_sensor, source_name):
+    source = df[df["sensor"].str.upper().eq(db_sensor)].copy()
+    if source.empty:
+        return pd.DataFrame()
+
+    source["FechaHora"] = pd.to_datetime(source["fecha"], errors="coerce", utc=True).dt.tz_convert(None)
+    source = source.dropna(subset=["FechaHora"]).sort_values("FechaHora")
+    source["Fecha_Filtro"] = source["FechaHora"].dt.date
+    source["Gramos de agua (g)"] = pd.to_numeric(source["gramos_agua"], errors="coerce")
+    source["Humedad Relativa (%)"] = pd.to_numeric(source["humedad_relativa"], errors="coerce")
+    source["Radiación PAR (µmol m-2 s-1)"] = pd.to_numeric(source["radiacion_par"], errors="coerce")
+    source["Temperatura (°C)"] = pd.to_numeric(source["temperatura"], errors="coerce")
+    source = source[["FechaHora", "Fecha_Filtro", *MARLEY_VARIABLES.keys()]].copy()
+
+    for variable in MARLEY_VARIABLES:
+        source.rename(columns={variable: f"{variable} - {source_name}"}, inplace=True)
+    return source
+
+
+def _prepare_marley_from_supabase(df):
+    if df.empty:
+        return pd.DataFrame(), {}
+
+    data = df.copy()
+    data["finca"] = data["finca"].apply(_clean_supabase_text)
+    data["bloque"] = data["bloque"].apply(_clean_supabase_text)
+    data["sensor"] = data["sensor"].apply(_clean_supabase_text)
+    data = data[
+        data["finca"].eq("Marley") &
+        data["bloque"].isin(["MONTAÑA", "MONTANA", "MONTA?A"])
+    ].copy()
+    if data.empty:
+        return pd.DataFrame(), {}
+
+    source_frames = {
+        "WIGA": _prepare_marley_source_frame_from_supabase(data, "WIGGA", "WIGA"),
+        "ECOWITT": _prepare_marley_source_frame_from_supabase(data, "ECOWITT", "ECOWITT"),
+    }
+    source_frames = {name: frame for name, frame in source_frames.items() if not frame.empty}
+
+    merged = None
+    for frame in source_frames.values():
+        merge_frame = frame.drop(columns=["Fecha_Filtro"], errors="ignore")
+        merged = merge_frame if merged is None else merged.merge(merge_frame, on="FechaHora", how="outer")
+
+    if merged is None or merged.empty:
+        return pd.DataFrame(), source_frames
+
+    merged = merged.sort_values("FechaHora").reset_index(drop=True)
+    merged["Fecha_Filtro"] = merged["FechaHora"].dt.date
+    return merged, source_frames
+
+
 def _load_marley_data():
+    if _supabase_is_configured():
+        try:
+            variables_db = _load_supabase_table(SUPABASE_TABLES["variables"])
+            marley_df, source_frames = _prepare_marley_from_supabase(variables_db)
+            if not marley_df.empty:
+                return marley_df, source_frames
+        except Exception as error:
+            st.warning(f"No fue posible cargar datos de Marly desde Supabase. Se usará el respaldo Excel/GitHub. Detalle: {error}")
+
     errors = []
     for excel_source in _resolve_marley_excel_sources():
         try:
@@ -6161,7 +6379,73 @@ def _load_ponderosa_ecowitt_data_from_source(excel_source, source_signature):
     return df[['FechaHora', 'Fecha_Filtro', *PONDEROSA_ECOWITT_DATA_VARIABLES.keys()]].copy()
 
 
+def _prepare_ponderosa_ecowitt_from_supabase(df):
+    if df.empty:
+        return pd.DataFrame()
+
+    data = df.copy()
+    data["finca"] = data["finca"].apply(_clean_supabase_text)
+    data["bloque"] = data["bloque"].apply(_clean_supabase_text)
+    data["sensor"] = data["sensor"].apply(_clean_supabase_text).str.upper()
+    data = data[
+        data["finca"].eq("Ponderosa") &
+        data["bloque"].eq("EXTERNO ALMACEN") &
+        data["sensor"].isin(["ECOWITT", "APOGEE"])
+    ].copy()
+    if data.empty:
+        return pd.DataFrame()
+
+    data["FechaHora"] = pd.to_datetime(data["fecha"], errors="coerce", utc=True).dt.tz_convert(None)
+    data = data.dropna(subset=["FechaHora"]).sort_values("FechaHora")
+
+    ecowitt = data[data["sensor"].eq("ECOWITT")].copy()
+    apogee = data[data["sensor"].eq("APOGEE")].copy()
+
+    eco_frame = pd.DataFrame()
+    if not ecowitt.empty:
+        eco_frame = pd.DataFrame({
+            "FechaHora": ecowitt["FechaHora"],
+            "Temperatura": pd.to_numeric(ecowitt["temperatura"], errors="coerce"),
+            "Humedad Relativa": pd.to_numeric(ecowitt["humedad_relativa"], errors="coerce"),
+            "Radiación PAR": pd.to_numeric(ecowitt["radiacion_par"], errors="coerce"),
+        })
+
+    apogee_frame = pd.DataFrame()
+    if not apogee.empty:
+        apogee_frame = pd.DataFrame({
+            "FechaHora": apogee["FechaHora"],
+            "LUX": pd.to_numeric(apogee["luz_lux"], errors="coerce"),
+        })
+
+    if eco_frame.empty:
+        result = apogee_frame
+    elif apogee_frame.empty:
+        result = eco_frame
+    else:
+        result = eco_frame.merge(apogee_frame, on="FechaHora", how="outer")
+
+    if result.empty:
+        return pd.DataFrame()
+
+    result = result.sort_values("FechaHora").reset_index(drop=True)
+    result["Fecha_Filtro"] = result["FechaHora"].dt.date
+    for variable in PONDEROSA_ECOWITT_DATA_VARIABLES:
+        if variable not in result.columns:
+            result[variable] = pd.NA
+        result[variable] = pd.to_numeric(result[variable], errors="coerce")
+    return result[["FechaHora", "Fecha_Filtro", *PONDEROSA_ECOWITT_DATA_VARIABLES.keys()]].copy()
+
+
 def _load_ponderosa_ecowitt_data():
+    if _supabase_is_configured():
+        try:
+            variables_db = _load_supabase_table(SUPABASE_TABLES["variables"])
+            df = _prepare_ponderosa_ecowitt_from_supabase(variables_db)
+            if not df.empty:
+                return df
+        except Exception as error:
+            st.warning(f"No fue posible cargar ECOWITT Ponderosa desde Supabase. Se usará el respaldo Excel/GitHub. Detalle: {error}")
+
     errors = []
     for excel_source in _resolve_ponderosa_ecowitt_sources():
         try:
@@ -10285,6 +10569,17 @@ def cargar_cortinas(ruta_bytes, cache_version=DATA_CACHE_VERSION):
 @st.cache_data(show_spinner="Cargando dashboard y preparando datos...")
 def cargar_dashboard_completo(cache_version=DATA_CACHE_VERSION):
     _ = cache_version
+    if _supabase_is_configured():
+        try:
+            variables_db = _load_supabase_table(SUPABASE_TABLES["variables"], cache_version=cache_version)
+            cortinas_db = _load_supabase_table(SUPABASE_TABLES["cortinas"], cache_version=cache_version)
+            df_variables = _prepare_ponderosa_variables_from_supabase(variables_db)
+            df_cortinas = _prepare_cortinas_from_supabase(cortinas_db)
+            if not df_variables.empty or not df_cortinas.empty:
+                return df_variables, df_cortinas
+        except Exception as error:
+            st.warning(f"No fue posible cargar datos desde Supabase. Se usará el respaldo Excel/GitHub. Detalle: {error}")
+
     archivo_variables_bytes = descargar_desde_github(URL_VARIABLES_FALLBACKS)
     archivo_cortinas_bytes = descargar_desde_github(URL_CORTINAS_FALLBACKS)
 
