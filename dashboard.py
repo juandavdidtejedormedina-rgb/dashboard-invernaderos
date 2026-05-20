@@ -1806,18 +1806,31 @@ div[data-testid="stDataFrame"] {{
 }}
 [data-testid="stVerticalBlock"]:has(.series-side-panel-marker) .series-control-card {{
     margin-top: 0;
+    margin-bottom: 0.65rem;
+    padding: 0.78rem 0.85rem;
+    border-radius: 8px;
     border-color: rgba(84,83,134,0.16);
     background:
-        radial-gradient(circle at 8% 0%, rgba(231,200,122,0.16), transparent 28%),
-        linear-gradient(145deg, rgba(255,255,255,0.98), rgba(244,241,235,0.94));
+        linear-gradient(145deg, rgba(255,255,255,0.98), rgba(248,246,241,0.96));
+    box-shadow: 0 12px 24px rgba(45,48,64,0.055);
+}}
+[data-testid="stVerticalBlock"]:has(.series-side-panel-marker) .series-control-kicker {{
+    font-size: 0.68rem;
+}}
+[data-testid="stVerticalBlock"]:has(.series-side-panel-marker) .series-control-title {{
+    font-size: 0.98rem;
+    line-height: 1.18;
+}}
+[data-testid="stVerticalBlock"]:has(.series-side-panel-marker) .series-control-copy {{
+    display: none;
 }}
 [data-testid="stVerticalBlock"]:has(.series-side-panel-marker) [data-testid="stCheckbox"] {{
-    margin-bottom: 0.34rem;
+    margin-bottom: 0.24rem;
 }}
 [data-testid="stVerticalBlock"]:has(.series-side-panel-marker) [data-testid="stCheckbox"] label {{
     width: 100%;
-    min-height: 2.85rem;
-    padding: 0.34rem 0.62rem;
+    min-height: 2.45rem;
+    padding: 0.28rem 0.56rem;
     border-radius: 999px;
     border: 1px solid rgba(84,83,134,0.16);
     background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(246,244,239,0.96));
@@ -1830,7 +1843,7 @@ div[data-testid="stDataFrame"] {{
 }}
 [data-testid="stVerticalBlock"]:has(.series-side-panel-marker) [data-testid="stCheckbox"] label p {{
     color: var(--elite-graphite);
-    font-size: 0.86rem;
+    font-size: 0.82rem;
     font-weight: 800;
     line-height: 1.15;
 }}
@@ -3232,7 +3245,7 @@ def _render_cortina_visibility_panel(available_motors):
         <span class="series-side-panel-marker"></span>
         <div class="series-control-card">
             <p class="series-control-kicker">Cortinas visibles</p>
-            <h3 class="series-control-title">Activa las aperturas del bloque</h3>
+            <h3 class="series-control-title">Series activas</h3>
             <p class="series-control-copy">
                 Elige los frentes y puertas que quieres mantener visibles en la grafica principal.
             </p>
@@ -5272,6 +5285,97 @@ def _render_marley_individual_variable_charts(
                 _plotly_chart(chart)
 
 
+def _build_marley_comparison_for_resolution(
+    filtered_df,
+    variable_name,
+    selected_range,
+    comparison_resolution
+):
+    point_mode = comparison_resolution == COMPARISON_RESOLUTION_OPTIONS[1]
+    nearest_wiga_mode = comparison_resolution == COMPARISON_RESOLUTION_OPTIONS[2]
+    return (
+        _build_point_comparison(filtered_df, variable_name, MARLEY_SENSOR_NAMES)
+        if point_mode else
+        _build_wiga_anchor_nearest_comparison(
+            filtered_df,
+            variable_name,
+            MARLEY_SENSOR_NAMES,
+            selected_range,
+            _build_marley_hourly_series
+        )
+        if nearest_wiga_mode else
+        _build_marley_hourly_comparison(filtered_df, variable_name, selected_range)
+    )
+
+
+def _render_marley_comparison_metric_cards(overlap, selected_variable):
+    config = MARLEY_VARIABLES.get(selected_variable)
+    if config is None:
+        st.info("La variable seleccionada ya no esta disponible para la comparacion WIGA / ECOWITT.")
+        return
+
+    avg_abs_diff = overlap['DiffValue'].mean() if not overlap.empty else None
+    avg_signed_diff = overlap['SignedDiff'].mean() if not overlap.empty else None
+    std_diff = overlap['SignedDiff'].std() if not overlap.empty else None
+    unit = config.get('unit', '')
+
+    if pd.isna(avg_signed_diff):
+        signed_interpretation = "Sin lecturas simultaneas suficientes para identificar que sensor quedo por encima."
+    elif avg_signed_diff > 0:
+        signed_interpretation = "En promedio, WIGA estuvo por encima de ECOWITT."
+    elif avg_signed_diff < 0:
+        signed_interpretation = "En promedio, ECOWITT estuvo por encima de WIGA."
+    else:
+        signed_interpretation = "En promedio, ambos sensores quedaron practicamente alineados."
+
+    if pd.isna(std_diff):
+        std_interpretation = "Sin lecturas comparables suficientes para medir estabilidad."
+    elif std_diff <= 0.3:
+        std_interpretation = "La diferencia entre sensores fue bastante estable durante el periodo."
+    elif std_diff <= 0.8:
+        std_interpretation = "La diferencia entre sensores tuvo una variacion moderada."
+    else:
+        std_interpretation = "La diferencia entre sensores cambio bastante entre franjas."
+
+    metrics = [
+        {
+            'label': 'Diferencia absoluta media',
+            'value': f"{avg_abs_diff:.2f}" if pd.notna(avg_abs_diff) else "Sin datos",
+            'accent': config['colors']['WIGA'],
+            'note': f"Separacion promedio sin importar que sensor quedo arriba. Unidad: {unit}.",
+        },
+        {
+            'label': 'Diferencia media WIGA - ECOWITT',
+            'value': f"{avg_signed_diff:+.2f}" if pd.notna(avg_signed_diff) else "Sin datos",
+            'accent': config['colors']['ECOWITT'],
+            'note': f"{signed_interpretation} Unidad: {unit}.",
+        },
+        {
+            'label': 'Estabilidad de la diferencia',
+            'value': f"{std_diff:.2f}" if pd.notna(std_diff) else "Sin datos",
+            'accent': config.get('accent', BRAND_COLORS['hero']),
+            'note': f"{std_interpretation} Unidad: {unit}.",
+        },
+    ]
+
+    cards_html = ['<div class="analysis-metrics-grid">']
+    for metric in metrics:
+        cards_html.append(
+            '<div class="analysis-metric-card" style="--analysis-accent: {accent};">'
+            '<p class="analysis-metric-label">{label}</p>'
+            '<p class="analysis-metric-value">{value}</p>'
+            '<p class="analysis-note">{note}</p>'
+            '</div>'.format(
+                accent=html.escape(metric['accent']),
+                label=html.escape(metric['label']),
+                value=html.escape(metric['value']),
+                note=html.escape(metric['note']),
+            )
+        )
+    cards_html.append('</div>')
+    st.markdown(''.join(cards_html), unsafe_allow_html=True)
+
+
 def _render_marley_comparison_tabs(
     filtered_df,
     selected_range,
@@ -5279,78 +5383,91 @@ def _render_marley_comparison_tabs(
     comparison_resolution,
     marley_source_data
 ):
-    point_mode = comparison_resolution == COMPARISON_RESOLUTION_OPTIONS[1]
-    nearest_wiga_mode = comparison_resolution == COMPARISON_RESOLUTION_OPTIONS[2]
-    comparisons = []
+    if st.session_state.get("marley_chart_variable") not in compared_variables:
+        st.session_state["marley_chart_variable"] = compared_variables[0]
+    if st.session_state.get("marley_stats_variable") not in compared_variables:
+        st.session_state["marley_stats_variable"] = compared_variables[0]
 
-    for variable_name in compared_variables:
-        comparison = (
-            _build_point_comparison(filtered_df, variable_name, MARLEY_SENSOR_NAMES)
-            if point_mode else
-            _build_wiga_anchor_nearest_comparison(
-                filtered_df,
-                variable_name,
-                MARLEY_SENSOR_NAMES,
-                selected_range,
-                _build_marley_hourly_series
-            )
-            if nearest_wiga_mode else
-            _build_marley_hourly_comparison(filtered_df, variable_name, selected_range)
-        )
-        has_overlap = not comparison.empty and not comparison.dropna(how='all', subset=list(MARLEY_SENSOR_NAMES)).empty
-        comparisons.append((variable_name, comparison if has_overlap else None))
-
-    tab_compare, tab_diff, tab_detail, tab_records = st.tabs([
-        "Comparativas",
-        "Diferencias",
-        "Detalle individual",
+    tab_compare, tab_stats, tab_detail, tab_records = st.tabs([
+        "Grafica",
+        "Analisis estadistico",
+        "Graficas individuales",
         "Registros",
     ])
 
     with tab_compare:
         _render_chart_explanation(
-            'Comparacion directa WIGA vs ECOWITT',
-            'Cada variable compartida queda separada en esta pestana para revisar la relacion entre sensores sin mezclarla con las diferencias o las tablas.',
-            accent=BRAND_COLORS['hero']
+            "Comparacion directa WIGA / ECOWITT",
+            "Elige una variable para comparar ambos sensores sobre la misma linea de tiempo. Marly queda organizado igual que Ponderosa y solo se calcula la grafica activa.",
+            accent=BRAND_COLORS['hero'],
+            kicker='Vista principal'
         )
-        rendered_any_chart = False
-        for variable_name, comparison in comparisons:
-            if comparison is None:
-                st.info(f"No hay datos suficientes para graficar {_format_variable_display_title(MARLEY_VARIABLES[variable_name]['title'])}.")
-                continue
-            _plotly_chart(_make_marley_comparison_chart(comparison, variable_name, selected_range, comparison_resolution))
-            rendered_any_chart = True
-        if not rendered_any_chart:
-            st.warning("No hay datos suficientes para construir las comparativas de Marly en este periodo.")
-
-    with tab_diff:
-        _render_chart_explanation(
-            'Diferencias WIGA - ECOWITT',
-            'Estas graficas separan la diferencia entre sensores para ver en que horas se abren o se acercan las lecturas.',
-            accent=BRAND_COLORS['beige']
+        selected_chart_variable = st.segmented_control(
+            "Variable en grafica:",
+            options=compared_variables,
+            format_func=lambda value: _format_variable_display_title(MARLEY_VARIABLES.get(value, {}).get('title', value)),
+            key="marley_chart_variable",
+            width="stretch"
         )
-        rendered_any_difference = False
-        for variable_name, comparison in comparisons:
-            if comparison is None:
-                continue
-            difference_chart = _make_marley_difference_chart(comparison, variable_name, selected_range, comparison_resolution)
-            if difference_chart is not None:
-                _plotly_chart(difference_chart)
-                rendered_any_difference = True
-        if not rendered_any_difference:
-            st.info("No hay diferencias suficientes para graficar con la resolucion seleccionada.")
-
-        _render_difference_table_30min(
+        if selected_chart_variable not in compared_variables:
+            selected_chart_variable = compared_variables[0]
+        comparison = _build_marley_comparison_for_resolution(
             filtered_df,
-            compared_variables,
-            MARLEY_SENSOR_NAMES,
+            selected_chart_variable,
             selected_range,
-            comparison_resolution,
-            _build_marley_hourly_comparison,
-            _build_marley_hourly_series,
-            MARLEY_VARIABLES,
-            "mostrar_marley_tabla_diferencias_30min"
+            comparison_resolution
         )
+        if comparison.empty or comparison.dropna(how='all', subset=list(MARLEY_SENSOR_NAMES)).empty:
+            variable_title = MARLEY_VARIABLES.get(selected_chart_variable, {}).get('title', selected_chart_variable)
+            st.info(f"No hay datos suficientes para graficar {_format_variable_display_title(variable_title)}.")
+        else:
+            _plotly_chart(_make_marley_comparison_chart(comparison, selected_chart_variable, selected_range, comparison_resolution))
+
+    with tab_stats:
+        _render_chart_explanation(
+            "Analisis de relacion WIGA / ECOWITT",
+            "Aqui queda la lectura estadistica de una variable: diferencias, dispersion y estabilidad. Cambia la variable sin recalcular todas las graficas de Marly.",
+            accent=BRAND_COLORS['rose'],
+            kicker='Lectura estadistica'
+        )
+        selected_variable_stats = st.segmented_control(
+            "Variable para detalle estadistico:",
+            options=compared_variables,
+            format_func=lambda value: _format_variable_display_title(MARLEY_VARIABLES.get(value, {}).get('title', value)),
+            key="marley_stats_variable",
+            width="stretch"
+        )
+        if selected_variable_stats not in compared_variables:
+            selected_variable_stats = compared_variables[0]
+        comparison_stats = _build_marley_comparison_for_resolution(
+            filtered_df,
+            selected_variable_stats,
+            selected_range,
+            comparison_resolution
+        )
+        if not all(sensor_name in comparison_stats.columns for sensor_name in MARLEY_SENSOR_NAMES):
+            st.info("No hay columnas suficientes para construir el resumen estadistico de esta variable.")
+        else:
+            overlap = comparison_stats.dropna(subset=list(MARLEY_SENSOR_NAMES)).copy()
+            _render_marley_comparison_metric_cards(overlap, selected_variable_stats)
+            difference_chart = _make_marley_difference_chart(comparison_stats, selected_variable_stats, selected_range, comparison_resolution)
+            if difference_chart is not None:
+                _render_chart_explanation(
+                    'Diferencia WIGA - ECOWITT',
+                    'Valores sobre cero significan que WIGA midio mas alto; valores bajo cero significan que ECOWITT midio mas alto.',
+                    accent=MARLEY_VARIABLES[selected_variable_stats]['colors']['ECOWITT']
+                )
+                _plotly_chart(difference_chart)
+            scatter_chart = _make_marley_scatter_chart(comparison_stats, selected_variable_stats)
+            if scatter_chart is not None:
+                _render_chart_explanation(
+                    'Dispersion entre sensores',
+                    'Cada punto cruza una lectura simultanea de WIGA y ECOWITT. Mientras mas cerca este de la linea diagonal, mas parecidos fueron ambos sensores.',
+                    accent=MARLEY_VARIABLES[selected_variable_stats]['colors']['WIGA']
+                )
+                _plotly_chart(scatter_chart)
+            else:
+                st.info("No hay suficientes datos simultaneos entre WIGA y ECOWITT para construir la dispersion.")
 
     with tab_detail:
         if st.checkbox(
@@ -5365,12 +5482,28 @@ def _render_marley_comparison_tabs(
             )
 
     with tab_records:
-        if st.checkbox(
-            "Cargar registros consolidados de Marly",
-            key="mostrar_marley_registros",
-            help=FILTER_HELP_TEXTS['registros']
-        ):
-            _dataframe(filtered_df.drop(columns=['Fecha_Filtro'], errors='ignore'), hide_index=True)
+        _render_chart_explanation(
+            "Registros consolidados Marly",
+            "Tablas de soporte para la comparacion: resumen por equipo, diferencias por franja y registros consolidados.",
+            accent=BRAND_COLORS['hero'],
+            kicker='Datos fuente'
+        )
+        record_report_options = [
+            "Resumen por equipo",
+            "Diferencias WIGA - ECOWITT",
+            "Registros consolidados",
+        ]
+        if st.session_state.get("marley_records_report") not in record_report_options:
+            st.session_state["marley_records_report"] = record_report_options[0]
+        selected_records_report = st.segmented_control(
+            "Reporte",
+            options=record_report_options,
+            key="marley_records_report",
+            help="Selecciona que tabla quieres revisar o descargar.",
+            width="stretch"
+        )
+
+        if selected_records_report == "Resumen por equipo":
             summary_rows = []
             for source_name, source_df in marley_source_data.items():
                 current = source_df[source_df['Fecha_Filtro'].between(*selected_range)]
@@ -5381,6 +5514,33 @@ def _render_marley_comparison_tabs(
                     'Fin': current['FechaHora'].max().strftime('%Y-%m-%d %H:%M') if not current.empty else '-',
                 })
             _dataframe(pd.DataFrame(summary_rows), hide_index=True)
+
+        elif selected_records_report == "Diferencias WIGA - ECOWITT":
+            difference_table, difference_table_mode = _build_difference_table_30min(
+                filtered_df,
+                compared_variables,
+                MARLEY_SENSOR_NAMES,
+                selected_range,
+                comparison_resolution,
+                _build_marley_hourly_comparison,
+                _build_marley_hourly_series,
+                MARLEY_VARIABLES
+            )
+            if difference_table.empty:
+                st.info("No hay datos suficientes para construir la tabla de diferencias.")
+            else:
+                st.caption(f"Tabla calculada con: {difference_table_mode}. La diferencia se calcula como WIGA - ECOWITT.")
+                _render_comparison_table_summary(difference_table, title="Resumen ejecutivo de diferencias")
+                _render_variable_split_tables(
+                    difference_table,
+                    default_expanded=True,
+                    download_label="Descargar reporte Marly WIGA vs ECOWITT",
+                    download_file_name=f"marly_wiga_ecowitt_{_build_report_slug(difference_table_mode)}.xlsx",
+                    download_key="download_marley_difference_report"
+                )
+
+        elif selected_records_report == "Registros consolidados":
+            _dataframe(filtered_df.drop(columns=['Fecha_Filtro'], errors='ignore'), hide_index=True)
 
 
 def _render_marley_dashboard(dashboard_mode):
@@ -7612,27 +7772,28 @@ def _render_ponderosa_cortinas_dashboard(df_cortinas_all, selected_finca):
     )
 
     st.markdown(f"## La Ponderosa - Solo bloques | {block_label}")
-    intro_col, controls_col = st.columns([3.2, 1.05], vertical_alignment="top")
-    with intro_col:
-        st.caption("Vista dedicada al comportamiento de frentes y puertas registrado en Registro_Cortinas.")
-    with controls_col:
-        _render_cortina_visibility_panel(available_motors)
+    st.caption("Vista dedicada al comportamiento de frentes y puertas registrado en Registro_Cortinas.")
     selected_motors = _get_selected_cortina_motors(available_motors)
     tab_chart, tab_summary, tab_records = st.tabs(["Gráfica", "Resumen operativo", "Registros"])
     with tab_chart:
-        if not selected_motors:
-            st.warning("Selecciona al menos una cortina para graficar.")
-        else:
-            chart = _build_cortinas_only_chart(filtered_df, selected_range, selected_motors, block_label=block_label)
-            if chart is None:
-                st.warning("No hay información de apertura para las cortinas seleccionadas.")
+        chart_col, controls_col = st.columns([4.45, 0.95], vertical_alignment="top")
+        with controls_col:
+            _render_cortina_visibility_panel(available_motors)
+        selected_motors = _get_selected_cortina_motors(available_motors)
+        with chart_col:
+            if not selected_motors:
+                st.warning("Selecciona al menos una cortina para graficar.")
             else:
-                _plotly_chart(chart)
-                _render_chart_explanation(
-                    "Comportamiento de cortinas",
-                    "Las cortinas cerradas se muestran en 0% como en el registro original. El eje de tiempo se resume por horas para leer mejor el día completo; pasa el cursor por cada punto para ver inicio de apertura, duración y cierre cuando esa información exista en el registro.",
-                    accent=BRAND_COLORS['hero']
-                )
+                chart = _build_cortinas_only_chart(filtered_df, selected_range, selected_motors, block_label=block_label)
+                if chart is None:
+                    st.warning("No hay informacion de apertura para las cortinas seleccionadas.")
+                else:
+                    _plotly_chart(chart)
+                    _render_chart_explanation(
+                        "Comportamiento de cortinas",
+                        "Las cortinas cerradas se muestran en 0% como en el registro original. El eje de tiempo se resume por horas para leer mejor el dia completo; pasa el cursor por cada punto para ver inicio de apertura, duracion y cierre cuando esa informacion exista en el registro.",
+                        accent=BRAND_COLORS['hero']
+                    )
 
     with tab_summary:
         _render_info_panels(
@@ -15065,11 +15226,7 @@ force_all_correlacion_series = dashboard_mode == "WIGA con cortinas" and previou
 st.session_state["_last_dashboard_mode"] = dashboard_mode
 
 if selected_finca == 'Marly':
-    with _loading_context(
-        st.session_state.get("marley_modo_fechas") == "Varios días",
-        "Cargando gráficas de Marly..."
-    ):
-        _render_marley_dashboard(dashboard_mode)
+    _render_marley_dashboard(dashboard_mode)
     st.stop()
 
 if dashboard_mode == PONDEROSA_BLOCK_INFO_VIEW_NAME:
