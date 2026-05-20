@@ -685,20 +685,30 @@ section[data-testid="stSidebar"][aria-expanded="true"] [data-testid="stSidebarHe
     min-width: 2.5rem !important;
     min-height: 2.5rem !important;
     border-radius: 999px !important;
-    border: 1px solid rgba(84, 83, 134, 0.14) !important;
-    background: rgba(255, 255, 255, 0.88) !important;
-    box-shadow: 0 12px 24px rgba(45, 48, 64, 0.12) !important;
+    border: 1px solid rgba(255, 255, 255, 0.28) !important;
+    background:
+        linear-gradient(180deg, rgba(109, 107, 166, 0.98), rgba(78, 77, 128, 0.98)) !important;
+    color: #ffffff !important;
+    box-shadow:
+        0 14px 28px rgba(28, 30, 52, 0.24),
+        inset 0 1px 0 rgba(255, 255, 255, 0.22) !important;
     backdrop-filter: blur(10px);
 }}
 [data-testid="stSidebarCollapseButton"] > button:hover,
 [data-testid="stSidebarHeader"] button:hover {{
-    border-color: rgba(84, 83, 134, 0.24) !important;
-    background: rgba(255, 255, 255, 0.98) !important;
+    border-color: rgba(255, 255, 255, 0.44) !important;
+    background:
+        linear-gradient(180deg, rgba(123, 121, 180, 1), rgba(88, 86, 142, 1)) !important;
+    box-shadow:
+        0 18px 34px rgba(28, 30, 52, 0.30),
+        inset 0 1px 0 rgba(255, 255, 255, 0.28) !important;
 }}
 [data-testid="stSidebarCollapseButton"] svg,
 [data-testid="stSidebarHeader"] button svg {{
     width: 1.15rem !important;
     height: 1.15rem !important;
+    color: #ffffff !important;
+    stroke: #ffffff !important;
 }}
 [data-testid="stSidebarHeader"] a {{
     display: inline-flex;
@@ -1785,6 +1795,57 @@ div[data-testid="stDataFrame"] {{
     color: #666c78;
     font-size: 0.9rem;
     line-height: 1.5;
+}}
+.series-side-panel-marker {{
+    display: block;
+    height: 0;
+}}
+[data-testid="stVerticalBlock"]:has(.series-side-panel-marker) {{
+    position: sticky;
+    top: 0.85rem;
+}}
+[data-testid="stVerticalBlock"]:has(.series-side-panel-marker) .series-control-card {{
+    margin-top: 0;
+    border-color: rgba(84,83,134,0.16);
+    background:
+        radial-gradient(circle at 8% 0%, rgba(231,200,122,0.16), transparent 28%),
+        linear-gradient(145deg, rgba(255,255,255,0.98), rgba(244,241,235,0.94));
+}}
+[data-testid="stVerticalBlock"]:has(.series-side-panel-marker) [data-testid="stCheckbox"] {{
+    margin-bottom: 0.34rem;
+}}
+[data-testid="stVerticalBlock"]:has(.series-side-panel-marker) [data-testid="stCheckbox"] label {{
+    width: 100%;
+    min-height: 2.85rem;
+    padding: 0.34rem 0.62rem;
+    border-radius: 999px;
+    border: 1px solid rgba(84,83,134,0.16);
+    background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(246,244,239,0.96));
+    box-shadow: 0 8px 18px rgba(45,48,64,0.055);
+}}
+[data-testid="stVerticalBlock"]:has(.series-side-panel-marker) [data-testid="stCheckbox"] label:hover {{
+    border-color: rgba(84,83,134,0.32);
+    background: linear-gradient(180deg, rgba(255,255,255,1), rgba(239,236,229,0.98));
+    box-shadow: 0 12px 24px rgba(45,48,64,0.08);
+}}
+[data-testid="stVerticalBlock"]:has(.series-side-panel-marker) [data-testid="stCheckbox"] label p {{
+    color: var(--elite-graphite);
+    font-size: 0.86rem;
+    font-weight: 800;
+    line-height: 1.15;
+}}
+[data-testid="stVerticalBlock"]:has(.series-side-panel-marker) [data-testid="stCheckbox"] [role="checkbox"] {{
+    width: 1rem;
+    height: 1rem;
+    border-radius: 6px;
+    border-color: rgba(84,83,134,0.24);
+}}
+[data-testid="stVerticalBlock"]:has(.series-side-panel-marker) [data-testid="stCheckbox"]:has([aria-checked="true"]) label {{
+    border-color: rgba(84,83,134,0.32);
+    background: linear-gradient(180deg, rgba(255,255,255,1), rgba(237,232,247,0.98));
+    box-shadow:
+        inset 0 1px 0 rgba(255,255,255,0.95),
+        0 14px 28px rgba(84,83,134,0.10);
 }}
 .series-toolbar-label {{
     margin: 0.2rem 0 0.55rem 0.12rem;
@@ -3143,6 +3204,53 @@ def _get_selected_correlacion_vars(options):
     selected_vars = [option for option in options if st.session_state.get(_selector_state_key(option), True)]
     st.session_state['variables_correlacion'] = selected_vars
     return selected_vars
+
+
+def _cortina_visibility_state_key(motor_name):
+    safe_name = _build_normalized_text_key(motor_name).replace(' ', '_')
+    return f"ponderosa_cortina_visible_{safe_name}"
+
+
+def _ensure_cortina_visibility_state(available_motors):
+    for motor_name in available_motors:
+        key = _cortina_visibility_state_key(motor_name)
+        if key not in st.session_state:
+            st.session_state[key] = True
+
+
+def _get_selected_cortina_motors(available_motors):
+    return [
+        motor_name
+        for motor_name in available_motors
+        if st.session_state.get(_cortina_visibility_state_key(motor_name), True)
+    ]
+
+
+def _render_cortina_visibility_panel(available_motors):
+    st.markdown(
+        """
+        <span class="series-side-panel-marker"></span>
+        <div class="series-control-card">
+            <p class="series-control-kicker">Cortinas visibles</p>
+            <h3 class="series-control-title">Activa las aperturas del bloque</h3>
+            <p class="series-control-copy">
+                Elige los frentes y puertas que quieres mantener visibles en la grafica principal.
+            </p>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+    if not available_motors:
+        st.info("No hay frentes o puertas disponibles en este periodo.")
+        return
+
+    _ensure_cortina_visibility_state(available_motors)
+    for motor_name in available_motors:
+        st.checkbox(
+            VARIABLE_SELECTOR_LABELS.get(motor_name, motor_name),
+            key=_cortina_visibility_state_key(motor_name),
+            help=VARIABLE_FILTER_HELP.get(motor_name, FILTER_HELP_TEXTS['series_visibles'])
+        )
 
 
 def _render_correlacion_series_panel(available_vars, selected_block_code, df_variables_almacen):
@@ -5164,6 +5272,117 @@ def _render_marley_individual_variable_charts(
                 _plotly_chart(chart)
 
 
+def _render_marley_comparison_tabs(
+    filtered_df,
+    selected_range,
+    compared_variables,
+    comparison_resolution,
+    marley_source_data
+):
+    point_mode = comparison_resolution == COMPARISON_RESOLUTION_OPTIONS[1]
+    nearest_wiga_mode = comparison_resolution == COMPARISON_RESOLUTION_OPTIONS[2]
+    comparisons = []
+
+    for variable_name in compared_variables:
+        comparison = (
+            _build_point_comparison(filtered_df, variable_name, MARLEY_SENSOR_NAMES)
+            if point_mode else
+            _build_wiga_anchor_nearest_comparison(
+                filtered_df,
+                variable_name,
+                MARLEY_SENSOR_NAMES,
+                selected_range,
+                _build_marley_hourly_series
+            )
+            if nearest_wiga_mode else
+            _build_marley_hourly_comparison(filtered_df, variable_name, selected_range)
+        )
+        has_overlap = not comparison.empty and not comparison.dropna(how='all', subset=list(MARLEY_SENSOR_NAMES)).empty
+        comparisons.append((variable_name, comparison if has_overlap else None))
+
+    tab_compare, tab_diff, tab_detail, tab_records = st.tabs([
+        "Comparativas",
+        "Diferencias",
+        "Detalle individual",
+        "Registros",
+    ])
+
+    with tab_compare:
+        _render_chart_explanation(
+            'Comparacion directa WIGA vs ECOWITT',
+            'Cada variable compartida queda separada en esta pestana para revisar la relacion entre sensores sin mezclarla con las diferencias o las tablas.',
+            accent=BRAND_COLORS['hero']
+        )
+        rendered_any_chart = False
+        for variable_name, comparison in comparisons:
+            if comparison is None:
+                st.info(f"No hay datos suficientes para graficar {_format_variable_display_title(MARLEY_VARIABLES[variable_name]['title'])}.")
+                continue
+            _plotly_chart(_make_marley_comparison_chart(comparison, variable_name, selected_range, comparison_resolution))
+            rendered_any_chart = True
+        if not rendered_any_chart:
+            st.warning("No hay datos suficientes para construir las comparativas de Marly en este periodo.")
+
+    with tab_diff:
+        _render_chart_explanation(
+            'Diferencias WIGA - ECOWITT',
+            'Estas graficas separan la diferencia entre sensores para ver en que horas se abren o se acercan las lecturas.',
+            accent=BRAND_COLORS['beige']
+        )
+        rendered_any_difference = False
+        for variable_name, comparison in comparisons:
+            if comparison is None:
+                continue
+            difference_chart = _make_marley_difference_chart(comparison, variable_name, selected_range, comparison_resolution)
+            if difference_chart is not None:
+                _plotly_chart(difference_chart)
+                rendered_any_difference = True
+        if not rendered_any_difference:
+            st.info("No hay diferencias suficientes para graficar con la resolucion seleccionada.")
+
+        _render_difference_table_30min(
+            filtered_df,
+            compared_variables,
+            MARLEY_SENSOR_NAMES,
+            selected_range,
+            comparison_resolution,
+            _build_marley_hourly_comparison,
+            _build_marley_hourly_series,
+            MARLEY_VARIABLES,
+            "mostrar_marley_tabla_diferencias_30min"
+        )
+
+    with tab_detail:
+        if st.checkbox(
+            "Cargar variables individuales",
+            key="mostrar_marley_detalles",
+            help=FILTER_HELP_TEXTS['graficas_detalladas']
+        ):
+            _render_marley_individual_variable_charts(
+                filtered_df,
+                selected_range,
+                resolution_label=comparison_resolution
+            )
+
+    with tab_records:
+        if st.checkbox(
+            "Cargar registros consolidados de Marly",
+            key="mostrar_marley_registros",
+            help=FILTER_HELP_TEXTS['registros']
+        ):
+            _dataframe(filtered_df.drop(columns=['Fecha_Filtro'], errors='ignore'), hide_index=True)
+            summary_rows = []
+            for source_name, source_df in marley_source_data.items():
+                current = source_df[source_df['Fecha_Filtro'].between(*selected_range)]
+                summary_rows.append({
+                    'Equipo': source_name,
+                    'Registros': len(current),
+                    'Inicio': current['FechaHora'].min().strftime('%Y-%m-%d %H:%M') if not current.empty else '-',
+                    'Fin': current['FechaHora'].max().strftime('%Y-%m-%d %H:%M') if not current.empty else '-',
+                })
+            _dataframe(pd.DataFrame(summary_rows), hide_index=True)
+
+
 def _render_marley_dashboard(dashboard_mode):
     try:
         marley_df, marley_source_data = _load_marley_data()
@@ -5366,13 +5585,12 @@ def _render_marley_dashboard(dashboard_mode):
         kicker='Orientación'
     )
 
-    show_marley_details = st.checkbox(
-        "Cargar variables individuales",
-        key="mostrar_marley_detalles",
-        help=FILTER_HELP_TEXTS['graficas_detalladas']
-    )
-
     if dashboard_mode in ("Varianza", "Desviacion estandar", "Promedio"):
+        show_marley_details = st.checkbox(
+            "Cargar variables individuales",
+            key="mostrar_marley_detalles",
+            help=FILTER_HELP_TEXTS['graficas_detalladas']
+        )
         selected_variable = st.segmented_control(
             "Variable Marly",
             options=list(MARLEY_VARIABLES.keys()),
@@ -5452,6 +5670,15 @@ def _render_marley_dashboard(dashboard_mode):
         "Humedad Relativa (%)",
         "Radiación PAR (µmol m-2 s-1)",
     ]
+    _render_marley_comparison_tabs(
+        filtered_df,
+        selected_range,
+        compared_variables,
+        comparison_resolution,
+        marley_source_data
+    )
+    st.stop()
+
     _render_chart_explanation(
         'Comparación directa WIGA vs ECOWITT',
         (
@@ -7367,25 +7594,7 @@ def _render_ponderosa_cortinas_dashboard(df_cortinas_all, selected_finca):
         st.stop()
 
     available_motors = _get_available_cortina_vars(filtered_df)
-    with st.sidebar.expander("Cortinas visibles", expanded=True):
-        if not available_motors:
-            st.write("No hay frentes o puertas disponibles en este periodo.")
-        else:
-            for motor_name in available_motors:
-                key = f"ponderosa_cortina_visible_{_build_normalized_text_key(motor_name).replace(' ', '_')}"
-                if key not in st.session_state:
-                    st.session_state[key] = True
-                st.checkbox(
-                    VARIABLE_SELECTOR_LABELS.get(motor_name, motor_name),
-                    key=key,
-                    help=VARIABLE_FILTER_HELP.get(motor_name, FILTER_HELP_TEXTS['series_visibles'])
-                )
-
-    selected_motors = [
-        motor_name
-        for motor_name in available_motors
-        if st.session_state.get(f"ponderosa_cortina_visible_{_build_normalized_text_key(motor_name).replace(' ', '_')}", True)
-    ]
+    _ensure_cortina_visibility_state(available_motors)
     block_label = _format_block_display_name(selected_block_code)
     rango_multiple = fecha_inicio != fecha_fin
     block_modification = _get_block_modification(block_label)
@@ -7403,7 +7612,12 @@ def _render_ponderosa_cortinas_dashboard(df_cortinas_all, selected_finca):
     )
 
     st.markdown(f"## La Ponderosa - Solo bloques | {block_label}")
-    st.caption("Vista dedicada al comportamiento de frentes y puertas registrado en Registro_Cortinas.")
+    intro_col, controls_col = st.columns([3.2, 1.05], vertical_alignment="top")
+    with intro_col:
+        st.caption("Vista dedicada al comportamiento de frentes y puertas registrado en Registro_Cortinas.")
+    with controls_col:
+        _render_cortina_visibility_panel(available_motors)
+    selected_motors = _get_selected_cortina_motors(available_motors)
     tab_chart, tab_summary, tab_records = st.tabs(["Gráfica", "Resumen operativo", "Registros"])
     with tab_chart:
         if not selected_motors:
