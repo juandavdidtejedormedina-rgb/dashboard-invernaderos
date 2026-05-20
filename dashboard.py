@@ -5655,7 +5655,7 @@ def _render_marley_dashboard(dashboard_mode):
         st.caption(f"Lectura de todas las variables medidas por {source_name}, sin superponer el otro sensor.")
         _render_chart_explanation(
             f'Variables {source_name}',
-            f'Primero se muestran todas las variables de {source_name} en una sola visual apilada para comparar tendencias en el mismo periodo. Luego se muestran las gráficas individuales para revisar cada variable con más detalle.',
+            f'Elige una variable de {source_name} con los botones de la vista principal. El detalle completo queda bajo demanda para mantener el dashboard liviano.',
             accent=BRAND_COLORS['hero'],
             kicker='Orientación'
         )
@@ -5667,34 +5667,55 @@ def _render_marley_dashboard(dashboard_mode):
             help="Usa promedio para agrupar por media hora, punto por punto para ver las lecturas crudas, o valor más cercano para tomar el registro más próximo a cada marca exacta de 30 minutos."
         )
 
-        combined_chart = _make_source_all_variables_chart(
-            filtered_df,
-            selected_range,
-            list(MARLEY_VARIABLES.keys()),
-            MARLEY_VARIABLES,
-            source_name,
-            _build_marley_individual_series,
-            f"Variables {source_name} - Marly",
-            source_resolution,
-        )
-        if combined_chart is None:
-            st.warning(f"No hay datos suficientes para graficar las variables de {source_name} en el periodo seleccionado.")
-            st.stop()
+        source_variables = list(MARLEY_VARIABLES.keys())
+        source_variable_key = f"marley_{source_name.lower()}_source_variable"
+        if st.session_state.get(source_variable_key) not in source_variables:
+            st.session_state[source_variable_key] = source_variables[0]
         graphed_frame = _build_single_source_correlacion_frame(
             filtered_df,
             selected_range,
-            list(MARLEY_VARIABLES.keys()),
+            source_variables,
             source_name,
             _build_marley_individual_series,
             source_resolution,
         )
+        if graphed_frame.empty:
+            st.warning(f"No hay datos suficientes para graficar las variables de {source_name} en el periodo seleccionado.")
+            st.stop()
 
         tab_general, tab_stats, tab_detail, tab_records = st.tabs(["Gráfica", "Resumen estadístico", "Detalle individual", "Registros"])
         with tab_general:
-            _plotly_chart(combined_chart)
+            _render_chart_explanation(
+                f"Variable {source_name}",
+                "Selecciona una variable para verla limpia y con mas espacio. El resto de variables queda disponible en los botones superiores, igual que en las comparativas.",
+                accent=BRAND_COLORS['hero'],
+                kicker='Vista principal'
+            )
+            selected_source_variable = st.segmented_control(
+                "Variable en grafica:",
+                options=source_variables,
+                format_func=lambda value: _format_variable_display_title(MARLEY_VARIABLES.get(value, {}).get('title', value)),
+                key=source_variable_key,
+                width="stretch"
+            )
+            if selected_source_variable not in source_variables:
+                selected_source_variable = source_variables[0]
+            selected_chart = _make_marley_individual_variable_chart(
+                filtered_df,
+                selected_source_variable,
+                source_name,
+                selected_range,
+                source_resolution
+            )
+            if selected_chart is None:
+                variable_title = MARLEY_VARIABLES.get(selected_source_variable, {}).get('title', selected_source_variable)
+                st.info(f"No hay datos suficientes para graficar {_format_variable_display_title(variable_title)}.")
+            else:
+                selected_chart.update_layout(height=430, margin=dict(l=28, r=20, t=58, b=48))
+                _plotly_chart(selected_chart)
 
         with tab_stats:
-            stats_table = _build_variable_distribution_table(graphed_frame, list(MARLEY_VARIABLES.keys()))
+            stats_table = _build_variable_distribution_table(graphed_frame, source_variables)
             _render_variable_distribution_cards(
                 stats_table,
                 MARLEY_VARIABLES,
@@ -5705,18 +5726,23 @@ def _render_marley_dashboard(dashboard_mode):
                     _dataframe(stats_table.round(2), hide_index=True)
 
         with tab_detail:
-            _render_marley_individual_variable_charts(
-                filtered_df,
-                selected_range,
-                source_names=(source_name,),
-                heading=f"Variables individuales {source_name} - Marly",
-                resolution_label=source_resolution
-            )
+            if st.checkbox(
+                f"Cargar detalle individual {source_name}",
+                key=f"mostrar_marley_{source_name.lower()}_detalle",
+                help=FILTER_HELP_TEXTS['graficas_detalladas']
+            ):
+                _render_marley_individual_variable_charts(
+                    filtered_df,
+                    selected_range,
+                    source_names=(source_name,),
+                    heading=f"Variables individuales {source_name} - Marly",
+                    resolution_label=source_resolution
+                )
 
         with tab_records:
             _render_graphed_series_table(
                 graphed_frame,
-                list(MARLEY_VARIABLES.keys()),
+                source_variables,
                 MARLEY_VARIABLES,
                 f"Tabla de datos graficados - {source_name}",
                 source_resolution,
