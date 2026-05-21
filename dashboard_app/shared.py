@@ -348,16 +348,25 @@ def _render_chart_explanation(title, description, accent=None, kicker='Guía de 
 
 
 def _sidebar_icon_svg(icon_name):
+    svg_attrs = (
+        'xmlns="http://www.w3.org/2000/svg" '
+        'viewBox="0 0 24 24" '
+        'width="16" height="16" '
+        'fill="none" stroke="currentColor" stroke-width="2" '
+        'stroke-linecap="round" stroke-linejoin="round" '
+        'aria-hidden="true" '
+        'style="width:1rem;height:1rem;display:block;flex:0 0 auto;"'
+    )
     icons = {
         'filter': (
-            '<svg viewBox="0 0 24 24" aria-hidden="true">'
+            f'<svg {svg_attrs}>'
             '<path d="M4 7h16"></path>'
             '<path d="M7 12h10"></path>'
             '<path d="M10 17h4"></path>'
             '</svg>'
         ),
         'calendar': (
-            '<svg viewBox="0 0 24 24" aria-hidden="true">'
+            f'<svg {svg_attrs}>'
             '<rect x="3" y="5" width="18" height="16" rx="2"></rect>'
             '<path d="M16 3v4"></path>'
             '<path d="M8 3v4"></path>'
@@ -365,7 +374,7 @@ def _sidebar_icon_svg(icon_name):
             '</svg>'
         ),
         'location': (
-            '<svg viewBox="0 0 24 24" aria-hidden="true">'
+            f'<svg {svg_attrs}>'
             '<path d="M12 21s6-5.2 6-11a6 6 0 1 0-12 0c0 5.8 6 11 6 11Z"></path>'
             '<circle cx="12" cy="10" r="2.4"></circle>'
             '</svg>'
@@ -377,8 +386,8 @@ def _sidebar_icon_svg(icon_name):
 def _sidebar_field_label(icon_name, text):
     st.markdown(
         (
-            f'<div class="sidebar-field-label">'
-            f'<span class="sidebar-field-icon">{_sidebar_icon_svg(icon_name)}</span>'
+            f'<div class="sidebar-field-label" style="display:flex;align-items:center;gap:0.42rem;">'
+            f'<span class="sidebar-field-icon" style="width:1rem;height:1rem;display:inline-flex;align-items:center;justify-content:center;flex:0 0 1rem;">{_sidebar_icon_svg(icon_name)}</span>'
             f'<span>{html.escape(text)}</span>'
             f'</div>'
         ),
