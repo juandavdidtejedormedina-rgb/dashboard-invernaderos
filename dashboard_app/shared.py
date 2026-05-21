@@ -1363,6 +1363,22 @@ def _extract_block_identifier(block_name):
     return None
 
 
+def _sort_block_names(block_names):
+    def sort_key(name):
+        text = str(name)
+        normalized = _build_normalized_text_key(text)
+        if 'almacen' in normalized:
+            return (0, 0, text)
+
+        match = re.search(r'(\d+)', text)
+        if match:
+            return (1, int(match.group(1)), text)
+
+        return (2, float('inf'), text)
+
+    return sorted(block_names, key=sort_key)
+
+
 def _get_finca_for_block(block_name):
     normalized_key = _build_normalized_text_key(block_name)
     if 'marley' in normalized_key or 'marly' in normalized_key:
