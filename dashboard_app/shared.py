@@ -1415,6 +1415,86 @@ def _get_block_options(df_variables_all, df_cortinas_all, selected_finca=None):
     return block_codes, variable_map, cortina_map
 
 
+def _add_day_breaks_to_series(serie, value_col):
+    if serie.empty or 'DateTime' not in serie.columns:
+        return serie
+
+    serie = serie.sort_values('DateTime').reset_index(drop=True)
+    if serie['DateTime'].dt.date.nunique() <= 1:
+        return serie
+
+    rows = []
+    previous_date = None
+
+    for _, row in serie.iterrows():
+        current_date = row['DateTime'].date()
+        if previous_date is not None and current_date != previous_date:
+            rows.append({'DateTime': row['DateTime'], value_col: None})
+        rows.append({'DateTime': row['DateTime'], value_col: row[value_col]})
+        previous_date = current_date
+
+    return pd.DataFrame(rows)
+
+
+def _resolve_plot_resample_rule(total_days, total_points):
+    if total_points <= 1200 and total_days <= 3:
+        return None
+    if total_points <= 2500 and total_days <= 7:
+        return None
+    if total_days <= 7:
+        return '30min'
+    if total_days <= 21:
+        return '1h'
+    if total_days <= 60:
+        return '3h'
+    return '6h'
+
+
+def _prepare_sensor_series_for_plot(serie, value_col, multi_day_view=False):
+    if serie.empty or 'DateTime' not in serie.columns or value_col not in serie.columns:
+        return serie, None
+
+    working = (
+        serie[['DateTime', value_col]]
+        .dropna(subset=['DateTime', value_col])
+        .sort_values('DateTime')
+        .copy()
+    )
+    if working.empty:
+        return working, None
+
+    if not multi_day_view:
+        return working, None
+
+    total_points = len(working)
+    min_dt = pd.Timestamp(working['DateTime'].min())
+    max_dt = pd.Timestamp(working['DateTime'].max())
+    total_days = max(((max_dt - min_dt).total_seconds() / 86400.0) + 1, 1)
+    resample_rule = _resolve_plot_resample_rule(total_days, total_points)
+
+    if not resample_rule:
+        return _add_day_breaks_to_series(working, value_col), None
+
+    try:
+        resampled = (
+            working.set_index('DateTime')[[value_col]]
+            .resample(resample_rule)
+            .mean()
+            .dropna()
+            .reset_index()
+        )
+    except ValueError:
+        return _add_day_breaks_to_series(working, value_col), None
+    if resampled.empty:
+        return _add_day_breaks_to_series(working, value_col), None
+
+    return _add_day_breaks_to_series(resampled, value_col), {
+        'rule': resample_rule,
+        'original_points': total_points,
+        'display_points': len(resampled)
+    }
+
+
 def _normalize_percent_value(value):
     if pd.isna(value):
         return None
