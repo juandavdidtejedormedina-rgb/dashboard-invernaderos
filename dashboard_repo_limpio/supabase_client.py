@@ -1,5 +1,6 @@
 import os
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from itertools import count
 
 import pandas as pd
 import requests
@@ -114,6 +115,49 @@ def _load_supabase_table_sequential(
     return rows
 
 
+def _load_supabase_table_parallel_until_last(url, table_name, headers, first_page, select="*", query_params=None):
+    rows_by_offset = {0: first_page}
+
+    for batch_number in count(start=0):
+        batch_offsets = [
+            offset
+            for offset in range(
+                SUPABASE_PAGE_SIZE + (batch_number * SUPABASE_MAX_WORKERS * SUPABASE_PAGE_SIZE),
+                SUPABASE_PAGE_SIZE + ((batch_number + 1) * SUPABASE_MAX_WORKERS * SUPABASE_PAGE_SIZE),
+                SUPABASE_PAGE_SIZE,
+            )
+        ]
+        reached_last_page = False
+
+        with ThreadPoolExecutor(max_workers=SUPABASE_MAX_WORKERS) as executor:
+            futures = {
+                executor.submit(
+                    _fetch_supabase_page,
+                    url,
+                    table_name,
+                    headers,
+                    offset,
+                    select,
+                    query_params,
+                ): offset
+                for offset in batch_offsets
+            }
+            for future in as_completed(futures):
+                offset, page, _ = future.result()
+                if page:
+                    rows_by_offset[offset] = page
+                if len(page) < SUPABASE_PAGE_SIZE:
+                    reached_last_page = True
+
+        if reached_last_page:
+            break
+
+    rows = []
+    for offset in sorted(rows_by_offset):
+        rows.extend(rows_by_offset[offset])
+    return rows
+
+
 @st.cache_data(ttl=SUPABASE_CACHE_TTL_SECONDS, show_spinner="Cargando datos desde Supabase...")
 def load_supabase_table(table_name, cache_version="supabase-v1", select="*", query_params=None):
     _ = cache_version
@@ -123,28 +167,65 @@ def load_supabase_table(table_name, cache_version="supabase-v1", select="*", que
         "apikey": key,
         "Authorization": f"Bearer {key}",
         "Accept": "application/json",
+    }
+    count_headers = {
+        **headers,
         "Prefer": "count=exact",
     }
 
-    _, first_page, first_headers = _fetch_supabase_page(
-        url,
-        table_name,
-        headers,
-        0,
-        select=select,
-        query_params=query_params,
-    )
+    try:
+        active_headers = count_headers
+        _, first_page, first_headers = _fetch_supabase_page(
+            url,
+            table_name,
+            active_headers,
+            0,
+            select=select,
+            query_params=query_params,
+        )
+    except requests.HTTPError:
+        active_headers = headers
+        _, first_page, first_headers = _fetch_supabase_page(
+            url,
+            table_name,
+            active_headers,
+            0,
+            select=select,
+            query_params=query_params,
+        )
     if not first_page:
         return pd.DataFrame()
     if len(first_page) < SUPABASE_PAGE_SIZE:
         return pd.DataFrame(first_page)
 
     total_rows = _parse_content_range_total(first_headers.get("Content-Range"))
-    if not total_rows or total_rows <= len(first_page):
+    if not total_rows:
+        try:
+            rows = _load_supabase_table_parallel_until_last(
+                url,
+                table_name,
+                active_headers,
+                first_page,
+                select=select,
+                query_params=query_params,
+            )
+        except Exception:
+            rows = _load_supabase_table_sequential(
+                url,
+                table_name,
+                active_headers,
+                first_page,
+                0,
+                select=select,
+                query_params=query_params,
+            )
+        return pd.DataFrame(rows)
+
+    if total_rows <= len(first_page):
         rows = _load_supabase_table_sequential(
             url,
             table_name,
-            headers,
+            active_headers,
             first_page,
             0,
             select=select,
@@ -162,7 +243,7 @@ def load_supabase_table(table_name, cache_version="supabase-v1", select="*", que
                     _fetch_supabase_page,
                     url,
                     table_name,
-                    headers,
+                    active_headers,
                     offset,
                     select,
                     query_params,
@@ -176,7 +257,7 @@ def load_supabase_table(table_name, cache_version="supabase-v1", select="*", que
         rows = _load_supabase_table_sequential(
             url,
             table_name,
-            headers,
+            active_headers,
             first_page,
             0,
             select=select,
