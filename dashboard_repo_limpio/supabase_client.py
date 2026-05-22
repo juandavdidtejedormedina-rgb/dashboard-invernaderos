@@ -84,6 +84,41 @@ def _fetch_supabase_page(url, table_name, headers, offset, select="*", query_par
     return offset, response.json(), response.headers
 
 
+def _fetch_first_page_with_fallback(url, table_name, headers, select="*", query_params=None):
+    query_params = tuple(query_params or ())
+    count_headers = {
+        **headers,
+        "Prefer": "count=exact",
+    }
+
+    attempts = [
+        (count_headers, query_params),
+        (headers, query_params),
+    ]
+    if query_params:
+        attempts.extend([
+            (count_headers, ()),
+            (headers, ()),
+        ])
+
+    last_error = None
+    for active_headers, active_query_params in attempts:
+        try:
+            offset, page, response_headers = _fetch_supabase_page(
+                url,
+                table_name,
+                active_headers,
+                0,
+                select=select,
+                query_params=active_query_params,
+            )
+            return offset, page, response_headers, active_headers, active_query_params
+        except requests.HTTPError as error:
+            last_error = error
+
+    raise last_error
+
+
 def _load_supabase_table_sequential(
     url,
     table_name,
@@ -168,31 +203,13 @@ def load_supabase_table(table_name, cache_version="supabase-v1", select="*", que
         "Authorization": f"Bearer {key}",
         "Accept": "application/json",
     }
-    count_headers = {
-        **headers,
-        "Prefer": "count=exact",
-    }
-
-    try:
-        active_headers = count_headers
-        _, first_page, first_headers = _fetch_supabase_page(
-            url,
-            table_name,
-            active_headers,
-            0,
-            select=select,
-            query_params=query_params,
-        )
-    except requests.HTTPError:
-        active_headers = headers
-        _, first_page, first_headers = _fetch_supabase_page(
-            url,
-            table_name,
-            active_headers,
-            0,
-            select=select,
-            query_params=query_params,
-        )
+    _, first_page, first_headers, active_headers, active_query_params = _fetch_first_page_with_fallback(
+        url,
+        table_name,
+        headers,
+        select=select,
+        query_params=query_params,
+    )
     if not first_page:
         return pd.DataFrame()
     if len(first_page) < SUPABASE_PAGE_SIZE:
@@ -207,7 +224,7 @@ def load_supabase_table(table_name, cache_version="supabase-v1", select="*", que
                 active_headers,
                 first_page,
                 select=select,
-                query_params=query_params,
+                query_params=active_query_params,
             )
         except Exception:
             rows = _load_supabase_table_sequential(
@@ -217,7 +234,7 @@ def load_supabase_table(table_name, cache_version="supabase-v1", select="*", que
                 first_page,
                 0,
                 select=select,
-                query_params=query_params,
+                query_params=active_query_params,
             )
         return pd.DataFrame(rows)
 
@@ -229,7 +246,7 @@ def load_supabase_table(table_name, cache_version="supabase-v1", select="*", que
             first_page,
             0,
             select=select,
-            query_params=query_params,
+            query_params=active_query_params,
         )
         return pd.DataFrame(rows)
 
@@ -246,7 +263,7 @@ def load_supabase_table(table_name, cache_version="supabase-v1", select="*", que
                     active_headers,
                     offset,
                     select,
-                    query_params,
+                    active_query_params,
                 ): offset
                 for offset in offsets
             }
@@ -261,7 +278,7 @@ def load_supabase_table(table_name, cache_version="supabase-v1", select="*", que
             first_page,
             0,
             select=select,
-            query_params=query_params,
+            query_params=active_query_params,
         )
         return pd.DataFrame(rows)
 
