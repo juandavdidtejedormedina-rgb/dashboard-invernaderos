@@ -17,6 +17,8 @@ SUPABASE_TABLES = {
 SUPABASE_PAGE_SIZE = 1000
 SUPABASE_MAX_WORKERS = 16
 SUPABASE_CACHE_TTL_SECONDS = 3600
+DEFAULT_SUPABASE_URL = "https://jteuezxtnetehcwhaqxo.supabase.co"
+DEFAULT_SUPABASE_KEY = "sb_publishable_hPoxF8y42vqbJDg5Uu4zQQ_HXATf7Ku"
 
 
 def _get_secret_value(*names):
@@ -32,14 +34,40 @@ def _get_secret_value(*names):
     return None
 
 
+def _normalize_secret_value(value):
+    if value is None:
+        return None
+    value = str(value).strip().strip('"').strip("'")
+    if "=" in value and value.upper().startswith(("SUPABASE_URL", "SUPABASE_KEY", "SUPABASE_ANON_KEY")):
+        value = value.split("=", 1)[1].strip().strip('"').strip("'")
+    return value or None
+
+
+def _is_valid_supabase_url(url):
+    return bool(url and url.startswith("https://") and "supabase.co" in url)
+
+
+def _is_valid_supabase_key(key):
+    return bool(key and (key.startswith("sb_publishable_") or key.startswith("eyJ")))
+
+
 def get_supabase_settings():
-    url = _get_secret_value("SUPABASE_URL", "supabase_url")
-    key = _get_secret_value("SUPABASE_KEY", "SUPABASE_ANON_KEY", "supabase_key")
-    if not url or not key:
-        raise RuntimeError(
-            "Faltan SUPABASE_URL y SUPABASE_KEY en Streamlit secrets."
-        )
+    url = _normalize_secret_value(_get_secret_value("SUPABASE_URL", "supabase_url"))
+    key = _normalize_secret_value(_get_secret_value("SUPABASE_KEY", "SUPABASE_ANON_KEY", "supabase_key"))
+    if not _is_valid_supabase_url(url):
+        url = DEFAULT_SUPABASE_URL
+    if not _is_valid_supabase_key(key):
+        key = DEFAULT_SUPABASE_KEY
     return url.rstrip("/"), key
+
+
+def _get_supabase_setting_candidates():
+    configured_url, configured_key = get_supabase_settings()
+    candidates = [(configured_url, configured_key)]
+    default_pair = (DEFAULT_SUPABASE_URL, DEFAULT_SUPABASE_KEY)
+    if default_pair not in candidates:
+        candidates.append(default_pair)
+    return candidates
 
 
 def supabase_is_configured():
@@ -84,6 +112,41 @@ def _fetch_supabase_page(url, table_name, headers, offset, select="*", query_par
     return offset, response.json(), response.headers
 
 
+def _build_supabase_headers(key):
+    return {
+        "apikey": key,
+        "Authorization": f"Bearer {key}",
+        "Accept": "application/json",
+    }
+
+
+def _get_response_error_detail(error):
+    response = getattr(error, "response", None)
+    if response is None:
+        return "sin respuesta de Supabase"
+
+    detail = response.text or response.reason or ""
+    detail = " ".join(str(detail).split())
+    if len(detail) > 400:
+        detail = f"{detail[:400]}..."
+    return f"HTTP {response.status_code}: {detail}"
+
+
+def _raise_supabase_error(table_name, errors):
+    details = [_get_response_error_detail(error) for error in errors if error is not None]
+    unique_details = []
+    for detail in details:
+        if detail not in unique_details:
+            unique_details.append(detail)
+    details_text = " | ".join(unique_details) or "sin detalle"
+    raise RuntimeError(
+        "No fue posible leer la tabla "
+        f"'{table_name}' desde Supabase. Revisa en Streamlit Cloud que "
+        "SUPABASE_URL y SUPABASE_KEY esten bien configurados, y que la tabla "
+        f"tenga permisos de lectura para la publishable key. Detalle: {details_text}"
+    )
+
+
 def _fetch_first_page_with_fallback(url, table_name, headers, select="*", query_params=None):
     query_params = tuple(query_params or ())
     count_headers = {
@@ -119,90 +182,8 @@ def _fetch_first_page_with_fallback(url, table_name, headers, select="*", query_
     raise last_error
 
 
-def _load_supabase_table_sequential(
-    url,
-    table_name,
-    headers,
-    first_rows=None,
-    first_offset=0,
-    select="*",
-    query_params=None,
-):
-    rows = list(first_rows or [])
-    offset = first_offset + SUPABASE_PAGE_SIZE
-
-    while True:
-        _, page, _ = _fetch_supabase_page(
-            url,
-            table_name,
-            headers,
-            offset,
-            select=select,
-            query_params=query_params,
-        )
-        if not page:
-            break
-        rows.extend(page)
-        if len(page) < SUPABASE_PAGE_SIZE:
-            break
-        offset += SUPABASE_PAGE_SIZE
-
-    return rows
-
-
-def _load_supabase_table_parallel_until_last(url, table_name, headers, first_page, select="*", query_params=None):
-    rows_by_offset = {0: first_page}
-
-    for batch_number in count(start=0):
-        batch_offsets = [
-            offset
-            for offset in range(
-                SUPABASE_PAGE_SIZE + (batch_number * SUPABASE_MAX_WORKERS * SUPABASE_PAGE_SIZE),
-                SUPABASE_PAGE_SIZE + ((batch_number + 1) * SUPABASE_MAX_WORKERS * SUPABASE_PAGE_SIZE),
-                SUPABASE_PAGE_SIZE,
-            )
-        ]
-        reached_last_page = False
-
-        with ThreadPoolExecutor(max_workers=SUPABASE_MAX_WORKERS) as executor:
-            futures = {
-                executor.submit(
-                    _fetch_supabase_page,
-                    url,
-                    table_name,
-                    headers,
-                    offset,
-                    select,
-                    query_params,
-                ): offset
-                for offset in batch_offsets
-            }
-            for future in as_completed(futures):
-                offset, page, _ = future.result()
-                if page:
-                    rows_by_offset[offset] = page
-                if len(page) < SUPABASE_PAGE_SIZE:
-                    reached_last_page = True
-
-        if reached_last_page:
-            break
-
-    rows = []
-    for offset in sorted(rows_by_offset):
-        rows.extend(rows_by_offset[offset])
-    return rows
-
-
-@st.cache_data(ttl=SUPABASE_CACHE_TTL_SECONDS, show_spinner="Cargando datos desde Supabase...")
-def load_supabase_table(table_name, cache_version="supabase-v1", select="*", query_params=None):
-    _ = cache_version
-    query_params = tuple(query_params or ())
-    url, key = get_supabase_settings()
-    headers = {
-        "apikey": key,
-        "Authorization": f"Bearer {key}",
-        "Accept": "application/json",
-    }
+def _download_supabase_table(url, key, table_name, select="*", query_params=None):
+    headers = _build_supabase_headers(key)
     _, first_page, first_headers, active_headers, active_query_params = _fetch_first_page_with_fallback(
         url,
         table_name,
@@ -286,3 +267,99 @@ def load_supabase_table(table_name, cache_version="supabase-v1", select="*", que
     for offset in sorted(pages):
         rows.extend(pages[offset])
     return pd.DataFrame(rows)
+
+
+def _load_supabase_table_sequential(
+    url,
+    table_name,
+    headers,
+    first_rows=None,
+    first_offset=0,
+    select="*",
+    query_params=None,
+):
+    rows = list(first_rows or [])
+    offset = first_offset + SUPABASE_PAGE_SIZE
+
+    while True:
+        _, page, _ = _fetch_supabase_page(
+            url,
+            table_name,
+            headers,
+            offset,
+            select=select,
+            query_params=query_params,
+        )
+        if not page:
+            break
+        rows.extend(page)
+        if len(page) < SUPABASE_PAGE_SIZE:
+            break
+        offset += SUPABASE_PAGE_SIZE
+
+    return rows
+
+
+def _load_supabase_table_parallel_until_last(url, table_name, headers, first_page, select="*", query_params=None):
+    rows_by_offset = {0: first_page}
+
+    for batch_number in count(start=0):
+        batch_offsets = [
+            offset
+            for offset in range(
+                SUPABASE_PAGE_SIZE + (batch_number * SUPABASE_MAX_WORKERS * SUPABASE_PAGE_SIZE),
+                SUPABASE_PAGE_SIZE + ((batch_number + 1) * SUPABASE_MAX_WORKERS * SUPABASE_PAGE_SIZE),
+                SUPABASE_PAGE_SIZE,
+            )
+        ]
+        reached_last_page = False
+
+        with ThreadPoolExecutor(max_workers=SUPABASE_MAX_WORKERS) as executor:
+            futures = {
+                executor.submit(
+                    _fetch_supabase_page,
+                    url,
+                    table_name,
+                    headers,
+                    offset,
+                    select,
+                    query_params,
+                ): offset
+                for offset in batch_offsets
+            }
+            for future in as_completed(futures):
+                offset, page, _ = future.result()
+                if page:
+                    rows_by_offset[offset] = page
+                if len(page) < SUPABASE_PAGE_SIZE:
+                    reached_last_page = True
+
+        if reached_last_page:
+            break
+
+    rows = []
+    for offset in sorted(rows_by_offset):
+        rows.extend(rows_by_offset[offset])
+    return rows
+
+
+@st.cache_data(ttl=SUPABASE_CACHE_TTL_SECONDS, show_spinner="Cargando datos desde Supabase...")
+def load_supabase_table(table_name, cache_version="supabase-v1", select="*", query_params=None):
+    _ = cache_version
+    query_params = tuple(query_params or ())
+    errors = []
+    for url, key in _get_supabase_setting_candidates():
+        try:
+            return _download_supabase_table(
+                url,
+                key,
+                table_name,
+                select=select,
+                query_params=query_params,
+            )
+        except requests.HTTPError as error:
+            errors.append(error)
+        except requests.RequestException as error:
+            errors.append(error)
+
+    _raise_supabase_error(table_name, errors)
