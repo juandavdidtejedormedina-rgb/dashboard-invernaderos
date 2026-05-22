@@ -382,7 +382,7 @@ PONDEROSA_LIGHT_VARIABLES = {
         "accent": "#5E5AAE",
     },
 }
-LOGO_URL_LARGE = "https://raw.githubusercontent.com/juandavdidtejedormedina-rgb/dashboard-invernaderos/main/logo%20elite.png"
+LOGO_URL_LARGE = "https://raw.githubusercontent.com/juandavdidtejedormedina-rgb/dashboard-invernaderos/main/dashboard_repo_limpio/logo%20elite.png"
 LOGO_URL_SMALL = LOGO_URL_LARGE
 DASHBOARD_MEDIA = {
     'La Ponderosa': {
@@ -544,10 +544,11 @@ def render_app_foundation():
         page_icon="📊",
         layout="wide"
     )
+    logo_source = str(LOGO_PATH) if LOGO_PATH.exists() else LOGO_URL_LARGE
     st.logo(
-        LOGO_URL_LARGE,
+        logo_source,
         link="https://streamlit.io/gallery",
-        icon_image=LOGO_URL_SMALL,
+        icon_image=logo_source,
     )
     logo_base64 = _image_to_base64(LOGO_PATH)
     logo_html = (
