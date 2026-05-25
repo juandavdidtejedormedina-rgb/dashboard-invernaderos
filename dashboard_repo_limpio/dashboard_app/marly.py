@@ -1390,12 +1390,14 @@ def _render_graphed_series_table(
 def _render_marley_individual_variable_charts(
     filtered_df,
     selected_range,
+    variables=None,
     source_names=MARLEY_SENSOR_NAMES,
     heading="Variables individuales Marly",
     resolution_label=COMPARISON_RESOLUTION_OPTIONS[0],
 ):
     rendered_charts = []
-    for variable in MARLEY_VARIABLES:
+    variables = list(variables or MARLEY_VARIABLES.keys())
+    for variable in variables:
         for source_name in source_names:
             chart = _make_marley_individual_variable_chart(
                 filtered_df,
@@ -1522,6 +1524,18 @@ def _render_marley_comparison_tabs(
     comparison_resolution,
     marley_source_data
 ):
+    compared_variables = _render_variable_visibility_selector(
+        compared_variables,
+        key_prefix="marley_comparison_variables",
+        label_map={
+            variable: _format_variable_display_title(MARLEY_VARIABLES.get(variable, {}).get('title', variable))
+            for variable in compared_variables
+        },
+        title="Variables activas en Marly",
+        description="Estos botones controlan la grafica principal, el analisis estadistico, los detalles individuales y las tablas de soporte.",
+        expander_label="Variables visibles de la comparativa",
+        expanded=True,
+    )
     if st.session_state.get("marley_chart_variable") not in compared_variables:
         st.session_state["marley_chart_variable"] = compared_variables[0]
     if st.session_state.get("marley_stats_variable") not in compared_variables:
@@ -1617,6 +1631,7 @@ def _render_marley_comparison_tabs(
             _render_marley_individual_variable_charts(
                 filtered_df,
                 selected_range,
+                variables=compared_variables,
                 resolution_label=comparison_resolution
             )
 
@@ -1807,6 +1822,18 @@ def _render_marley_dashboard(dashboard_mode):
         )
 
         source_variables = list(MARLEY_VARIABLES.keys())
+        source_variables = _render_variable_visibility_selector(
+            source_variables,
+            key_prefix=f"marley_{source_name.lower()}_source_variables",
+            label_map={
+                variable: _format_variable_display_title(MARLEY_VARIABLES.get(variable, {}).get('title', variable))
+                for variable in source_variables
+            },
+            title=f"Variables visibles de {source_name}",
+            description="La seleccion se aplica a la grafica principal, el resumen estadistico, el detalle individual y la tabla de datos graficados.",
+            expander_label=f"Variables visibles {source_name}",
+            expanded=True,
+        )
         source_variable_key = f"marley_{source_name.lower()}_source_variable"
         if st.session_state.get(source_variable_key) not in source_variables:
             st.session_state[source_variable_key] = source_variables[0]
@@ -1873,6 +1900,7 @@ def _render_marley_dashboard(dashboard_mode):
                 _render_marley_individual_variable_charts(
                     filtered_df,
                     selected_range,
+                    variables=source_variables,
                     source_names=(source_name,),
                     heading=f"Variables individuales {source_name} - Marly",
                     resolution_label=source_resolution
