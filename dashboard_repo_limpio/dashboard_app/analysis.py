@@ -1101,7 +1101,17 @@ def _format_metric_card_value(value, decimals=2, scientific_threshold=100000):
 
 
 def _format_analysis_unit_text(unit):
-    return str(unit or '').replace('Âµmol mâ»Â² sâ»Â¹', 'Âµmol/mÂ²/s').replace('µmol m⁻² s⁻¹', 'µmol/m²/s').replace('µmol m-2 s-1', 'µmol/m²/s')
+    text = str(unit or '')
+    try:
+        text = text.encode('latin1').decode('utf-8')
+    except UnicodeError:
+        pass
+    return (
+        text
+        .replace('µmol m⁻² s⁻¹', 'µmol/m²/s')
+        .replace('µmol m-2 s-1', 'µmol/m²/s')
+        .replace('µmol/m²/s', 'µmol/m²/s')
+    )
 
 
 def _build_analysis_distribution_table(df_source, variable_name, group_col='Bloque', group_label='Bloque'):
@@ -2609,13 +2619,16 @@ def _render_hourly_analysis_view_organized(
         st.info(f'No se encontraron datos para {variable_name} en el rango seleccionado.')
         return
 
-    analysis_tabs = st.tabs(["Gráfica", "Resumen estadístico", "Tabla"] if show_table_tab else ["Gráfica", "Resumen estadístico"])
-    tab_grafica = analysis_tabs[0]
-    tab_resumen = analysis_tabs[1]
-    with tab_grafica:
+    analysis_sections = ["Grafica", "Resumen estadistico", "Tabla"] if show_table_tab else ["Grafica", "Resumen estadistico"]
+    selected_analysis_section = _render_lazy_section_selector(
+        analysis_sections,
+        key=f"{variable_state_key}_analysis_section",
+        label="Contenido"
+    )
+    if selected_analysis_section == "Grafica":
         _render_hourly_metric_visual(grouped_df, variable_name, tab_label, single_day_analysis)
 
-    with tab_resumen:
+    if selected_analysis_section == "Resumen estadistico":
         selected_stats = _build_analysis_distribution_table(
             df_variables,
             variable_name,
@@ -2652,18 +2665,16 @@ def _render_hourly_analysis_view_organized(
             variable_options=variable_options
         )
 
-    if show_table_tab:
-        tab_tabla = analysis_tabs[2]
-        with tab_tabla:
-            _render_hourly_metric_table(
-                tab_label,
-                pivot_promedio,
-                pivot_varianza,
-                pivot_desviacion,
-                variable_name,
-                period_text,
-                variable_state_key
-            )
+    if show_table_tab and selected_analysis_section == "Tabla":
+        _render_hourly_metric_table(
+            tab_label,
+            pivot_promedio,
+            pivot_varianza,
+            pivot_desviacion,
+            variable_name,
+            period_text,
+            variable_state_key
+        )
 
 
 __all__ = [name for name in globals() if not name.startswith("__")]
