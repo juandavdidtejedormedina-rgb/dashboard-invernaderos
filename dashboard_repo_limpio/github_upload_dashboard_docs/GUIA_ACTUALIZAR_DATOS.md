@@ -54,6 +54,13 @@ Abra PowerShell o la terminal de VS Code y entre a la carpeta del proyecto:
 cd "C:\Users\pastautomatizacion4\OneDrive - Elite Flower\Escritorio\Dashboard Variables\dashboard_repo_limpio"
 ```
 
+Antes de ejecutar el script, confirme que la conexion a Supabase esta configurada en `.streamlit/secrets.toml`, en Streamlit Cloud Secrets o como variables de entorno:
+
+```toml
+SUPABASE_URL = "https://tu-proyecto.supabase.co"
+SUPABASE_KEY = "sb_publishable_tu_llave"
+```
+
 ## 4. Ejecutar revision
 
 Primero ejecute el modo revision. Este comando no sube nada a Supabase:
@@ -214,4 +221,3 @@ Siempre use este orden:
 5. Reiniciar Streamlit
 6. Validar dashboard
 ```
-
