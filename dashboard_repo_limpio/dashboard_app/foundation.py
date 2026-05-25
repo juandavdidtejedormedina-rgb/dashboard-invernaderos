@@ -1878,6 +1878,11 @@ def render_app_foundation():
         color: rgba(56, 58, 53, 0.68);
         font-size: 0.84rem;
     }}
+    .series-chip-note--compact {{
+        margin: 0.15rem 0 0 0;
+        font-size: 0.78rem;
+        line-height: 1.35;
+    }}
     [data-testid="stExpander"]:has(.series-control-card) {{
         border-radius: 12px;
         border: 1px solid rgba(84,83,134,0.12);
@@ -1894,7 +1899,7 @@ def render_app_foundation():
         height: 3.1rem;
         min-height: 3.1rem;
         padding: 0 1rem;
-        border-radius: 8px;
+        border-radius: 999px;
         border: 1px solid rgba(84,83,134,0.18);
         background:
             linear-gradient(180deg, rgba(255,255,255,0.98), rgba(248,246,241,0.98));
@@ -1919,7 +1924,7 @@ def render_app_foundation():
         height: 3.1rem;
         min-height: 3.1rem;
         padding: 0 0.78rem;
-        border-radius: 8px;
+        border-radius: 999px;
         border: 1px solid rgba(84,83,134,0.14);
         background:
             linear-gradient(180deg, rgba(255,255,255,0.98), rgba(248,246,241,0.96));
@@ -1944,12 +1949,12 @@ def render_app_foundation():
         border-color: rgba(84,83,134,0.24);
     }}
     [data-testid="stExpander"]:has(.series-control-card) [data-testid="stCheckbox"]:has([aria-checked="true"]) label {{
-        border-color: rgba(84,83,134,0.30);
+        border-color: rgba(84,83,134,0.44);
         background:
-            linear-gradient(180deg, rgba(255,255,255,1), rgba(237,232,247,0.98));
+            linear-gradient(180deg, rgba(255,255,255,1), rgba(237,232,247,1));
         box-shadow:
             inset 0 1px 0 rgba(255,255,255,0.95),
-            0 14px 28px rgba(84,83,134,0.10);
+            0 14px 28px rgba(84,83,134,0.16);
     }}
     [data-testid="stAppViewContainer"] div.stButton > button {{
         border-radius: 999px;
