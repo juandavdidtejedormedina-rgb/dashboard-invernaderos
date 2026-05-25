@@ -1381,6 +1381,18 @@ def _render_ponderosa_wiga_values_dashboard(df_variables_all, df_cortinas_all, s
     )
 
     wiga_variables = list(PONDEROSA_WIGA_VARIABLES.keys())
+    wiga_variables = _render_variable_visibility_selector(
+        wiga_variables,
+        key_prefix="ponderosa_wiga_only_variables",
+        label_map={
+            variable: _format_variable_display_title(PONDEROSA_WIGA_VARIABLES.get(variable, {}).get('title', variable))
+            for variable in wiga_variables
+        },
+        title="Variables visibles WIGA",
+        description="La seleccion se aplica a la grafica, el resumen estadistico, el detalle individual y la tabla de registros graficados.",
+        expander_label="Variables visibles WIGA",
+        expanded=True,
+    )
     correlation_df = _build_single_source_correlacion_frame(
         filtered_df,
         selected_range,
@@ -1836,6 +1848,18 @@ def _render_ponderosa_ecowitt_values_dashboard():
     )
 
     ecowitt_variables = list(PONDEROSA_ECOWITT_VARIABLES.keys())
+    ecowitt_variables = _render_variable_visibility_selector(
+        ecowitt_variables,
+        key_prefix="ponderosa_ecowitt_only_variables",
+        label_map={
+            variable: _format_variable_display_title(PONDEROSA_ECOWITT_VARIABLES.get(variable, {}).get('title', variable))
+            for variable in ecowitt_variables
+        },
+        title="Variables visibles ECOWITT",
+        description="La seleccion se aplica a la grafica, el resumen estadistico, el detalle individual y la tabla de registros graficados.",
+        expander_label="Variables visibles ECOWITT",
+        expanded=True,
+    )
     correlation_df = _build_single_source_correlacion_frame(
         filtered_df,
         selected_range,
@@ -1883,7 +1907,15 @@ def _render_ponderosa_ecowitt_values_dashboard():
             key="mostrar_ponderosa_ecowitt_only_detalle",
             help=FILTER_HELP_TEXTS['graficas_detalladas']
         ):
-            _render_ponderosa_ecowitt_individual_charts(filtered_df, selected_range, ecowitt_resolution)
+            _render_ponderosa_source_individual_charts(
+                filtered_df,
+                selected_range,
+                ecowitt_variables,
+                ("ECOWITT",),
+                "Variables individuales ECOWITT Ponderosa",
+                "Estas graficas muestran las variables ECOWITT/MCI seleccionadas, sin mezclar la luminosidad de APOGEE.",
+                ecowitt_resolution
+            )
 
     with tab_records:
         _render_graphed_series_table(
@@ -3420,6 +3452,18 @@ def _render_ponderosa_ecowitt_dashboard(df_variables_all, df_cortinas_all, selec
     if not compared_variables:
         st.warning("No hay variables compartidas disponibles para comparar WIGA / ECOWITT en este periodo.")
         st.stop()
+    compared_variables = _render_variable_visibility_selector(
+        compared_variables,
+        key_prefix="ponderosa_ecowitt_comparison_variables",
+        label_map={
+            variable: _format_variable_display_title(PONDEROSA_COMPARISON_VARIABLES.get(variable, {}).get('title', variable))
+            for variable in compared_variables
+        },
+        title="Variables activas WIGA / ECOWITT",
+        description="Estos botones controlan la grafica principal, el analisis estadistico, los detalles individuales y las tablas de soporte.",
+        expander_label="Variables visibles de la comparativa",
+        expanded=True,
+    )
 
     if st.session_state.get("ponderosa_ecowitt_stats_variable") not in compared_variables:
         st.session_state["ponderosa_ecowitt_stats_variable"] = compared_variables[0]
