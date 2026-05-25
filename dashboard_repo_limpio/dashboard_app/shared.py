@@ -11,14 +11,8 @@ def _limpiar_columnas(df):
 
 
 def _build_normalized_text_key(value):
-    text = str(value).replace('Âµ', 'u').replace('Â°', ' ')
+    text = str(value).replace('µ', 'u').replace('°', ' ')
     return _normalize_text_key_cached(text)
-    normalized = unicodedata.normalize('NFKD', str(value))
-    normalized = ''.join(char for char in normalized if not unicodedata.combining(char))
-    normalized = normalized.replace('µ', 'u').replace('°', ' ')
-    normalized = normalized.lower()
-    normalized = re.sub(r'[^a-z0-9]+', ' ', normalized)
-    return re.sub(r'\s+', ' ', normalized).strip()
 
 
 def _parse_date_series(date_series):
@@ -148,6 +142,34 @@ def _date_input_with_state(label, default_value, key, min_value, max_value, help
 
 def _loading_context(enabled, message):
     return st.spinner(message, show_time=True) if enabled else nullcontext()
+
+
+def _render_loading_stage(title, message):
+    st.markdown(
+        f"""
+        <div class="initial-loading-card">
+            <p class="series-control-kicker">{html.escape(title)}</p>
+            <h3 class="series-control-title">{html.escape(message)}</h3>
+            <p class="series-control-copy">La primera carga prepara y guarda los datos en cache; luego los cambios de vista responden mas rapido.</p>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+
+def _render_lazy_section_selector(options, key, label="Seccion"):
+    options = list(options)
+    if not options:
+        return None
+    if st.session_state.get(key) not in options:
+        st.session_state[key] = options[0]
+    selected = st.segmented_control(
+        label,
+        options=options,
+        key=key,
+        width="stretch"
+    )
+    return selected if selected in options else options[0]
 
 
 def _get_sidebar_default_range_end(fecha_inicio, max_date, default_days=7):
@@ -1291,6 +1313,93 @@ def _render_info_panels(
 def _selector_state_key(var_name):
     safe_name = re.sub(r'[^a-z0-9]+', '_', str(var_name).lower()).strip('_')
     return f'variables_correlacion_{safe_name}'
+
+
+def _variable_visibility_state_key(namespace, var_name):
+    safe_namespace = _build_normalized_text_key(namespace).replace(' ', '_')
+    safe_name = _build_normalized_text_key(var_name).replace(' ', '_')
+    return f'{safe_namespace}_{safe_name}'
+
+
+def _set_variable_visibility_state(namespace, options, selected_options):
+    selected_options = set(selected_options or [])
+    for option in options:
+        st.session_state[_variable_visibility_state_key(namespace, option)] = option in selected_options
+
+
+def _get_variable_visibility_selection(namespace, options):
+    selected_options = [
+        option
+        for option in options
+        if st.session_state.get(_variable_visibility_state_key(namespace, option), True)
+    ]
+    if not selected_options and options:
+        first_option = options[0]
+        st.session_state[_variable_visibility_state_key(namespace, first_option)] = True
+        selected_options = [first_option]
+    return selected_options
+
+
+def _render_variable_visibility_selector(
+    available_vars,
+    key_prefix,
+    label_map=None,
+    title="Variables visibles",
+    description="Selecciona las variables que quieres mantener activas en las graficas, resumenes y registros.",
+    kicker="Selector de lectura",
+    expander_label="Configurar variables visibles",
+    expanded=False,
+    default_selected=None,
+    max_columns=4,
+):
+    available_vars = list(dict.fromkeys([var_name for var_name in available_vars if var_name]))
+    if not available_vars:
+        st.info("No hay variables disponibles para el rango seleccionado.")
+        return []
+
+    label_map = label_map or {}
+    default_selected = available_vars if default_selected is None else list(default_selected)
+    for var_name in available_vars:
+        state_key = _variable_visibility_state_key(key_prefix, var_name)
+        if state_key not in st.session_state:
+            st.session_state[state_key] = var_name in default_selected
+
+    with st.expander(expander_label, expanded=expanded):
+        st.markdown(
+            f"""
+            <div class="series-control-card">
+                <p class="series-control-kicker">{html.escape(kicker)}</p>
+                <h3 class="series-control-title">{html.escape(title)}</h3>
+                <p class="series-control-copy">{html.escape(description)}</p>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+        st.markdown('<p class="series-toolbar-label">Acciones rapidas</p>', unsafe_allow_html=True)
+        action_col, clear_col, info_col = st.columns([0.24, 0.24, 0.52], vertical_alignment="center")
+        with action_col:
+            if st.button("Seleccionar todas", key=f"{key_prefix}_select_all", width="stretch"):
+                _set_variable_visibility_state(key_prefix, available_vars, available_vars)
+        with clear_col:
+            if st.button("Quitar todas", key=f"{key_prefix}_clear_all", width="stretch"):
+                _set_variable_visibility_state(key_prefix, available_vars, [])
+        with info_col:
+            st.markdown(
+                '<p class="series-chip-note series-chip-note--compact">El dashboard conserva al menos una variable activa para evitar graficas vacias.</p>',
+                unsafe_allow_html=True
+            )
+
+        st.markdown('<div class="series-toolbar-spacer"></div>', unsafe_allow_html=True)
+        option_columns = st.columns(min(max_columns, max(1, len(available_vars))))
+        for idx, var_name in enumerate(available_vars):
+            with option_columns[idx % len(option_columns)]:
+                st.checkbox(
+                    label_map.get(var_name, VARIABLE_SELECTOR_LABELS.get(var_name, VARIABLE_LABELS.get(var_name, var_name))),
+                    key=_variable_visibility_state_key(key_prefix, var_name),
+                    help=VARIABLE_FILTER_HELP.get(var_name, FILTER_HELP_TEXTS['series_visibles'])
+                )
+
+    return _get_variable_visibility_selection(key_prefix, available_vars)
 
 
 def _reset_correlacion_selector(options):
