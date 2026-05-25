@@ -17,8 +17,6 @@ SUPABASE_TABLES = {
 SUPABASE_PAGE_SIZE = 1000
 SUPABASE_MAX_WORKERS = 16
 SUPABASE_CACHE_TTL_SECONDS = 3600
-DEFAULT_SUPABASE_URL = "https://jteuezxtnetehcwhaqxo.supabase.co"
-DEFAULT_SUPABASE_KEY = "sb_publishable_hPoxF8y42vqbJDg5Uu4zQQ_HXATf7Ku"
 
 
 def _get_secret_value(*names):
@@ -55,19 +53,20 @@ def get_supabase_settings():
     url = _normalize_secret_value(_get_secret_value("SUPABASE_URL", "supabase_url"))
     key = _normalize_secret_value(_get_secret_value("SUPABASE_KEY", "SUPABASE_ANON_KEY", "supabase_key"))
     if not _is_valid_supabase_url(url):
-        url = DEFAULT_SUPABASE_URL
+        raise RuntimeError(
+            "Falta SUPABASE_URL o no tiene el formato esperado. Configuralo en "
+            "Streamlit Secrets o como variable de entorno."
+        )
     if not _is_valid_supabase_key(key):
-        key = DEFAULT_SUPABASE_KEY
+        raise RuntimeError(
+            "Falta SUPABASE_KEY o no tiene el formato esperado. Configurala en "
+            "Streamlit Secrets o como variable de entorno."
+        )
     return url.rstrip("/"), key
 
 
 def _get_supabase_setting_candidates():
-    configured_url, configured_key = get_supabase_settings()
-    candidates = [(configured_url, configured_key)]
-    default_pair = (DEFAULT_SUPABASE_URL, DEFAULT_SUPABASE_KEY)
-    if default_pair not in candidates:
-        candidates.append(default_pair)
-    return candidates
+    return [get_supabase_settings()]
 
 
 def supabase_is_configured():
