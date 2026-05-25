@@ -96,6 +96,25 @@ def run():
         _render_greenhouse_analysis_dashboard()
         st.stop()
 
+    if dashboard_mode == "ECOWITT":
+        _render_loading_stage("Carga optimizada", "Preparando variables ECOWITT de Ponderosa")
+        with _loading_context(
+            st.session_state.get("ponderosa_ecowitt_only_modo_fechas") == "Varios días",
+            "Cargando variables ECOWITT de Ponderosa..."
+        ):
+            _render_ponderosa_ecowitt_values_dashboard()
+        st.stop()
+
+    if dashboard_mode == "APOGEE":
+        _render_loading_stage("Carga optimizada", "Preparando luminosidad APOGEE de Ponderosa")
+        with _loading_context(
+            st.session_state.get("ponderosa_apogee_modo_fechas") == "Varios días",
+            "Cargando luminosidad APOGEE de Ponderosa..."
+        ):
+            _render_ponderosa_apogee_values_dashboard()
+        st.stop()
+
+    _render_loading_stage("Carga inicial", "Preparando datos del dashboard")
     _df_variables_all, _df_cortinas_all = cargar_dashboard_completo()
 
     if dashboard_mode == "WIGA":
@@ -550,14 +569,14 @@ def run():
             elif datos_cortinas_sel.empty:
                 st.info("No hay información de motores para este periodo. Se mostrarán las variables ambientales disponibles.")
 
-            tab_chart, tab_observations, tab_stats, tab_detail, tab_records = st.tabs([
+            selected_correlacion_section = _render_lazy_section_selector([
                 "Gráfica",
                 "Observaciones del bloque",
                 "Análisis estadístico",
                 "Gráficas individuales",
                 "Registros"
-            ])
-            with tab_chart:
+            ], key="ponderosa_wiga_cortinas_section", label="Contenido")
+            if selected_correlacion_section == "Gráfica":
                 selected_vars = _render_correlacion_series_panel(
                     available_correlacion_vars,
                     selected_block_code,
@@ -588,7 +607,7 @@ def run():
                                 compare_with_almacen=st.session_state.get('comparar_con_almacen', False)
                             )
 
-            with tab_observations:
+            if selected_correlacion_section == "Observaciones del bloque":
                 _render_chart_explanation(
                     "Observaciones, modificación y estado de culatas",
                     "Esta lectura consolida las anotaciones operativas del bloque, la modificación configurada y el estado de culatas del periodo seleccionado.",
@@ -613,7 +632,7 @@ def run():
                         culatas_by_day=culatas_by_day
                     )
 
-            with tab_stats:
+            if selected_correlacion_section == "Análisis estadístico":
                 stats_variables = [variable for variable in variables_sensor if variable in df_variables_corr.columns]
                 variable_stat_configs = {
                     variable_name: {
@@ -631,7 +650,7 @@ def run():
                     block_label=block_label
                 )
 
-            with tab_detail:
+            if selected_correlacion_section == "Gráficas individuales":
                 _render_temperature_focus_chart(
                     df_variables_corr,
                     fecha_variables,
@@ -640,7 +659,7 @@ def run():
                     datos_cortinas_sel=datos_cortinas_sel
                 )
 
-            with tab_records:
+            if selected_correlacion_section == "Registros":
                 _render_correlacion_records_tab(
                     df_variables_corr,
                     datos_sensores_corr,
@@ -652,77 +671,3 @@ def run():
 
             st.stop()
 
-            if not df_variables_corr.empty and available_correlacion_vars:
-                if not selected_vars:
-                    st.warning('Selecciona al menos una variable para mostrar la correlación.')
-                else:
-                    with _loading_context(
-                        st.session_state.get("modo_fechas_compartidas") == "Varios días",
-                        "Cargando gráficas de correlación..."
-                    ):
-                        _render_correlacion(
-                            df_variables_corr,
-                            datos_cortinas_sel,
-                            fecha_variables,
-                            selected_vars,
-                            block_label=block_label,
-                            show_ideal_aperturas=st.session_state.get('mostrar_aperturas_ideales', False),
-                            df_variables_almacen=df_variables_almacen_corr,
-                            compare_with_almacen=st.session_state.get('comparar_con_almacen', False)
-                        )
-
-            if (
-                block_label or
-                block_modification or
-                culatas_observation or
-                daily_annotations or
-                culatas_by_day or
-                annotations_by_day
-            ):
-                _render_info_panels(
-                    block_label,
-                    block_modification,
-                    culatas_observation,
-                    daily_annotations,
-                    rango_multiple,
-                    annotations_by_day=annotations_by_day,
-                    culatas_by_day=culatas_by_day
-                )
-
-            _render_summary_cards_selector(
-                df_variables_corr,
-                fecha_variables,
-                df_reference=summary_reference_df,
-                reference_label='Estación externa',
-                base_label=block_label
-            )
-
-            _render_temperature_focus_chart(
-                df_variables_corr,
-                fecha_variables,
-                block_label=block_label,
-                df_external=df_variables_almacen_corr,
-                datos_cortinas_sel=datos_cortinas_sel
-            )
-
-            record_content_options = ["Ocultar registros", "Sensores", "Cortinas"]
-            if st.session_state.get("vista_registros_correlacion") not in record_content_options:
-                st.session_state["vista_registros_correlacion"] = record_content_options[0]
-            selected_record_content = st.segmented_control(
-                "Registros",
-                options=record_content_options,
-                key="vista_registros_correlacion",
-                help=FILTER_HELP_TEXTS['registros'],
-                width="stretch"
-            )
-
-            if selected_record_content == "Sensores":
-                if datos_sensores_corr.empty:
-                    st.info("No hay registros de sensores para los filtros seleccionados.")
-                else:
-                    _dataframe(datos_sensores_corr)
-            elif selected_record_content == "Cortinas":
-                if datos_cortinas_sel.empty:
-                    st.info("No hay registros de cortinas para los filtros seleccionados.")
-                else:
-                    _dataframe(datos_cortinas_sel)
